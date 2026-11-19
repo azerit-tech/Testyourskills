@@ -7,6 +7,8 @@
 // La page d'une bande a trois états (SPEC §18.48) : sans fiche (le formulaire,
 // et la bande suit jusqu'à la fiche posée), avec une fiche (« Rejoindre avec ma
 // fiche »), membre (son apport, « Partager la bande » en bouton principal).
+// Sous ses fiches (à côté, au bureau), le classement de sa ligue, sa ligne
+// marquée (§18.87).
 // Serveur muet : « le commissariat ne répond pas », jamais « introuvable ».
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
@@ -14,7 +16,7 @@ import type { BandBoard, BandMember, BandPage as BandPageData, BandStanding, Ban
 import { BAND_TYPES, bandPath } from "../../../shared/bands";
 import { Avatar } from "../components/Avatar";
 import { useBandShare } from "../components/BandPick";
-import { BandRow } from "../components/BandRow";
+import { BandLists } from "../components/BandLists";
 import { BandSlots } from "../components/BandSlots";
 import { BusyDots } from "../components/Busy";
 import { BandNotFound, Unreachable } from "../components/ErrorPage";
@@ -78,40 +80,7 @@ export function BoardPanel({ board, type, on, onShare, native }: PanelProps) {
       {/* au bureau, le titre de la colonne ; au téléphone, l'onglet le dit déjà */}
       <h2 className="bands-league">{t.bands.league[type]}</h2>
       {mine && mine.rank === null && <MineForming band={mine} onShare={onShare} native={native} />}
-      {board.entries.length > 0 && (
-        <div className="board-top">
-          <p className="board-tag">{tb.ranked}</p>
-          <span className="board-scale" aria-hidden>
-            {tb.scale}
-          </span>
-          <ol className="board-list is-top">
-            {board.entries.map((b) => (
-              <BandRow key={b.id} b={b} />
-            ))}
-          </ol>
-        </div>
-      )}
-      {mine && mine.rank !== null && (
-        <div className="board-top bands-yours">
-          <p className="board-tag">{tb.yours}</p>
-          <span className="board-scale" aria-hidden>
-            {tb.scale}
-          </span>
-          <ol className="board-list is-top">
-            <BandRow b={mine} />
-          </ol>
-        </div>
-      )}
-      {board.forming.length > 0 && (
-        <div className="board-top bands-forming">
-          <p className="board-tag">{t.bands.forming}</p>
-          <ul className="board-list is-top">
-            {board.forming.map((b) => (
-              <BandRow key={b.id} b={b} />
-            ))}
-          </ul>
-        </div>
-      )}
+      <BandLists entries={board.entries} lower={mine && mine.rank !== null ? { tag: tb.yours, band: mine } : null} forming={board.forming} />
       {nothing && <p className="bands-empty">{t.bands.none.league[type]}</p>}
     </section>
   );
@@ -144,7 +113,7 @@ export function Bands() {
   // Rien à montrer : ni bande au tableau, ni bande en formation, ni la sienne.
   const empty = BAND_TYPES.every((k) => data[k].entries.length === 0 && data[k].forming.length === 0 && !data[k].extra);
   // Le partage de sa bande en formation : le même que sur sa page.
-  const shareBand = (band: BandStanding) => void share(band, t.bands.page.shareText(band.label, t.bands.rank(band)), mine?.id ?? null);
+  const shareBand = (band: BandStanding) => void share(band, t.bands.page.shareText(band), mine?.id ?? null);
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
     const next = type === "ecole" ? "boite" : "ecole";
@@ -207,6 +176,59 @@ export function Bands() {
 }
 
 /* ---------- /bandes/:type/:id ---------- */
+
+/** Le tableau de la ligue vu depuis une bande : dix lignes au tableau, cinq en formation, et la bande elle-même, toujours. */
+export const PAGE_BOARD_ROWS = 10;
+export const PAGE_FORMING_ROWS = 5;
+
+/**
+ * Les listes du classement d'une page de bande. La bande de la page fait foi pour sa propre
+ * place (plus fraîche que le tableau, gardé une minute) : au tableau dans les dix premières,
+ * sinon seule sous « Cette bande » ; en formation, à sa place parmi les bandes en formation.
+ */
+export function boardAround(board: BandBoard, band: BandStanding): { entries: BandStanding[]; lower: BandStanding | null; forming: BandStanding[] } {
+  const others = (list: BandStanding[]) => list.filter((b) => b.id !== band.id);
+  const waiting = others(board.forming).slice(0, PAGE_FORMING_ROWS);
+  if (band.rank !== null) {
+    const top = board.entries.slice(0, PAGE_BOARD_ROWS);
+    const inTop = top.some((b) => b.id === band.id);
+    return { entries: top.map((b) => (b.id === band.id ? band : b)), lower: inTop ? null : band, forming: waiting };
+  }
+  // En formation : devant les bandes qui n'ont pas plus de dossiers ni plus d'étoiles qu'elle.
+  const at = waiting.findIndex((b) => b.members < band.members || (b.members === band.members && b.score <= band.score));
+  const forming = at < 0 ? [...waiting.slice(0, PAGE_FORMING_ROWS - 1), band] : [...waiting.slice(0, at), band, ...waiting.slice(at)].slice(0, PAGE_FORMING_ROWS);
+  return { entries: others(board.entries).slice(0, PAGE_BOARD_ROWS), lower: null, forming };
+}
+
+/** L'adresse de /bandes ouverte sur une ligue ; la requête en cours (?mock=1, ?lang=) est gardée. */
+function leagueHref(type: BandType): string {
+  const q = new URLSearchParams(typeof window === "undefined" ? "" : window.location.search);
+  q.set("t", type);
+  return `/bandes?${q.toString()}`;
+}
+
+/** « Le classement » sur la page d'une bande : sa ligue, sa ligne marquée, puis le lien vers tous les tableaux. */
+export function BandBoardSection({ board, band }: { board: BandBoard | null; band: BandStanding }) {
+  const { t } = useT();
+  const tp = t.bands.page;
+  const href = leagueHref(band.type);
+  const lists = board ? boardAround(board, band) : null;
+  return (
+    <section className="band-board" aria-labelledby="band-board-title" aria-busy={!lists}>
+      <h2 id="band-board-title">{tp.board}</h2>
+      {lists && (
+        <>
+          {/* rien au tableau : la règle d'abord, puis les bandes en formation */}
+          {lists.entries.length === 0 && !lists.lower && <p className="band-board-note">{t.bands.board.rule}</p>}
+          <BandLists entries={lists.entries} lower={lists.lower ? { tag: tp.thisBand, band: lists.lower } : null} forming={lists.forming} current={band.id} />
+        </>
+      )}
+      <a className="link-alt" href={href} onClick={(e) => onLinkClick(e, href)}>
+        {tp.all}
+      </a>
+    </section>
+  );
+}
 
 /** Le nombre de signes du plus long mot d'un nom : « CentraleSupélec » → 15. */
 export function longestWord(label: string): number {
@@ -378,6 +400,8 @@ export function BandPage({ type, id }: { type: BandType; id: string }) {
   const toast = useToast();
   const { share, native } = useBandShare(toast.show);
   const page = useRemote<BandPageData>(() => bandsApi.page(type, id), [type, id]);
+  // Le tableau de sa ligue, avec elle dedans même plus bas ou en formation ; muet, la section ne sort pas.
+  const league = useRemote<BandBoard>(() => bandsApi.board(type, id), [type, id]);
   const [mine] = useState<MyCard | null>(() => myCard());
   const [mb, setMb] = useState<MyBands | null | undefined>(undefined);
 
@@ -422,13 +446,15 @@ export function BandPage({ type, id }: { type: BandType; id: string }) {
   // La répartition seulement si la page a reçu toutes les fiches anonymes (le serveur en envoie 50 au plus).
   const anonList = data.members.filter((m) => !m.login || !m.cardId);
   const spread = anonList.length === anonymous ? starSpread(anonList) : null;
-  const shareBand = () => void share(band, tp.shareText(band.label, rank), mine?.id ?? null);
+  const shareBand = () => void share(band, tp.shareText(band), mine?.id ?? null);
+  // Le retour ouvre /bandes sur sa ligue.
+  const backHref = leagueHref(band.type);
 
   return (
     <main className="page page-band" id="main">
       <div className="band-side">
         <section className="band">
-          <a className="link-back" href="/bandes" onClick={(e) => onLinkClick(e, "/bandes")}>
+          <a className="link-back" href={backHref} onClick={(e) => onLinkClick(e, backHref)}>
             ← {tp.all}
           </a>
           <p className="label">{t.bands.kicker[band.type]}</p>
@@ -481,6 +507,7 @@ export function BandPage({ type, id }: { type: BandType; id: string }) {
           {anonymous > 0 && named.length === 0 && <p className="band-more">{t.bands.states.claimHint}</p>}
           {band.members === 0 && <p className="bands-empty">{tp.rosterNone}</p>}
         </section>
+        {league.s !== "down" && league.s !== "none" && <BandBoardSection board={league.s === "ok" ? league.data : null} band={band} />}
         {/* une bande de boîte : le bloc recruteur de la page d'une fiche, au nom de la boîte */}
         {band.type === "boite" && (
           <section className="after-block hire band-hire" aria-labelledby="band-hire-title">

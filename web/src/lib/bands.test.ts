@@ -46,6 +46,14 @@ describe("la ligne du rang", () => {
     expect(en.bands.rank(b({ rank: null, missing: 1, gap: null, ahead: null }))).toBe("Crew forming: 1 more sheet needed.");
   });
 
+  it("le partage d'une bande : une seule phrase avant l'appel, jamais deux deux-points de suite", () => {
+    const forming = { ...b({ rank: null, missing: 2, gap: null, ahead: null }), label: "CentraleSupélec" };
+    expect(fr.bands.page.shareText(forming)).toBe("CentraleSupélec est en formation\u00a0: encore 2\u00a0fiches pour entrer au tableau. Viens grossir les rangs\u00a0:");
+    expect(en.bands.page.shareText(forming)).toBe("CentraleSupélec is forming: 2\u00a0more sheets to make the board. Come add your stars:");
+    expect(fr.bands.page.shareText({ ...b({}), label: "Epitech" })).toBe("Epitech\u00a0: 3e des écoles, à 6\u00a0étoiles de la 2e. Viens grossir les rangs\u00a0:");
+    expect(en.bands.page.shareText({ ...b({}), label: "Epitech" })).toBe("Epitech: #3 among schools, 6\u00a0stars behind #2. Come add your stars:");
+  });
+
   it("les étoiles pleines seulement", () => {
     expect(starLine(4)).toBe("★★★★☆☆");
     expect(starLine(9)).toBe("★★★★★★");
@@ -82,6 +90,8 @@ describe("les textes des bandes", () => {
         ...all(dict.bands),
         dict.bands.rank(b({})),
         dict.bands.pick.shareText("★★★★", "Epitech", dict.bands.rank(b({}))),
+        dict.bands.page.shareText({ ...b({}), label: "Epitech" }),
+        dict.bands.page.shareText({ ...b({ rank: null, missing: 2 }), label: "Epitech" }),
         dict.bands.page.recruiter("Doctolib"),
         dict.bands.page.make("Epitech"),
       ];
