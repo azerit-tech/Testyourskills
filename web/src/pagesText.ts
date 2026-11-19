@@ -282,7 +282,7 @@ const fr = {
         h: "Supprimer ta fiche",
         blocks: [
           "« Supprimer ma fiche », sous ta fiche, l'efface tout de suite, avec ses images.",
-          "Depuis un autre appareil : « C'est moi » prouve que le compte GitHub est le tien, puis tu la masques ou tu la supprimes.",
+          "Depuis un autre appareil : reconnecte-toi avec LinkedIn ou GitHub, ou « C'est moi » prouve que le compte GitHub est le tien, puis tu la masques ou tu la supprimes.",
         ],
       },
       {
@@ -309,7 +309,18 @@ const fr = {
         blocks: [
           "« Se connecter avec LinkedIn » : LinkedIn nous donne ton nom, ta photo et ton email vérifié. Le nom et la photo servent à retrouver ton profil public ; l'email, à retrouver ton GitHub par la recherche publique de GitHub. Ton email est gardé avec ta fiche, comme si tu l'avais laissé dessous : il rejoint les contacts d'Azerit et part avec la fiche. Aucun jeton de connexion n'est gardé.",
           "La recherche par nom passe par un service tiers de collecte de profils publics (nom, titre, photo) et par la recherche publique de GitHub ; ses résultats sont gardés 24 heures.",
-          "« Se connecter avec GitHub » : GitHub nous donne ton pseudo, rien d'autre.",
+          "« Se connecter avec GitHub » : GitHub nous donne ton pseudo et ton identifiant publics, rien d'autre.",
+        ],
+      },
+      {
+        h: "Ton compte",
+        blocks: [
+          [
+            "Te connecter avec LinkedIn ou GitHub crée ton compte, sans mot de passe : te reconnecter, sur n'importe quel appareil, te ramène à ta fiche.",
+            "On garde un identifiant tiré au hasard, ton identifiant GitHub public ou une empreinte de ton identifiant LinkedIn, deux dates (création, dernière visite) et le lien vers ta fiche. Ni mot de passe, ni jeton, ni nom, ni photo, ni email.",
+            "Un cookie signé, valable 180 jours, te garde connecté. « Se déconnecter » l'efface.",
+            "Supprimer ta fiche depuis ton compte supprime aussi ton compte.",
+          ],
         ],
       },
       {
@@ -505,7 +516,18 @@ const en: PagesDict = {
         blocks: [
           "“Sign in with LinkedIn”: LinkedIn gives us your name, picture and verified email. The name and picture are used to find your public profile; the email, to find your GitHub through GitHub's public search. Your email is kept with your sheet, as if you had left it underneath: it joins Azerit's contacts and is deleted with the sheet. No sign-in token is kept.",
           "The name search goes through a third-party service that collects public profiles (name, headline, picture) and through GitHub's public search; its results are kept for 24 hours.",
-          "“Sign in with GitHub”: GitHub gives us your username, nothing else.",
+          "“Sign in with GitHub”: GitHub gives us your public username and ID, nothing else.",
+        ],
+      },
+      {
+        h: "Your account",
+        blocks: [
+          [
+            "Signing in with LinkedIn or GitHub creates your account, with no password: signing in again, on any device, takes you back to your sheet.",
+            "We keep a randomly drawn identifier, your public GitHub ID or a hash of your LinkedIn ID, two dates (created, last visit) and the link to your sheet. No password, no token, no name, no picture, no email.",
+            "A signed cookie, valid for 180 days, keeps you signed in. “Sign out” erases it.",
+            "Deleting your sheet from your account deletes your account too.",
+          ],
         ],
       },
       {
