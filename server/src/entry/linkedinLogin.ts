@@ -1,14 +1,16 @@
-// « Se connecter avec LinkedIn » (SPEC §18.80) : entrer sans rien taper.
+// « Se connecter avec LinkedIn » (SPEC §18.80, §18.85) : entrer sans rien taper.
 //
 // L'API de LinkedIn ne rend jamais l'adresse du profil sans accès partenaire :
 // « Sign in with LinkedIn » donne un nom, une photo et un email vérifié. La
 // certitude vient donc de l'email et de la photo :
 //
 //  1. le profil : recherche inverse par l'email, si un fournisseur la propose ;
-//     sinon recherche par nom, et la photo rendue par LinkedIn comparée à celle
-//     de chaque homonyme (photoHash.ts). Un seul profil à la même photo : c'est
-//     lui, la fiche part sans rien demander. Sinon « C'est toi ? », trois
-//     candidats au plus ;
+//     sinon recherche par nom dans un index web (une seconde), avec l'employeur
+//     que dit le domaine de l'email ; les trois premiers profils à ce nom sont
+//     lus (quatre secondes, ensemble), et la photo rendue par LinkedIn comparée à
+//     la leur (photoHash.ts). Un seul profil à la même photo : c'est lui, la
+//     fiche part sans rien demander. À défaut, le seul profil qui porte le nom et
+//     l'employeur. Sinon « C'est toi ? », trois candidats au plus ;
 //  2. le GitHub : par l'email (un commit signé de cette adresse, une preuve),
 //     sinon par le nom (le seul compte à ce nom, un indice), github/identity.ts.
 //     Les liens GitHub du profil LinkedIn, lus plus tard par le pipeline,
@@ -23,12 +25,14 @@ import { randomBytes } from "node:crypto";
 import type { Context, Hono } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import type { LinkedinSuggestion } from "../../../shared/entry";
+import type { ProfilePeek } from "../linkedinProfile/index";
+import { confidenceFor } from "../linkedinProfile/webSearch";
 import { sign, unsign } from "../auth";
 import { resolveGithubIdentity, type GithubIdentity, type IdentityInput } from "../github/identity";
 import type { GithubAuth } from "../github/http";
 import { downloadPhoto, type LinkedinEnterHook, type OidcProfile } from "../linkedin";
-import { SEARCHES_PER_IP, type LinkedinCandidate, type LinkedinPeople } from "../linkedinProfile/search";
-import { samePublicFullName } from "../names";
+import { PERSONAL_MAIL_RE, SEARCHES_PER_IP, type LinkedinCandidate, type LinkedinPeople } from "../linkedinProfile/search";
+import { nameWords, samePublicFullName } from "../names";
 import { clientIp, type RateLimiter } from "../ratelimit";
 import { toSuggestion } from "./linkedinSearch";
 import { licdnImageId, photoHash, samePhotoHash } from "./photoHash";
@@ -41,15 +45,22 @@ export const ENTER_STARTS_PER_DAY = 20;
 export const PICKER_MAX = 3;
 /** Homonymes dont la photo est comparée. */
 const PHOTOS_COMPARED = 8;
-/** Au-delà, la réponse part sans attendre : le front montre le champ. */
-const RESOLVE_WAIT_MS = 28_000;
+/** Profils lus par IP et par jour pour reconnaître qui se connecte (trois par connexion). */
+export const PEEKS_PER_IP = 30;
+/** Une lecture de profil qui traîne n'est plus attendue. */
+const PEEK_WAIT_MS = 20_000;
+/** Une demande du front attend la recherche ce temps-là, puis répond « pending » : il redemande. */
+export const POLL_WAIT_MS = 20_000;
+/** Au-delà (l'index lent a 90 s), la recherche est dite en panne. */
+export const RESOLVE_MAX_MS = 100_000;
 const SESSIONS_MAX = 5000;
 
 /** Ce que la recherche a établi pour une personne connectée. */
 export interface Resolution {
   /** Le profil sûr (email ou photo), sinon null. */
   sure: LinkedinCandidate | null;
-  how: "email" | "photo" | null;
+  /** « employer » : le seul profil au nom et à l'employeur de l'email. La fiche part, sans valoir une preuve. */
+  how: "email" | "photo" | "employer" | null;
   /** Les homonymes à proposer quand rien n'est sûr. */
   candidates: LinkedinCandidate[];
   github: GithubIdentity | null;
@@ -86,8 +97,12 @@ export interface LinkedinEnterOptions {
   github: GithubAuth;
   /** Le GitHub d'après l'identité ; les tests en donnent un faux. */
   resolveGithub?: (auth: GithubAuth, who: IdentityInput) => Promise<GithubIdentity | null>;
+  /** Le nom, le titre et la photo d'un profil (une lecture payée) ; absent : seules les photos que la recherche donne sont comparées. */
+  peek?: (url: string, opts: { spend: () => boolean; signal?: AbortSignal }) => Promise<ProfilePeek | null>;
   /** « Même photo ? » ; les tests en donnent un faux. */
   samePhoto?: (a: string, b: string) => Promise<boolean>;
+  /** Attente d'une demande du front avant « pending » (les tests la raccourcissent). */
+  pollWaitMs?: number;
   now?: () => number;
 }
 
@@ -112,12 +127,35 @@ export function photoMatcher(fetchImpl: typeof fetch): (a: string, b: string) =>
   };
 }
 
+/**
+ * L'employeur que dit un email vérifié : le nom de son domaine (« paysolde » pour
+ * camille@paysolde.io), jamais celui d'une messagerie personnelle, ni un domaine
+ * au nom de la personne (camille@ardent.dev ne départage aucune Camille Ardent).
+ * Il ne sert qu'à classer les homonymes d'une recherche.
+ */
+export function employerFromEmail(email: string | undefined, name?: string): string | null {
+  if (!email || PERSONAL_MAIL_RE.test(email)) return null;
+  const parts = email
+    .slice(email.lastIndexOf("@") + 1)
+    .toLowerCase()
+    .split(".")
+    .filter(Boolean);
+  if (parts.length < 2) return null;
+  let i = parts.length - 2;
+  // « acme.co.uk », « ecole.ac.jp » : le nom est un cran plus à gauche.
+  if (i > 0 && parts[parts.length - 1]!.length === 2 && /^(co|com|ac|org|gov|edu|net)$/.test(parts[i]!)) i--;
+  const label = parts[i]!;
+  if (!/^[a-z0-9-]{2,40}$/.test(label)) return null;
+  return nameWords(name).some((w) => w.length >= 3 && label.includes(w)) ? null : label;
+}
+
 export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
   const secret = o.secret ?? randomBytes(32).toString("base64url");
   const now = o.now ?? Date.now;
   const sessions = new Map<string, Session>();
   const cookieBase = { httpOnly: true, secure: o.secure, sameSite: "Lax" as const, path: "/" };
   const resolveGithub = o.resolveGithub ?? resolveGithubIdentity;
+  const pollWait = o.pollWaitMs ?? POLL_WAIT_MS;
 
   const sweep = () => {
     for (const [k, s] of sessions) if (s.exp < now()) sessions.delete(k);
@@ -141,10 +179,27 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
       out.sure = byEmail;
       out.how = "email";
     } else {
-      const found = await o.people.byName(who.name, { strict: true, spend });
+      const found = await o.people.byName(who.name, { strict: true, company: employerFromEmail(who.email, who.name), spend });
       if (found.status === "off") out.off = true;
       const all = found.status === "ok" ? found.results : [];
-      const same = all.filter((c) => samePublicFullName(who.name, c.name));
+      let same = all.filter((c) => samePublicFullName(who.name, c.name));
+      // Un index web ne donne pas de photo : les premiers profils à ce nom sont lus, ensemble.
+      // Leur lecture entre au cache : la fiche qui part ensuite ne la repaie pas.
+      const peek = o.peek;
+      if (peek) {
+        const signal = AbortSignal.timeout(PEEK_WAIT_MS);
+        const read = await Promise.all(
+          same.map((c, i) =>
+            i < PICKER_MAX && !c.photoUrl
+              ? peek(c.url, { spend: () => o.limiter.take("li-peek", ip, PEEKS_PER_IP), signal }).catch(() => null)
+              : null,
+          ),
+        );
+        same = same.map((c, i) => {
+          const p = read[i];
+          return p ? { ...c, headline: c.headline || p.headline, ...(p.photoUrl ? { photoUrl: p.photoUrl } : {}) } : c;
+        });
+      }
       if (who.picture && same.length) {
         const samePhoto = o.samePhoto ?? photoMatcher(o.fetchImpl);
         const picture = who.picture;
@@ -156,11 +211,21 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
           out.how = "photo";
         }
       }
+      if (!out.sure) {
+        // Le nom et l'employeur de l'email sur un seul profil (confiance haute de l'application Azerit).
+        const strong = same.filter((c) => c.score !== undefined && confidenceFor(c.score) === "high");
+        if (strong.length === 1) {
+          out.sure = strong[0]!;
+          out.how = "employer";
+        }
+      }
       out.candidates = (same.length ? same : all).slice(0, PICKER_MAX);
     }
     out.github = await githubP;
     return out;
   }
+
+  const failed = (): Resolution => ({ sure: null, how: null, candidates: [], github: null, off: true });
 
   const hook: LinkedinEnterHook = {
     allow: (c) => o.limiter.take("li-enter", clientIp(c), ENTER_STARTS_PER_DAY),
@@ -174,7 +239,7 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
         picture: profile.picture,
         exp: now() + ENTER_TTL_MS,
         // La recherche part tout de suite : elle tourne pendant que la page se recharge.
-        resolving: resolve(who, clientIp(c)).catch((): Resolution => ({ sure: null, how: null, candidates: [], github: null, off: true })),
+        resolving: Promise.race([resolve(who, clientIp(c)), new Promise<Resolution>((res) => setTimeout(() => res(failed()), RESOLVE_MAX_MS).unref?.())]).catch(failed),
       };
       void session.resolving.then((r) => (session.resolved = r));
       sessions.set(id, session);
@@ -187,17 +252,18 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
 
   // GET /api/entry/linkedin : ce que le front fait au retour de LinkedIn. `auto` :
   // le profil est sûr, la fiche part. Sinon `candidates` pour « C'est toi ? ».
-  // Jamais l'email.
+  // `pending` : la recherche tourne encore, le front redemande (son attente reste
+  // à l'écran). Jamais l'email.
   app.get("/api/entry/linkedin", async (c) => {
     c.header("Cache-Control", "no-store");
     const found = sessionOf(c);
     if (!found) return c.json({ signedIn: false });
     const { session } = found;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const r = await Promise.race([session.resolving, new Promise<null>((res) => (timer = setTimeout(() => res(null), RESOLVE_WAIT_MS)))]);
+    const r = await Promise.race([session.resolving, new Promise<null>((res) => (timer = setTimeout(() => res(null), pollWait)))]);
     clearTimeout(timer);
     const show = (x: LinkedinCandidate): LinkedinSuggestion => toSuggestion(x);
-    if (!r) return c.json({ signedIn: true, name: session.name, candidates: [], off: true });
+    if (!r) return c.json({ signedIn: true, name: session.name, candidates: [], pending: true });
     return c.json({
       signedIn: true,
       name: session.name,
@@ -222,7 +288,8 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
     return {
       email: found.session.email,
       github: r.github,
-      sureProfile: sure,
+      // Le profil au seul nom et employeur fait partir la fiche, sans valoir la preuve d'un email ou d'une photo.
+      sureProfile: sure && r.how !== "employer",
       used() {
         sessions.delete(found.id);
         deleteCookie(c, ENTER_COOKIE, cookieBase);

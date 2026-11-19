@@ -4,7 +4,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { GithubIdentity } from "../github/identity";
 import { AUTHORIZE_URL, LI_STATE_COOKIE, TOKEN_URL, USERINFO_URL } from "../linkedin";
-import { ENTER_COOKIE, ENTER_STARTS_PER_DAY } from "./linkedinLogin";
+import { ENTER_COOKIE, ENTER_STARTS_PER_DAY, PEEKS_PER_IP, employerFromEmail } from "./linkedinLogin";
 import { CAMILLE, CAMILLE_URL, HOMONYM, cardState, cookiesOf, postCard, setupEntry, type EntryCtx, type EntrySetup } from "./testing";
 
 const BASE = "https://skills.test";
@@ -47,6 +47,7 @@ function setup(o: Opts = {}) {
   const ctx = setupEntry({
     people: o.people,
     forUrl: o.forUrl,
+    peek: o.peek,
     app: {
       fetchImpl,
       leadsEndpoint: LEADS,
@@ -78,8 +79,9 @@ const entry = async (ctx: EntryCtx, jar: string) =>
     signedIn: boolean;
     name?: string;
     auto?: { url: string; name: string; headline: string; photo?: string };
-    candidates?: { url: string }[];
+    candidates?: { url: string; headline?: string; photo?: string }[];
     off?: boolean;
+    pending?: boolean;
   };
 
 const kindOf = async (ctx: EntryCtx, id: string) => ((await cardState(ctx, id)) as { kind?: string }).kind;
@@ -158,6 +160,96 @@ describe("retrouver le profil", () => {
     expect(JSON.stringify(got)).not.toContain(EMAIL);
     expect(ctx.calls.byName).toEqual([{ raw: "Camille Ardent", strict: true, spent: true }]);
     expect(asked).toEqual([{ name: "Camille Ardent", email: EMAIL }]);
+  });
+
+  it("un index web ne donne pas de photo : les trois premiers profils à ce nom sont lus, la photo désigne le sien", async () => {
+    const bare = (n: number, name = "Camille Ardent") => ({ url: `https://www.linkedin.com/in/camille-ardent-${n}`, name, headline: "", score: 0.67 - n / 100 });
+    const results = [bare(1), { ...bare(9, "Camille Autre") }, bare(2), bare(3), bare(4)];
+    const photoOf = (url: string) => `https://media.licdn.com/dms/image/v2/photo-de-${url.slice(-1)}/p/0/1`;
+    const { ctx } = setup({
+      people: { byName: () => ({ status: "ok", results }) },
+      peek: (url) => (url.endsWith("-3") ? null : { name: "Camille Ardent", headline: `Lu ${url.slice(-1)}`, photoUrl: photoOf(url) }),
+      samePhoto: (a, b) => a === PICTURE && b === photoOf("x2"),
+    });
+    const got = await entry(ctx, (await signIn(ctx)).jar);
+    // Les homonymes seulement, trois au plus ; le quatrième et l'autre nom ne sont pas lus.
+    expect(ctx.calls.peek).toEqual([bare(1).url, bare(2).url, bare(3).url]);
+    expect(got.auto).toEqual({ url: bare(2).url, name: "Camille Ardent", headline: "Lu 2", photo: photoOf("x2") });
+    expect(got.candidates).toEqual([]);
+  });
+
+  it("aucune photo ne concorde : « C'est toi ? » montre les profils lus, avec leur photo et leur titre", async () => {
+    const results = [1, 2].map((n) => ({ url: `https://www.linkedin.com/in/camille-ardent-${n}`, name: "Camille Ardent", headline: n === 1 ? "Paysolde" : "" }));
+    const { ctx } = setup({
+      people: { byName: () => ({ status: "ok", results }) },
+      peek: (url) => ({ name: "Camille Ardent", headline: "Titre lu", photoUrl: `https://media.licdn.com/dms/image/v2/p${url.slice(-1)}/p/0/1` }),
+      samePhoto: () => false,
+    });
+    const got = await entry(ctx, (await signIn(ctx)).jar);
+    expect(got.auto).toBeUndefined();
+    expect(got.candidates).toEqual([
+      { url: results[0]!.url, name: "Camille Ardent", headline: "Paysolde", photo: "https://media.licdn.com/dms/image/v2/p1/p/0/1" },
+      { url: results[1]!.url, name: "Camille Ardent", headline: "Titre lu", photo: "https://media.licdn.com/dms/image/v2/p2/p/0/1" },
+    ]);
+  });
+
+  it("trente profils lus par IP et par jour, puis la recherche continue sans les photos", async () => {
+    const results = [{ url: "https://www.linkedin.com/in/camille-ardent-1", name: "Camille Ardent", headline: "Paysolde" }];
+    const { ctx } = setup({ people: { byName: () => ({ status: "ok", results }) }, peek: () => ({ name: "Camille Ardent", headline: "", photoUrl: CAMILLE.photoUrl }) });
+    for (let i = 0; i < ENTER_STARTS_PER_DAY; i++) await entry(ctx, (await signIn(ctx)).jar);
+    expect(ctx.calls.peek).toHaveLength(ENTER_STARTS_PER_DAY);
+    expect(PEEKS_PER_IP).toBeGreaterThanOrEqual(ENTER_STARTS_PER_DAY);
+  });
+
+  it("l'employeur de l'email : cherché avec le nom ; un seul profil au nom et à l'employeur part, sans valoir une preuve", async () => {
+    const mine = { url: CAMILLE_URL, name: "Camille Ardent", headline: "Paysolde", score: 0.9 };
+    const other = { url: HOMONYM.url, name: "Camille Ardent", headline: "Mairie de Nantes", score: 0.66 };
+    const userinfo = { name: "Camille Ardent", picture: PICTURE, email: "camille@paysolde.io", email_verified: true };
+    const { ctx } = setup({ userinfo, people: { byName: () => ({ status: "ok", results: [mine, other] }) }, samePhoto: () => false });
+    const { jar } = await signIn(ctx);
+    const got = await entry(ctx, jar);
+    expect(ctx.calls.byName).toEqual([{ raw: "Camille Ardent", strict: true, spent: true, company: "paysolde" }]);
+    expect(got.auto?.url).toBe(CAMILLE_URL);
+    // Le GitHub vient de l'email, mais le profil n'est sûr ni par l'email ni par la photo : rien de prouvé.
+    const { json } = await postCard(ctx, { linkedin: CAMILLE_URL }, jar);
+    expect(await kindOf(ctx, json.id)).toBe("comparison");
+    expect(facts(ctx, json.id)?.linkedinProven).not.toBe(true);
+    expect(ctx.store.getCard(json.id)?.email).toBe("camille@paysolde.io");
+
+    // Deux profils au nom et à l'employeur : la personne choisit.
+    const twice = setup({ userinfo, people: { byName: () => ({ status: "ok", results: [mine, { ...other, score: 0.89 }] }) }, samePhoto: () => false });
+    const b = await entry(twice.ctx, (await signIn(twice.ctx)).jar);
+    expect(b.auto).toBeUndefined();
+    expect(b.candidates).toHaveLength(2);
+  });
+
+  it("l'employeur d'un email : le nom du domaine, jamais une messagerie ni un domaine au nom de la personne", () => {
+    expect(employerFromEmail("camille@paysolde.io")).toBe("paysolde");
+    expect(employerFromEmail("c.ardent@mail.acme.co.uk", "Camille Ardent")).toBe("acme");
+    expect(employerFromEmail("camille@etu.univ-lyon1.fr")).toBe("univ-lyon1");
+    expect(employerFromEmail("camille@gmail.com")).toBeNull();
+    expect(employerFromEmail("camille@ardent.dev", "Camille Ardent")).toBeNull();
+    expect(employerFromEmail("moi@camille-ardent.fr", "Camille Ardent")).toBeNull();
+    expect(employerFromEmail(undefined)).toBeNull();
+    expect(employerFromEmail("pas-un-email")).toBeNull();
+  });
+
+  it("la recherche tourne encore : « pending », le front redemande, puis la réponse", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const { ctx } = setup({
+      people: {
+        byName: async () => {
+          await gate;
+          return { status: "ok", results: [CAMILLE, HOMONYM] };
+        },
+      },
+      app: { entryPollWaitMs: 15 },
+    });
+    const { jar } = await signIn(ctx);
+    expect(await entry(ctx, jar)).toEqual({ signedIn: true, name: "Camille Ardent", candidates: [], pending: true });
+    release();
+    expect((await entry(ctx, jar)).auto?.url).toBe(CAMILLE_URL);
   });
 
   it("l'email d'abord : un profil rendu par la recherche inverse est sûr, sans recherche par nom", async () => {

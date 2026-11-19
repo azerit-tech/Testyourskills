@@ -106,6 +106,8 @@ export interface AppOptions {
   /** Le GitHub d'après l'identité LinkedIn, et « même photo ? » (§18.80). Absents : les vrais (github/identity.ts, entry/photoHash.ts). */
   githubIdentity?: LinkedinEnterOptions["resolveGithub"];
   samePhoto?: LinkedinEnterOptions["samePhoto"];
+  /** Attente d'une demande de /api/entry/linkedin avant « pending » (tests). */
+  entryPollWaitMs?: number;
   /** La trace du film (FILM_TRACE=1, filmTrace.ts) : le fichier où l'écrire. Absent : pas de route. */
   filmTraceFile?: string;
 }
@@ -340,6 +342,8 @@ export function createApp(opts: AppOptions) {
     opts.linkedin && opts.linkedinProfiles && opts.linkedinPeople
       ? createLinkedinEnter(app, {
           people: opts.linkedinPeople,
+          peek: opts.linkedinProfiles.peek ? (url, o) => opts.linkedinProfiles!.peek!(url, o) : undefined,
+          pollWaitMs: opts.entryPollWaitMs,
           limiter,
           baseUrl,
           secure: opts.secureCookies ?? baseUrl.startsWith("https://"),

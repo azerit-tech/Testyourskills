@@ -53,10 +53,19 @@ export interface GithubLookup {
   proven: boolean;
 }
 
+/** Ce qui reconnaît une personne sur son profil : son nom, son titre, sa photo (jamais gardée). */
+export interface ProfilePeek {
+  name: string;
+  headline: string;
+  photoUrl?: string;
+}
+
 /** Ce que le pipeline demande ; les tests en donnent un faux. */
 export interface LinkedinFinder {
   forGithub(facts: unknown, opts?: LookupOptions & { url?: string }): Promise<GithubLookup | null>;
   forUrl(url: string, opts?: LookupOptions): Promise<UrlLookup>;
+  /** Le profil lu pour sa photo, au retour d'une connexion LinkedIn (§18.85). null : introuvable, plafond, panne. */
+  peek?(url: string, opts?: LookupOptions): Promise<ProfilePeek | null>;
 }
 
 export interface LinkedinProfilesOptions {
@@ -130,6 +139,29 @@ export class LinkedinProfiles implements LinkedinFinder {
       const link = proves ? gh.login : r.githubChecked ? r.githubLogin : undefined;
       cache.putProfile(url, r.profile, r.profile ? link : undefined, this.now());
       return r.profile ? { profile: r.profile, proven: proves } : null;
+    } catch (err) {
+      warn("profil", err);
+      return null;
+    }
+  }
+
+  /**
+   * Toujours une lecture chez le fournisseur : le cache ne garde pas la photo. Le
+   * profil lu y entre s'il n'y était pas, et la fiche qui part ensuite ne le repaie pas.
+   */
+  async peek(raw: string, opts: LookupOptions = {}): Promise<ProfilePeek | null> {
+    const { cache, provider } = this.opts;
+    const url = normalizeLinkedinUrl(raw);
+    if (!url) return null;
+    const hit = cache.getProfile(url, this.now());
+    if (hit && !hit.found) return null;
+    if (!this.take(opts)) return null;
+    try {
+      const r = await provider.fetchProfile(url, { withGithub: true, signal: opts.signal });
+      // Un profil déjà gardé garde son lien avec un GitHub, que cette lecture ne sait pas prouver.
+      if (!hit) cache.putProfile(url, r.profile, r.profile ? r.githubLogin : undefined, this.now());
+      const p = r.profile;
+      return p ? { name: p.name, headline: p.headline, ...(p.photoUrl ? { photoUrl: p.photoUrl } : {}) } : null;
     } catch (err) {
       warn("profil", err);
       return null;

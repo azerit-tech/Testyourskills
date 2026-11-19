@@ -207,6 +207,39 @@ describe("forUrl (entrée LinkedIn)", () => {
   });
 });
 
+describe("peek (retour d'une connexion LinkedIn, §18.85)", () => {
+  it("rend le nom, le titre et la photo ; le profil entre au cache, la fiche qui suit ne le repaie pas", async () => {
+    const t = setup((u) => ({ profile: profile(u), githubLogin: "camille-dev", githubChecked: true }));
+    expect(await t.finder.peek(CAMILLE)).toEqual({ name: "Camille Ardent", headline: "Senior Full-Stack Engineer", photoUrl: "https://media.example.invalid/camille.jpg" });
+    expect(await t.finder.forUrl(CAMILLE)).toMatchObject({ status: "found", githubLogin: "camille-dev" });
+    expect(t.calls).toEqual([{ url: CAMILLE, withGithub: true }]);
+    expect(JSON.stringify(t.db.prepare("SELECT * FROM linkedin_profiles").all())).not.toContain("camille.jpg");
+  });
+
+  it("un profil déjà gardé est relu pour sa photo, sans toucher à son lien avec un GitHub", async () => {
+    const t = setup();
+    await t.finder.forGithub(facts({ blog: CAMILLE }));
+    expect((await t.finder.peek(CAMILLE))?.photoUrl).toBe("https://media.example.invalid/camille.jpg");
+    expect(t.calls).toHaveLength(2);
+    expect(t.cache.getProfile(CAMILLE, NOW)).toMatchObject({ found: true, githubLogin: "camille-ardent" });
+  });
+
+  it("introuvable (lu ou déjà gardé comme tel), adresse invalide, panne, plafond, limite par IP : null", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const gone = setup(() => ({ profile: null, githubLogin: null, githubChecked: true }));
+    expect(await gone.finder.peek(CAMILLE)).toBeNull();
+    expect(await gone.finder.peek(CAMILLE)).toBeNull();
+    expect(gone.calls).toHaveLength(1);
+    expect(await setup().finder.peek("https://linkedin.com/company/brumes")).toBeNull();
+    expect(await setup(() => new Error("boom")).finder.peek(CAMILLE)).toBeNull();
+    expect(await setup(undefined, { daily: 0 }).finder.peek(CAMILLE)).toBeNull();
+    const limited = setup();
+    expect(await limited.finder.peek(CAMILLE, { spend: () => false })).toBeNull();
+    expect(limited.calls).toHaveLength(0);
+    warn.mockRestore();
+  });
+});
+
 describe("profil gardé (§18.37)", () => {
   it("type de contrat et distinctions passent la base ; un profil gardé avant se relit", () => {
     const cache = new LinkedinCache(new Database(":memory:"));
