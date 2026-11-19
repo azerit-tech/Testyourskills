@@ -35,6 +35,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import type { Context, Hono } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
+import { autoJoinBands } from "./bands";
 import type { Store } from "./db";
 import { ID_RE } from "./pipeline";
 import { clientIp, type RateLimiter } from "./ratelimit";
@@ -355,6 +356,9 @@ export function mountAuth(app: Hono, o: AuthRoutesOptions) {
     const owner = o.store.claimOwner(user.login, user.githubId);
     // La cible d'une dénonciation a appelé son avocat (§18.6).
     if (row?.denouncedBy) o.store.recordEvent("denounce_claimed", row.id);
+    // La fiche revendiquée entre d'office dans la bande de son école et de sa boîte (§18.82) : une
+    // fiche née d'une dénonciation attendait sa personne. Rien pour une fiche masquée ou sans lecture IA.
+    if (row) autoJoinBands(o.store, row);
     setCookie(c, SESSION_COOKIE, signSession(cfg.sessionSecret, owner), { ...cookieBase, path: "/", maxAge: SESSION_TTL_MS / 1000 });
     return c.redirect(back(st.r, "ok", owner.login), 302);
   });

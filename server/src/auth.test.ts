@@ -277,6 +277,37 @@ describe("redirection ouverte", () => {
     await claim(ctx);
     expect(ctx.store.listEvents("denounce_claimed")).toMatchObject([{ cardId: "CardAAAA01" }]);
   });
+
+  it("une fiche née d'une dénonciation entre dans ses bandes à la revendication, pas avant (§18.82)", async () => {
+    const ctx = setup();
+    const card: CardData = { ...FIXTURES.gold, id: "CardAAAA01", name: "leamd", login: "leamd", club: "@Doctolib", school: "epitech" };
+    ctx.store.insertCards([{ id: card.id, createdAt: Date.now(), source: "github", login: "leamd", kind: "card", data: card, deleteToken: "tok" }]);
+    ctx.store.markDenounced("CardAAAA01", "Denonce001", null);
+    const bands = () => ctx.store.db.prepare(`SELECT person_key AS person, kind, band_id AS band, card_id AS card FROM band_members ORDER BY kind`).all();
+    // Le jeton est celui du dénonciateur : personne ne l'y fait entrer, ni lui ni le serveur.
+    const refused = await ctx.app.request("/api/bands/join", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-card-token": "tok" },
+      body: JSON.stringify({ cardId: "CardAAAA01", type: "ecole", id: "epitech" }),
+    });
+    expect(refused.status).toBe(403);
+    expect(bands()).toEqual([]);
+    const { session } = await claim(ctx);
+    expect(bands()).toEqual([
+      { person: "gh:leamd", kind: "boite", band: "doctolib", card: "CardAAAA01" },
+      { person: "gh:leamd", kind: "ecole", band: "epitech", card: "CardAAAA01" },
+    ]);
+    expect(ctx.store.listEvents("band_join")).toMatchObject([{ meta: { type: "ecole", auto: true } }, { meta: { type: "boite", auto: true } }]);
+    // Sa personne en sort d'un toucher ; se reconnecter ne l'y remet pas.
+    const out = await ctx.app.request("/api/bands/leave", {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: BASE, ...asOwner(session) },
+      body: JSON.stringify({ cardId: "CardAAAA01", type: "ecole" }),
+    });
+    expect(out.status).toBe(200);
+    await claim(ctx);
+    expect(bands()).toEqual([{ person: "gh:leamd", kind: "boite", band: "doctolib", card: "CardAAAA01" }]);
+  });
 });
 
 describe("callback", () => {
