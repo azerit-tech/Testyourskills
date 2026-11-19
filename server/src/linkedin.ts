@@ -194,7 +194,7 @@ export interface OidcProfile {
 }
 
 /**
- * « Continuer avec LinkedIn » (§18.80, entry/linkedinLogin.ts) : la même
+ * « Se connecter avec LinkedIn » (§18.80, entry/linkedinLogin.ts) : la même
  * connexion, le même retour, pour entrer au lieu de poser une photo.
  */
 export interface LinkedinEnterHook {
@@ -256,7 +256,7 @@ export interface LinkedinRoutesOptions {
   secure?: boolean;
   /** Secret de signature du cookie d'état (SESSION_SECRET). Absent : tiré au hasard, pour la durée du processus. */
   stateSecret?: string;
-  /** « Continuer avec LinkedIn » (§18.80). Absent : /auth/linkedin/enter n'existe pas. */
+  /** « Se connecter avec LinkedIn » (§18.80). Absent : /auth/linkedin/enter n'existe pas. */
   enter?: LinkedinEnterHook;
 }
 
@@ -316,7 +316,7 @@ export function mountLinkedin(app: Hono, o: LinkedinRoutesOptions) {
     return c.redirect(url.toString(), 302);
   });
 
-  // « Continuer avec LinkedIn » (§18.80) : nom, photo et email vérifié, pour retrouver le profil.
+  // « Se connecter avec LinkedIn » (§18.80) : nom, photo et email vérifié, pour retrouver le profil.
   app.get("/auth/linkedin/enter", (c) => {
     c.header("Cache-Control", "no-store");
     const returnPath = safeReturnPath(c.req.query("return")) ?? "/";
@@ -348,7 +348,7 @@ export function mountLinkedin(app: Hono, o: LinkedinRoutesOptions) {
     // L'état de l'URL doit être celui que ce navigateur a reçu au départ, comparé en temps constant.
     const sameBrowser =
       typeof bound?.s === "string" && typeof bound.e === "number" && bound.e > Date.now() && o.tokenMatches(given, bound.s);
-    // « Continuer avec LinkedIn » : même retour, mais on revient sur la page de départ avec ?li=.
+    // « Se connecter avec LinkedIn » : même retour, mais on revient sur la page de départ avec ?li=.
     if (enterPath !== null) {
       const home = (result: "1" | "error" | "cancel") => {
         const u = new URL(sameBrowser ? enterPath : "/", o.baseUrl);

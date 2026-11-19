@@ -1,4 +1,4 @@
-// « Continuer avec GitHub » (SPEC §18.80) : de la connexion au pseudo, avec un
+// « Se connecter avec GitHub » (SPEC §18.80) : de la connexion au pseudo, avec un
 // faux GitHub. Le retour est partagé avec « C'est moi » (§18.1).
 
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -52,7 +52,7 @@ const whoami = async (ctx: EntryCtx, jar: string) => {
   return { json: (await res.json()) as { signedIn: boolean; login?: string }, jar: cookiesOf(res, jar) };
 };
 
-describe("« Continuer avec GitHub »", () => {
+describe("« Se connecter avec GitHub »", () => {
   it("va chez GitHub sans aucun scope, et revient avec le pseudo dans un cookie, jamais dans l'adresse", async () => {
     const { ctx, exchanged } = setup();
     const { start, to, back, jar } = await signIn(ctx, "/c/abc");

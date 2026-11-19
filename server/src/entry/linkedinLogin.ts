@@ -1,4 +1,4 @@
-// « Continuer avec LinkedIn » (SPEC §18.80) : entrer sans rien taper.
+// « Se connecter avec LinkedIn » (SPEC §18.80) : entrer sans rien taper.
 //
 // L'API de LinkedIn ne rend jamais l'adresse du profil sans accès partenaire :
 // « Sign in with LinkedIn » donne un nom, une photo et un email vérifié. La

@@ -1,4 +1,4 @@
-// « Continuer avec LinkedIn » (SPEC §18.80) : de la connexion à la fiche, avec
+// « Se connecter avec LinkedIn » (SPEC §18.80) : de la connexion à la fiche, avec
 // un faux LinkedIn, un faux chercheur de profils et un faux GitHub.
 
 import { afterEach, describe, expect, it, vi } from "vitest";

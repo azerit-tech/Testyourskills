@@ -1,6 +1,6 @@
 // Recherche d'un profil LinkedIn par nom (SPEC §18.80) : ce qui remplace le lien
 // collé. Deux usages : le champ « Ton nom » (suggestions pendant la frappe) et le
-// retour de « Continuer avec LinkedIn » (les candidats au nom rendu par LinkedIn).
+// retour de « Se connecter avec LinkedIn » (les candidats au nom rendu par LinkedIn).
 //
 // Fournisseur par défaut : l'acteur Apify `harvestapi~linkedin-profile-search-by-name`,
 // sans cookies, mode « Short » : une page de dix profils au plus (adresse, nom,

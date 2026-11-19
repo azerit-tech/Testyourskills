@@ -1,4 +1,4 @@
-// « Même photo ? » (SPEC §18.80). Après « Continuer avec LinkedIn », LinkedIn
+// « Même photo ? » (SPEC §18.80). Après « Se connecter avec LinkedIn », LinkedIn
 // rend la photo de la personne mais jamais l'adresse de son profil : la photo
 // sert à reconnaître le bon profil parmi les homonymes. Deux photos sont les
 // mêmes si LinkedIn leur donne le même identifiant d'image, sinon si leurs

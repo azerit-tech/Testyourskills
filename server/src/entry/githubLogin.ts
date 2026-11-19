@@ -1,4 +1,4 @@
-// « Continuer avec GitHub » (SPEC §18.80) : entrer par la porte GitHub sans
+// « Se connecter avec GitHub » (SPEC §18.80) : entrer par la porte GitHub sans
 // taper son pseudo. GitHub OAuth sans aucun scope : le profil public suffit.
 //
 // /auth/github/enter?return= → GitHub → /auth/github/callback, le même retour

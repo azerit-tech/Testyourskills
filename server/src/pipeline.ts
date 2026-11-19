@@ -338,7 +338,7 @@ export interface JobInput {
   /** Prend une unité de la limite par IP avant une lecture payante de profil ; false : refusé. */
   linkedinSpend?: () => boolean;
   /**
-   * Entrée « Continuer avec LinkedIn » (§18.80) : le GitHub retrouvé d'après
+   * Entrée « Se connecter avec LinkedIn » (§18.80) : le GitHub retrouvé d'après
    * l'identité rendue par LinkedIn. `email` : un commit signé de son adresse
    * vérifiée, une preuve, qui passe devant les liens du profil. `name` : le seul
    * compte à son nom, un indice, pris seulement si le profil ne donne aucun

@@ -80,7 +80,7 @@ export interface AppOptions {
   linkedin?: LinkedinConfig;
   /** « C'est moi » par GitHub OAuth (§18.1). Absent : fonctionnalité désactivée, bouton caché. */
   githubAuth?: GithubAuthConfig;
-  /** « Continuer avec GitHub » (§18.80). Absent : bouton caché. */
+  /** « Se connecter avec GitHub » (§18.80). Absent : bouton caché. */
   githubLogin?: GithubLoginConfig;
   /** Cookies de session en Secure. Défaut : si baseUrl est en https. */
   secureCookies?: boolean;
@@ -311,7 +311,7 @@ export function createApp(opts: AppOptions) {
     return c.json(errorBody("internal", MESSAGES.internal), 500);
   });
 
-  // « Continuer avec GitHub » (§18.80), avant la revendication : les deux partagent
+  // « Se connecter avec GitHub » (§18.80), avant la revendication : les deux partagent
   // /auth/github/callback, et l'entrée ne prend que ses propres retours.
   mountGithubEnter(app, {
     store,
@@ -335,7 +335,7 @@ export function createApp(opts: AppOptions) {
     removeImages: (ids) => removeImages(ogDir, ids),
   });
 
-  // « Continuer avec LinkedIn » (§18.80) : il faut la connexion, la lecture des profils et leur recherche par nom.
+  // « Se connecter avec LinkedIn » (§18.80) : il faut la connexion, la lecture des profils et leur recherche par nom.
   const linkedinEnter =
     opts.linkedin && opts.linkedinProfiles && opts.linkedinPeople
       ? createLinkedinEnter(app, {
@@ -434,9 +434,9 @@ export function createApp(opts: AppOptions) {
       linkedinEntry: !!opts.linkedinProfiles,
       // linkedinSearch : le champ « Ton nom » propose des profils (§18.80) ; sinon on y colle un lien.
       linkedinSearch: !!opts.linkedinProfiles && !!opts.linkedinPeople,
-      // linkedinLogin : le bouton « Continuer avec LinkedIn » (§18.80).
+      // linkedinLogin : le bouton « Se connecter avec LinkedIn » (§18.80).
       linkedinLogin: !!linkedinEnter,
-      // githubLogin : le bouton « Continuer avec GitHub » (§18.80).
+      // githubLogin : le bouton « Se connecter avec GitHub » (§18.80).
       githubLogin: !!opts.githubLogin,
       primesOpen: primesOpen(season, now),
       // primesListed : la saison porte au moins une prime (ouverte, à venir ou close) : /primes existe.
@@ -641,7 +641,7 @@ export function createApp(opts: AppOptions) {
         else void pipeline.wait(id).then(mark);
       };
 
-      // « Continuer avec LinkedIn » (§18.80) : le profil lancé est celui de la personne
+      // « Se connecter avec LinkedIn » (§18.80) : le profil lancé est celui de la personne
       // connectée (le profil sûr, ou l'un des homonymes proposés). Sa fiche reçoit le
       // GitHub retrouvé d'après son identité, et son email vérifié comme contact.
       const who = linkedinUrl && !login && !pdf && !denounce ? (linkedinEnter?.identityFor(c, linkedinUrl) ?? null) : null;

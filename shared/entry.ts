@@ -70,9 +70,10 @@ export function detectEntry(raw: unknown): Entry | null {
 }
 
 // --- Les deux portes de l'accueil -------------------------------------------
-// Le formulaire montre deux portes, LinkedIn d'abord, puis GitHub. Le champ de
-// la porte LinkedIn porte le préfixe fixe « linkedin.com/in/ » : on y tape ce qui
-// suit, ou on y colle le lien entier. Une adresse de l'autre porte bascule.
+// Le formulaire montre deux portes, LinkedIn d'abord, puis GitHub. Chaque champ
+// prend un nom (§18.80) : des personnes sortent dessous, on en touche une. Un
+// lien collé, ce qui suit « linkedin.com/in/ » ou un pseudo tapé en entier
+// marchent toujours, sans rien dire. Une adresse de l'autre porte bascule.
 
 export type Door = "linkedin" | "github";
 
@@ -87,19 +88,27 @@ export function linkedinSlug(raw: unknown): string | null {
  * Ce que donne le champ d'une porte à l'envoi.
  * - `linkedin` / `github` : de quoi lancer la fiche ; `switchTo` quand l'entrée
  *   appartient à l'autre porte (le formulaire bascule, puis lance) ;
+ * - `name` : un nom en plusieurs mots (« Camille Ardent »), qui ne lance rien
+ *   seul : la personne se choisit dans les suggestions ;
  * - `error` : `empty` (rien de tapé), `linkedin` (pas un profil LinkedIn),
  *   `github` (pas un pseudo GitHub).
  */
 export type DoorResult =
   | { kind: "linkedin"; url: string; switchTo?: Door }
   | { kind: "github"; login: string; switchTo?: Door }
+  | { kind: "name"; name: string }
   | { kind: "error"; error: "empty" | "linkedin" | "github" };
+
+/** Plusieurs mots faits de lettres : un nom, pas une adresse ni un pseudo. */
+const NAME_RE = /^[\p{L}\p{M}'’.-]+(?: [\p{L}\p{M}'’.-]+){1,5}$/u;
 
 export function resolveDoor(door: Door, raw: string): DoorResult {
   const s = raw.trim();
   if (!s) return { kind: "error", error: "empty" };
   const hasLinkedin = /linkedin\.com/i.test(s);
   const hasGithub = !hasLinkedin && /github\.com/i.test(s);
+  const name = s.replace(/\s+/g, " ");
+  if (!hasLinkedin && !hasGithub && name.length <= 80 && NAME_RE.test(name)) return { kind: "name", name };
   if (door === "linkedin") {
     if (hasGithub) {
       const login = parseGithubLogin(s);
