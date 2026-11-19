@@ -25,6 +25,6 @@ Toute personne de **18 ans ou plus** qui a revendiqué sa fiche avec GitHub.
 
 L'âge, l'école, le genre, l'origine. Le lieu n'est qu'une question posée.
 
-## Article 5. Vos données
+## Article 5. Tes données
 
 En démonstration, rien ne quitte la machine.

@@ -27,8 +27,10 @@
 // en mémoire et oublié à chaque entrée, sortie, suppression, purge ou masquage.
 //
 // Le rang d'école du barème n'apparaît nulle part ici. Sur la page d'une bande,
-// jamais un nom : le profil criminel et les étoiles, le @pseudo seulement pour
-// une fiche revendiquée.
+// chaque membre est la vraie personne (§18.88) : le nom de sa fiche (le @pseudo
+// d'une fiche GitHub sans nom), sa photo ou ses initiales, son profil criminel,
+// ses étoiles, et le lien vers sa fiche. Reste anonyme une fiche née d'une
+// dénonciation tant qu'elle n'est pas revendiquée ; un pseudo masqué n'y est pas.
 //
 // Le nom d'une boîte hors alias vient de son premier membre (tapé, ou lu sur son
 // profil) : refusé s'il porte une insulte, une adresse, un @ ou un numéro,
@@ -39,6 +41,7 @@
 import type Database from "better-sqlite3";
 import type { Context, Hono } from "hono";
 import { z } from "zod";
+import { boardPerson } from "../../shared/boardPerson";
 import {
   BAND_ID_MAX,
   BAND_ID_RE,
@@ -80,6 +83,8 @@ export const BAND_PAGE_MEMBERS = 50;
 /** Bandes du tableau d'une ligue ; l'accueil en montre cinq. */
 export const BOARD_SIZE = 20;
 export const HOME_SIZE = 5;
+/** Bandes en formation listées sous le tableau d'une ligue. */
+export const FORMING_SIZE = 10;
 
 const f = (fr: string, en: string): Fact => ({ fr: frTypo(fr), en });
 
@@ -242,12 +247,22 @@ export function publicBandStanding(db: Database.Database, type: BandType, id: st
   return b?.hasPage ? b : null;
 }
 
-/** Le tableau d'une ligue : les vingt premières, et `withId` si elle est plus bas ou en formation. */
+/**
+ * Le tableau d'une ligue : les vingt premières ; `withId` si elle est plus bas ou en
+ * formation ; puis les bandes en formation qui ont leur page publique (une boîte au
+ * nom libre reste cachée avant trois dossiers), les plus avancées d'abord.
+ */
 export function bandBoard(db: Database.Database, type: BandType, withId?: string | null, now = Date.now()): BandBoard {
   const c = league(db, type, now);
   const entries = c.ranked.slice(0, BOARD_SIZE).map((b) => toStanding(c, b));
-  const extra = withId && !entries.some((e) => e.id === withId) ? publicBandStanding(db, type, withId, now) : null;
-  return { type, total: c.ranked.length, entries, extra: extra && extra.members > 0 ? extra : null };
+  const found = withId && !entries.some((e) => e.id === withId) ? publicBandStanding(db, type, withId, now) : null;
+  const extra = found && found.members > 0 ? found : null;
+  const forming = [...c.all.values()]
+    .filter((b) => b.members < BAND_MIN_MEMBERS && b.id !== extra?.id && bandHasPage(b.type, b.id, b.members))
+    .sort((a, b) => b.members - a.members || b.score - a.score || a.since - b.since || a.id.localeCompare(b.id))
+    .slice(0, FORMING_SIZE)
+    .map((b) => toStanding(c, b));
+  return { type, total: c.ranked.length, entries, forming, extra };
 }
 
 /** Les cinq premières de chaque ligue, pour l'accueil. */
@@ -259,11 +274,15 @@ export function bandsTop(db: Database.Database, now = Date.now()): BandsTop {
   return { ecole: top("ecole"), boite: top("boite") };
 }
 
-/** Les membres d'une bande, du plus étoilé au moins étoilé : jamais un nom. */
+/**
+ * Les membres d'une bande, du plus étoilé au moins étoilé : la personne de chaque
+ * fiche (§18.88), sauf une fiche née d'une dénonciation et pas encore revendiquée,
+ * qui garde son profil et ses étoiles sans nom, sans visage et sans lien.
+ */
 function bandMembers(store: Store, type: BandType, id: string, now: number): BandMember[] {
   const rows = store.db
     .prepare(
-      `SELECT m.card_id AS cardId, m.login, m.person_key AS personKey, m.stars
+      `SELECT m.card_id AS cardId, m.login, m.stars
        FROM band_members m JOIN cards c ON c.id = m.card_id
        WHERE m.kind = ? AND m.band_id = ? AND c.degraded = 0
          AND (c.expires_at IS NULL OR c.expires_at > ?)
@@ -271,16 +290,18 @@ function bandMembers(store: Store, type: BandType, id: string, now: number): Ban
        ORDER BY m.stars DESC, m.joined_at ASC
        LIMIT ?`,
     )
-    .all(type, id, now, BAND_PAGE_MEMBERS) as { cardId: string; login: string | null; personKey: string; stars: number }[];
+    .all(type, id, now, BAND_PAGE_MEMBERS) as { cardId: string; login: string | null; stars: number }[];
   return rows.map((r) => {
     const row = store.getCard(r.cardId);
     const card = row ? mainCard(row) : null;
     const profile = card?.profile?.label ?? null;
     // Le poste, déjà sur la fiche publique : deux dossiers du même profil ne se lisent plus comme un doublon.
     const position = card?.position;
-    // Le @pseudo seulement pour une fiche revendiquée par ce login, jamais le nom d'une fiche LinkedIn ou CV.
-    const claimed = !!r.login && r.personKey === `gh:${r.login}` && !!store.getOwner(r.login);
-    return { stars: r.stars, profile, ...(position ? { position } : {}), ...(claimed ? { login: card?.login ?? r.login!, cardId: r.cardId } : {}) };
+    // Faite par un tiers pour dénoncer et pas encore revendiquée : la personne n'a rien demandé, rien ne la nomme.
+    const root = row ? rootOf(store, row) : null;
+    const login = r.login ?? (root ? store.loginOf(root) : null);
+    const shown = !!card && !!root && (!root.denounceBorn || (!!login && !!store.getOwner(login)));
+    return { stars: r.stars, profile, ...(position ? { position } : {}), ...(shown ? boardPerson(card, r.cardId, login) : {}) };
   });
 }
 

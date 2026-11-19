@@ -604,7 +604,7 @@ function makeCabinNotice(): THREE.CanvasTexture {
   });
   g.fillStyle = "#777a72";
   g.font = "400 22px Arial, sans-serif";
-  g.fillText("Merci de votre attention.", 54, 1008);
+  g.fillText("Merci de ton attention.", 54, 1008);
   // Petit coin plié, presque ton sur ton.
   g.fillStyle = "#cdc8bb";
   g.beginPath();

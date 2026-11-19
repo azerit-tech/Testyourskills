@@ -1,6 +1,7 @@
 // Les textes des bandes (§18.38), rangés sous `t.bands` dans i18n.ts. Épicène,
 // sans accord en « é·e » ; ton polar, sec. Ni tiret long ni point médian.
 import type { BandStanding, BandType } from "../../shared/bands";
+import { BAND_MIN_MEMBERS } from "../../shared/bands";
 
 type Rank = Pick<BandStanding, "type" | "rank" | "missing" | "gap" | "ahead">;
 
@@ -10,15 +11,25 @@ const n = (k: number, one: string, many: string) => `${k}\u00a0${k > 1 ? many : 
 const nEn = (k: number, one: string, many: string) => `${k}\u00a0${k === 1 ? one : many}`;
 const lowerFirst = (s: string) => `${s.charAt(0).toLowerCase()}${s.slice(1)}`;
 
+/** « 3e des écoles, à 6 étoiles de la 2e. » ; « N° 1 des boîtes. » ; « Bande en formation : encore 2 fiches. » Une phrase : elle commence par une majuscule. */
+function rankFr(b: Rank): string {
+  if (!b.rank) return `Bande en formation : encore ${n(b.missing, "fiche", "fiches")}.`;
+  const ord = `${b.rank === 1 ? "N° 1" : `${b.rank}e`} des ${b.type === "ecole" ? "écoles" : "boîtes"}`;
+  if (!b.ahead || b.gap === null) return `${ord}.`;
+  const ahead = b.ahead.rank === 1 ? "la tête" : `la ${b.ahead.rank}e`;
+  return b.gap > 0 ? `${ord}, à ${n(b.gap, "étoile", "étoiles")} de ${ahead}.` : `${ord}, à égalité avec ${ahead}.`;
+}
+
+function rankEn(b: Rank): string {
+  if (!b.rank) return `Crew forming: ${nEn(b.missing, "more sheet", "more sheets")} needed.`;
+  const ord = `#${b.rank} among ${b.type === "ecole" ? "schools" : "companies"}`;
+  if (!b.ahead || b.gap === null) return `${ord}.`;
+  const ahead = b.ahead.rank === 1 ? "the leader" : `#${b.ahead.rank}`;
+  return b.gap > 0 ? `${ord}, ${nEn(b.gap, "star", "stars")} behind ${ahead}.` : `${ord}, level with ${ahead}.`;
+}
+
 const fr = {
-  /** « 3e des écoles, à 6 étoiles de la 2e. » ; « N° 1 des boîtes. » ; « Bande en formation : encore 2 fiches. » Une phrase : elle commence par une majuscule. */
-  rank(b: Rank): string {
-    if (!b.rank) return `Bande en formation : encore ${n(b.missing, "fiche", "fiches")}.`;
-    const ord = `${b.rank === 1 ? "N° 1" : `${b.rank}e`} des ${b.type === "ecole" ? "écoles" : "boîtes"}`;
-    if (!b.ahead || b.gap === null) return `${ord}.`;
-    const ahead = b.ahead.rank === 1 ? "la tête" : `la ${b.ahead.rank}e`;
-    return b.gap > 0 ? `${ord}, à ${n(b.gap, "étoile", "étoiles")} de ${ahead}.` : `${ord}, à égalité avec ${ahead}.`;
-  },
+  rank: rankFr,
   dossiers: (k: number) => n(k, "fiche", "fiches"),
   score: (k: number) => n(k, "étoile", "étoiles"),
   /** Le mot seul, sous le grand nombre de la page d'une bande. */
@@ -55,13 +66,22 @@ const fr = {
   },
   board: {
     title: "Les bandes",
-    intro: "Chaque fiche peut rapporter ses étoiles à une école et à une boîte, au choix de la personne. Les vingt meilleures fiches d'une bande comptent ; trois suffisent pour entrer au tableau.",
+    intro: "Tes étoiles comptent pour ton école et ta boîte. Trois fiches pour entrer au tableau. Les vingt meilleures comptent.",
     tabs: "Tableau",
     yours: "Ta bande",
+    /** L'onglet des bandes classées ; celui des bandes en formation est `forming`. */
+    ranked: "Au tableau",
     /** L'unité des notes de bande, une fois en tête du tableau. */
     scale: "Étoiles",
-    rowLabel: (rank: number | null, label: string, score: number, dossiers: number) =>
-      `${rank ? (rank === 1 ? "n° 1" : `${rank}e`) : "En formation"}, ${label}, ${n(score, "étoile", "étoiles")}, ${n(dossiers, "fiche", "fiches")}`,
+    rowLabel: (rank: number, label: string, score: number, dossiers: number) => `${rank === 1 ? "n° 1" : `${rank}e`}, ${label}, ${n(score, "étoile", "étoiles")}, ${n(dossiers, "fiche", "fiches")}`,
+    /** Une bande en formation, pour un lecteur d'écran : pas d'étoiles, elles ne disent rien avant le tableau. */
+    formingLabel: (label: string, dossiers: number) => `${label}, en formation, ${n(dossiers, "fiche", "fiches")} sur ${BAND_MIN_MEMBERS}`,
+    /** Sous le nom d'une bande en formation : « Encore 2 fiches ». */
+    missing: (k: number) => `Encore ${n(k, "fiche", "fiches")}`,
+    /** Sa propre bande en formation : ce qu'il lui manque, en une phrase. */
+    toBoard: (k: number) => `Encore ${n(k, "fiche", "fiches")} pour entrer au tableau.`,
+    /** La règle, dite quand rien n'est encore au tableau (la page d'une bande). */
+    rule: "Trois fiches pour entrer au tableau.",
     makeTitle: "Fais gagner ta bande",
     make: "Fais ta fiche : ses étoiles comptent pour ton école et ta boîte. Tu peux changer juste sous elle.",
   },
@@ -69,15 +89,19 @@ const fr = {
     make: (label: string) => `Fais ta fiche pour ${label}`,
     makeNote: "Une fois ta fiche faite, un geste juste sous elle et tes étoiles comptent pour la bande.",
     roster: "Les fiches",
+    /** Le classement de sa ligue, à côté des fiches ; l'étiquette de sa ligne si elle est plus bas que les dix premières. */
+    board: "Le classement",
+    thisBand: "Cette bande",
     rosterNone: "Personne pour l'instant. La place est libre.",
     unnamed: "Fiche sans profil",
     more: (k: number) => `Et ${n(k, "autre fiche", "autres fiches")}.`,
-    /* On vouvoie qui recrute, comme sous la fiche. */
-    recruiter: (label: string) => `Vous recrutez chez ${label} ?`,
-    recruiterText: "Azerit vous présente des devs lus comme leurs fiches : l'expérience d'abord, le code comme preuve.",
+    recruiter: (label: string) => `Tu recrutes chez ${label} ?`,
+    recruiterText: "Azerit te présente des devs lus comme leurs fiches : l'expérience d'abord, le code comme preuve.",
     recruiterLink: "azerit.tech",
     share: "Partager la bande",
-    shareText: (label: string, rank: string) => `${label} : ${lowerFirst(rank)} Viens grossir les rangs :`,
+    /** Le texte du partage d'une bande, une seule phrase avant l'appel : son rang, ou ce qu'il lui manque. */
+    shareText: (b: Rank & { label: string }) =>
+      b.rank ? `${b.label} : ${lowerFirst(rankFr(b))} Viens grossir les rangs :` : `${b.label} est en formation : encore ${n(b.missing, "fiche", "fiches")} pour entrer au tableau. Viens grossir les rangs :`,
     ahead: "Devant\u00a0:",
     all: "Toutes les bandes",
     notFound: "Cette bande n'existe pas. Pas encore.",
@@ -107,11 +131,13 @@ const fr = {
     /** La fiche vient de se poser, sa bande l'attendait (message éphémère sous la fiche). */
     landed: (label: string) => `Tu roules pour ${label}.`,
     /** Les trois emplacements d'une bande en formation, pour un lecteur d'écran. */
-    slots: (k: number) => `${k} sur 3`,
-    /** Les fiches sans pseudo, en dernière ligne de la liste, derrière une pile de silhouettes. */
+    slots: (k: number) => `${n(k, "fiche", "fiches")} sur ${BAND_MIN_MEMBERS}`,
+    /** Les fiches nées d'une dénonciation et pas encore revendiquées, en dernière ligne de la liste, derrière une pile de silhouettes (§18.88). */
     anonymous: (k: number) => n(k, "fiche anonyme", "fiches anonymes"),
-    /** Sous la liste, quand aucune fiche n'a de pseudo. */
-    claimHint: "Une fiche revendiquée avec « C'est moi » s'affiche ici avec son pseudo.",
+    /** La même ligne quand la bande compte plus de fiches que la page n'en montre. */
+    others: (k: number) => n(k, "autre fiche", "autres fiches"),
+    /** Sous la liste, quand elle ne nomme personne. */
+    claimHint: "Une fiche faite pour dénoncer s'affiche ici avec son nom une fois revendiquée avec « C'est moi ».",
     /** La répartition des anonymes, pour un lecteur d'écran : « 2 fiches à 6 étoiles, 5 fiches à 5 étoiles ». */
     spread: (parts: [number, number][]) => parts.map(([s, k]) => `${n(k, "fiche", "fiches")} à ${n(s, "étoile", "étoiles")}`).join(", "),
   },
@@ -126,13 +152,7 @@ const fr = {
 export type BandsDict = typeof fr;
 
 const en: BandsDict = {
-  rank(b: Rank): string {
-    if (!b.rank) return `Crew forming: ${nEn(b.missing, "more sheet", "more sheets")} needed.`;
-    const ord = `#${b.rank} among ${b.type === "ecole" ? "schools" : "companies"}`;
-    if (!b.ahead || b.gap === null) return `${ord}.`;
-    const ahead = b.ahead.rank === 1 ? "the leader" : `#${b.ahead.rank}`;
-    return b.gap > 0 ? `${ord}, ${nEn(b.gap, "star", "stars")} behind ${ahead}.` : `${ord}, level with ${ahead}.`;
-  },
+  rank: rankEn,
   dossiers: (k: number) => nEn(k, "sheet", "sheets"),
   score: (k: number) => nEn(k, "star", "stars"),
   scoreWord: (k: number) => (k === 1 ? "star" : "stars"),
@@ -165,12 +185,16 @@ const en: BandsDict = {
   },
   board: {
     title: "The crews",
-    intro: "Every sheet can bring its stars to one school and one company, its owner's choice. A crew's top 20 sheets count; three are enough to make the board.",
+    intro: "Your stars count for your school and your company. Three sheets to make the board. The top twenty count.",
     tabs: "Board",
     yours: "Your crew",
+    ranked: "On the board",
     scale: "Stars",
-    rowLabel: (rank: number | null, label: string, score: number, dossiers: number) =>
-      `${rank ? `#${rank}` : "Forming"}, ${label}, ${nEn(score, "star", "stars")}, ${nEn(dossiers, "sheet", "sheets")}`,
+    rowLabel: (rank: number, label: string, score: number, dossiers: number) => `#${rank}, ${label}, ${nEn(score, "star", "stars")}, ${nEn(dossiers, "sheet", "sheets")}`,
+    formingLabel: (label: string, dossiers: number) => `${label}, forming, ${dossiers} of ${BAND_MIN_MEMBERS} sheets`,
+    missing: (k: number) => nEn(k, "more sheet", "more sheets"),
+    toBoard: (k: number) => `${nEn(k, "more sheet", "more sheets")} to make the board.`,
+    rule: "Three sheets to make the board.",
     makeTitle: "Put your crew on top",
     make: "Get your rap sheet: its stars count for your school and your company. You can switch right under it.",
   },
@@ -178,6 +202,8 @@ const en: BandsDict = {
     make: (label: string) => `Get your rap sheet for ${label}`,
     makeNote: "Once your sheet is out, one tap right under it and your stars count for the crew.",
     roster: "The sheets",
+    board: "The ranking",
+    thisBand: "This crew",
     rosterNone: "Nobody yet. The spot is open.",
     unnamed: "Sheet without a profile",
     more: (k: number) => `And ${nEn(k, "other sheet", "other sheets")}.`,
@@ -185,7 +211,8 @@ const en: BandsDict = {
     recruiterText: "Azerit brings you devs read like their sheets: experience first, code as proof.",
     recruiterLink: "azerit.tech",
     share: "Share the crew",
-    shareText: (label: string, rank: string) => `${label}: ${rank} Come add your stars:`,
+    shareText: (b: Rank & { label: string }) =>
+      b.rank ? `${b.label}: ${rankEn(b)} Come add your stars:` : `${b.label} is forming: ${nEn(b.missing, "more sheet", "more sheets")} to make the board. Come add your stars:`,
     ahead: "Ahead:",
     all: "All crews",
     notFound: "This crew doesn't exist. Not yet.",
@@ -206,9 +233,10 @@ const en: BandsDict = {
     seeCard: "See my sheet",
     pickUnder: "You already have your sheet: open it, your school and your company are picked right under it.",
     landed: (label: string) => `You ride for ${label}.`,
-    slots: (k: number) => `${k} of 3`,
+    slots: (k: number) => `${k} of ${BAND_MIN_MEMBERS} sheets`,
     anonymous: (k: number) => nEn(k, "anonymous sheet", "anonymous sheets"),
-    claimHint: "A sheet claimed with “That's me” shows here with its username.",
+    others: (k: number) => nEn(k, "more sheet", "more sheets"),
+    claimHint: "A sheet made to tip someone off shows here with its name once claimed with “That's me”.",
     spread: (parts: [number, number][]) => parts.map(([s, k]) => `${nEn(k, "sheet", "sheets")} at ${nEn(s, "star", "stars")}`).join(", "),
   },
   none: {

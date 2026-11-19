@@ -46,6 +46,14 @@ describe("la ligne du rang", () => {
     expect(en.bands.rank(b({ rank: null, missing: 1, gap: null, ahead: null }))).toBe("Crew forming: 1 more sheet needed.");
   });
 
+  it("le partage d'une bande : une seule phrase avant l'appel, jamais deux deux-points de suite", () => {
+    const forming = { ...b({ rank: null, missing: 2, gap: null, ahead: null }), label: "CentraleSupélec" };
+    expect(fr.bands.page.shareText(forming)).toBe("CentraleSupélec est en formation\u00a0: encore 2\u00a0fiches pour entrer au tableau. Viens grossir les rangs\u00a0:");
+    expect(en.bands.page.shareText(forming)).toBe("CentraleSupélec is forming: 2\u00a0more sheets to make the board. Come add your stars:");
+    expect(fr.bands.page.shareText({ ...b({}), label: "Epitech" })).toBe("Epitech\u00a0: 3e des écoles, à 6\u00a0étoiles de la 2e. Viens grossir les rangs\u00a0:");
+    expect(en.bands.page.shareText({ ...b({}), label: "Epitech" })).toBe("Epitech: #3 among schools, 6\u00a0stars behind #2. Come add your stars:");
+  });
+
   it("les étoiles pleines seulement", () => {
     expect(starLine(4)).toBe("★★★★☆☆");
     expect(starLine(9)).toBe("★★★★★★");
@@ -82,6 +90,8 @@ describe("les textes des bandes", () => {
         ...all(dict.bands),
         dict.bands.rank(b({})),
         dict.bands.pick.shareText("★★★★", "Epitech", dict.bands.rank(b({}))),
+        dict.bands.page.shareText({ ...b({}), label: "Epitech" }),
+        dict.bands.page.shareText({ ...b({ rank: null, missing: 2 }), label: "Epitech" }),
         dict.bands.page.recruiter("Doctolib"),
         dict.bands.page.make("Epitech"),
       ];
@@ -153,7 +163,7 @@ describe("les trois états de la page d'une bande, en mots", () => {
     for (const d of [fr, en]) {
       const s = d.bands.states;
       const n = d.bands.none;
-      const texts = [s.follow, s.joinTitle, s.joinText, s.join, s.moving("X"), s.lost, s.seeCard, s.pickUnder, s.landed("X"), s.slots(1), s.anonymous(2), s.claimHint, s.spread([[4, 2]]), n.title, n.note, n.league.ecole, n.league.boite];
+      const texts = [s.follow, s.joinTitle, s.joinText, s.join, s.moving("X"), s.lost, s.seeCard, s.pickUnder, s.landed("X"), s.slots(1), s.anonymous(2), s.others(2), s.claimHint, s.spread([[4, 2]]), n.title, n.note, n.league.ecole, n.league.boite];
       for (const x of texts) expect(x, x).not.toMatch(/[—·]/);
       expect(s.follow).not.toMatch(/toucher dessous|tap below/);
     }

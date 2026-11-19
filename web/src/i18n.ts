@@ -152,9 +152,8 @@ const fr = frTypoDeep({
       take: (n: number): string => (n === 1 ? "Prends-la" : "Prends-en une"),
       free: "Place libre",
       freeLabel: (rank: number) => `Place ${rank} libre : fais ta fiche`,
-      rowLabel: (rank: number, login: string, overall: number) => `Place ${rank} : @${login}, note ${overall}/100`,
-      rowLabelAnon: (rank: number, overall: number) => `Place ${rank} : une fiche LinkedIn, note ${overall}/100`,
-      anon: "Fiche LinkedIn",
+      /** `who` : le nom de la fiche, ou son « @pseudo ». */
+      rowLabel: (rank: number, who: string, overall: number) => `Place ${rank} : ${who}, note ${overall}/100`,
     },
     errLogin: "Ce pseudo ne ressemble pas à un pseudo GitHub.",
     errEmptyLogin: "Donne-nous un pseudo GitHub (ou une URL de profil).",
@@ -495,8 +494,8 @@ const fr = frTypoDeep({
       error: "Ça n'a pas pris. Réessaie.",
       note: "Laisse ton email : ta fiche reste en ligne, et Azerit peut t'écrire pour un poste.",
     },
-    /* le bloc recruteur, en fin de page : on vouvoie qui recrute */
-    cta: { title: "Vous recrutez ?", text: "Azerit vous présente des devs lus comme ici : l'expérience d'abord, le code comme preuve.", link: "azerit.tech" },
+    /* le bloc recruteur, en fin de page : on tutoie partout, qui recrute compris (§18.86) */
+    cta: { title: "Tu recrutes ?", text: "Azerit te présente des devs lus comme ici : l'expérience d'abord, le code comme preuve.", link: "azerit.tech" },
     del: {
       link: "Supprimer ma fiche",
       confirm: "Supprimer définitivement ?",
@@ -993,9 +992,7 @@ const en: Dict = {
       take: (n) => (n === 1 ? "Take it" : "Take one"),
       free: "Open spot",
       freeLabel: (rank) => `Spot ${rank} is open: get your rap sheet`,
-      rowLabel: (rank, login, overall) => `Spot ${rank}: @${login}, rating ${overall}/100`,
-      rowLabelAnon: (rank, overall) => `Spot ${rank}: a LinkedIn rap sheet, rating ${overall}/100`,
-      anon: "LinkedIn rap sheet",
+      rowLabel: (rank, who, overall) => `Spot ${rank}: ${who}, rating ${overall}/100`,
     },
     errLogin: "That doesn't look like a GitHub username.",
     errEmptyLogin: "Give us a GitHub username (or profile URL).",
