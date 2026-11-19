@@ -5,6 +5,7 @@ import { useT } from "../i18n";
 import { api, isMock } from "../lib/api";
 import { onLinkClick, usePath } from "../lib/router";
 import { seasonLine, useAppConfig } from "../lib/season";
+import { syncMine } from "../lib/entryApi";
 import { MINE_EVENT, myCard } from "../lib/session";
 import { AzeritMark, Brand } from "./Brand";
 
@@ -89,6 +90,8 @@ export function TopBar() {
   useEffect(() => {
     const on = () => reread((n) => n + 1);
     window.addEventListener(MINE_EVENT, on);
+    // Qui s'est connecté ici retrouve « Ma fiche », même mémoire vidée (§18.90).
+    void syncMine();
     return () => window.removeEventListener(MINE_EVENT, on);
   }, []);
   const mine = myCard();

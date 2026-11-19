@@ -1,0 +1,28 @@
+{
+  "searchParameters": { "q": "site:linkedin.com/in \"Camille Ardent\"", "gl": "fr", "hl": "fr", "type": "search", "num": 10, "engine": "google" },
+  "organic": [
+    {
+      "title": "Camille Ardent - Senior Full-Stack Engineer at Paysolde",
+      "link": "https://www.linkedin.com/in/camille-ardent",
+      "displayedLink": "Plus de 1,2 k abonnés",
+      "snippet": "Senior Full-Stack Engineer at Paysolde · Experience: Paysolde · Location: Lyon · 500+ connections on LinkedIn. View Camille Ardent's profile on LinkedIn, a professional ...",
+      "position": 1
+    },
+    {
+      "title": "Camille Ardent - Cheffe de projet",
+      "subtitle": "Nantes, Pays de la Loire, France · Cheffe de projet · Mairie de Nantes",
+      "link": "https://fr.linkedin.com/in/camille-ardent-2",
+      "displayedLink": "Plus de 120 abonnés",
+      "snippet": "Cheffe de projet · Experience: Mairie de Nantes · Location: Nantes. View Camille Ardent's profile on LinkedIn, a professional community of 1 billion ...",
+      "position": 2
+    },
+    {
+      "title": "Camille Ardent - Technicienne ...",
+      "link": "https://www.google.com/goto?url=CAESbwHEIkXXexemple&gsessionid=exemple",
+      "displayedLink": "linkedin.com",
+      "snippet": "Un lien de redirection de Google : aucune adresse de profil à en tirer.",
+      "position": 3
+    }
+  ],
+  "credits": 1
+}

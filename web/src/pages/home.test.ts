@@ -9,7 +9,7 @@ import { SUNSET } from "../../../shared/sunset";
 import { LangProvider } from "../i18n";
 import type { Showcase } from "../lib/api";
 import { MOCK_SHOWCASE_ID, mockApi } from "../lib/mock";
-import { ExampleCard, ReturnCall } from "./Home";
+import { ExampleCard, MineCard } from "./Home";
 
 const card = { ...FIXTURES.jmougeot, id: "Gh12345678", overall: 71 };
 const COMPARED: Showcase = { card, href: "/c/Cmp1234567", pieces: ["linkedin", "github"] };
@@ -52,8 +52,9 @@ describe("la fiche de Jacques sous le titre", () => {
   });
 });
 
+const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), "utf8");
+
 describe("la scène du premier écran (§18.81)", () => {
-  const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), "utf8");
   const home = read("./Home.tsx");
   const css = read("../styles.css");
 
@@ -84,20 +85,66 @@ describe("la scène du premier écran (§18.81)", () => {
   });
 });
 
-describe("l'accueil de qui a déjà sa fiche (§18.52)", () => {
+describe("l'accueil de qui a déjà sa fiche (§18.89)", () => {
   const mine = { id: "Card000001", login: "kevin-dev42", overall: 68 };
-  it("« Voir ma fiche » en rose vers elle, puis « Faire une autre fiche » en lien", () => {
-    const html = render(createElement(ReturnCall, { mine, onAnother: () => undefined }));
+  const own = { ...FIXTURES.bronze, id: mine.id, overall: 68 };
+  const count = (html: string, needle: string) => html.split(needle).length - 1;
+
+  it("sa fiche debout sur le crépuscule, tout entière un lien vers sa page, et un seul bouton rose dessous", () => {
+    const html = render(createElement(MineCard, { mine, card: own }));
+    expect(html).toMatch(/^<div class="home-stage"><div class="home-stage-in"><div class="sunset"/);
+    expect(html).toMatch(/<a class="home-mine-link" href="\/c\/Card000001" aria-label="Voir ma fiche, Fiche [^"]+">/);
+    // la fiche elle-même, pas une vignette : le composant de la page d'une fiche
+    expect(count(html, "tys-card__svg")).toBe(1);
+    expect(html).toContain("KEVIN-DEV42");
     expect(html).toMatch(/<a class="pill pill-big home-see" href="\/c\/Card000001">Voir ma fiche<\/a>/);
-    expect(html).toMatch(/<button type="button" class="link-alt home-another"[^>]*>Faire une autre fiche<\/button>/);
+    expect(count(html, "pill-big")).toBe(1);
+    expect(html.indexOf("tys-card__svg")).toBeLessThan(html.indexOf("home-see"));
+    // ni légende, ni phrase, ni formulaire
+    expect(html).not.toContain("<figcaption");
+    expect(html).not.toContain("Faire une autre fiche");
+    expect(html).not.toContain("home-back");
+  });
+
+  it("la fiche pas encore lue : son cadre à sa taille, le bouton déjà là", () => {
+    const html = render(createElement(MineCard, { mine, card: undefined }));
+    expect(html).toContain('<span class="home-mine-wait"></span>');
+    expect(html).not.toContain("tys-card");
+    expect(html).toMatch(/<a class="pill pill-big home-see" href="\/c\/Card000001">Voir ma fiche<\/a>/);
+    expect(read("../styles.css")).toMatch(/\.home-mine-wait \{[^}]*aspect-ratio: 360 \/ 520;/);
+  });
+
+  it("la fiche illisible (réseau) : la ligne de sa note, et le bouton", () => {
+    const html = render(createElement(MineCard, { mine, card: null }));
+    expect(html).not.toContain("home-stage");
     expect(html).toContain("68/100.");
-    expect(html.indexOf("Voir ma fiche")).toBeLessThan(html.indexOf("Faire une autre fiche"));
+    expect(html).toMatch(/<a class="pill pill-big home-see" href="\/c\/Card000001">Voir ma fiche<\/a>/);
   });
 
   it("en anglais", () => {
-    const html = render(createElement(ReturnCall, { mine, onAnother: () => undefined }), "en-US");
+    const html = render(createElement(MineCard, { mine, card: own }), "en-US");
     expect(html).toContain(">See my sheet<");
-    expect(html).toContain(">Make another sheet<");
+  });
+
+  it("la page : sa fiche, le top de la semaine, les primes ouvertes, les bandes, puis « Faire une autre fiche » ; rien d'autre", () => {
+    const home = read("./Home.tsx");
+    const page = home.slice(home.indexOf("if (mineHome && mem.mine) {"), home.indexOf('<main className="page page-home" id="main">'));
+    const order = ["<MineCard ", "<WeekBoard ", "<PrimesStrip />", "<HomeBands ", "h.back.another"].map((x) => page.indexOf(x));
+    expect(order.every((i) => i > 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    // le formulaire ne s'ouvre qu'à la demande, à la place du lien
+    expect(page).toMatch(/\{open \? \(\s*<EntryForm inputRef=\{inputRef\} \/>\s*\) : \(\s*<button type="button" className="link-alt home-another"/);
+    for (const gone of ["hero-title", "hero-hook", "<ExampleCard", "<Spin", "<ProfileWall", "<BandsTop", "home-last", "<BackLine"]) expect(page).not.toContain(gone);
+    // un préremplissage (« Réessayer », /<pseudo>), une dénonciation, un film à voir ou un dossier en cours gardent l'accueil du formulaire
+    expect(home).toMatch(/const returning = !!mem\.mine && !owed && !mem\.pending;/);
+    expect(home).toMatch(/const mineHome = returning && !denounce && !fromPrefill && !returnBack;/);
+  });
+
+  it("téléphone : une colonne ; bureau : la scène à gauche, les classements à droite", () => {
+    const css = read("../styles.css");
+    expect(css).toMatch(/\.home-mine \{[^}]*grid-template-columns: minmax\(0, 1fr\);/);
+    expect(css).toMatch(/@media \(min-width: 900px\) \{\s*\.home-mine \{\s*grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1fr\);/);
+    expect(css).toMatch(/\.home-mine > \.board \{\s*grid-column: 2;/);
   });
 });
 

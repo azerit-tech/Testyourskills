@@ -57,7 +57,7 @@ describe("GET /api/search/linkedin", () => {
     expect(res.headers.get("cache-control")).toBe("no-store");
   });
 
-  it("trente recherches payées par IP et par jour, puis « off » pour cette IP seulement", async () => {
+  it("soixante recherches payées par IP et par jour, puis « off » pour cette IP seulement", async () => {
     const ctx = setup({ people: { byName: () => ({ status: "ok", results: [CAMILLE] }) } });
     for (let i = 0; i < SEARCHES_PER_IP; i++) expect((await search(ctx, `Camille Ardent${"x".repeat(i)}`)).json.off).toBeUndefined();
     expect((await search(ctx, "Camille Autre")).json).toEqual({ results: [], off: true });

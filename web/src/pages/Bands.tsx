@@ -18,6 +18,7 @@ import { personLabel } from "../../../shared/boardPerson";
 import type { BandBoard, BandMember, BandPage as BandPageData, BandStanding, BandType, MyBands } from "../../../shared/bands";
 import { BAND_TYPES, bandPath } from "../../../shared/bands";
 import { Avatar } from "../components/Avatar";
+import { MineForming } from "../components/BandMine";
 import { useBandShare } from "../components/BandPick";
 import { BandLists } from "../components/BandLists";
 import { BandSlots } from "../components/BandSlots";
@@ -37,28 +38,6 @@ import { myCard, type MyCard } from "../lib/session";
 import "../components/bands.css";
 
 /* ---------- /bandes ---------- */
-
-/** Sa propre bande en formation : son nom, ses trois emplacements, ce qu'il lui manque, et le partage. Pas d'étoiles avant le tableau. */
-function MineForming({ band, onShare, native }: { band: BandStanding; onShare: (band: BandStanding) => void; native: boolean }) {
-  const { t } = useT();
-  const href = bandPath(band);
-  return (
-    <div className="block bands-mine">
-      <p className="label">{t.bands.board.yours}</p>
-      <h3 className="t-block">
-        <a href={href} onClick={(e) => onLinkClick(e, href)}>
-          {band.label}
-        </a>
-      </h3>
-      <BandSlots members={band.members} />
-      <p className="band-rank">{t.bands.board.toBoard(band.missing)}</p>
-      <button type="button" className="pill band-share" onClick={() => onShare(band)}>
-        {native ? <IconShare /> : <IconLinkedIn />}
-        {t.bands.page.share}
-      </button>
-    </div>
-  );
-}
 
 interface PanelProps {
   board: BandBoard;

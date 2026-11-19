@@ -1211,22 +1211,137 @@ svg {
 .hero .entry {
   margin-top: 8px;
 }
-/* qui revient avec sa fiche (§18.52) : sa ligne, « Voir ma fiche » en rose pleine largeur,
-   puis « Faire une autre fiche » qui déplie le formulaire sur place */
-.home-return {
+/* --- qui a déjà sa fiche (§18.89) : sa fiche en haut, les classements dessous, rien d'autre ---
+   Téléphone : la scène de la fiche d'exemple (§18.81), de bord à bord sous la barre, avec sa
+   propre fiche ; « Voir ma fiche », le seul rose de la page, sur le sol ; puis le top de la
+   semaine, les primes ouvertes, les bandes, et « Faire une autre fiche » tout en bas.
+   Bureau : la scène à gauche, qui reste à l'écran ; les classements à droite, l'un sous
+   l'autre ; les primes ouvertes dessous, sur tout le conteneur. */
+.home-mine {
   display: grid;
-  gap: 8px;
-  max-width: 440px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--home-gap) 40px;
+  width: 100%;
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 0 var(--gutter);
 }
-.home-return .home-back {
+/* la scène garde sa colonne, quelle que soit la règle du héros (bureau, téléphone couché) */
+.home-mine > .home-stage {
+  grid-column: 1;
+  grid-row: auto;
+  margin-top: 0;
+}
+.home-mine > .board {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+/* la rangée des primes porte ses propres marges : elle va de bord à bord, comme sur l'accueil du visiteur */
+.home-mine > .primes-strip {
+  width: auto;
+  min-width: 0;
+  margin: 0 calc(-1 * var(--gutter));
+}
+/* la fiche, puis le bouton sur le sol : 20 px sous la fiche, 20 px avant le bas de la scène */
+.home-stage .home-mine-card {
+  gap: 20px;
+}
+.home-mine .home-stage-in {
+  padding-bottom: 20px;
+}
+.home-mine-link {
+  display: block;
+  width: 100%;
+}
+/* la fiche pas encore lue : son cadre, à sa taille (360 × 520), rien ne saute quand elle arrive */
+.home-mine-wait {
+  display: block;
+  aspect-ratio: 360 / 520;
+}
+/* au-dessus de l'ombre portée de la fiche : le rose reste un aplat */
+.home-see {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+}
+/* la fiche n'a pas pu être lue (réseau) : la ligne de sa note, et le bouton */
+.home-mine-line {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  max-width: 440px;
+  padding-top: 16px;
+}
+.home-mine-line .home-back {
   margin: 0;
 }
-.home-see {
-  width: 100%;
+/* les bandes : les deux ligues l'une sous l'autre, chacune sous son nom */
+.home-bands-cols {
+  display: grid;
+  gap: 28px;
   margin-top: 8px;
 }
-.home-another {
-  justify-self: center;
+.home-league {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+}
+.home-league-name {
+  font: var(--font-block);
+  text-transform: uppercase;
+  color: var(--cream);
+}
+.home-bands .bands-top-all {
+  margin-top: 6px;
+}
+/* tout en bas : « Faire une autre fiche », un lien ; touché, le formulaire prend sa place */
+.home-more {
+  display: grid;
+  justify-items: center;
+  width: 100%;
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+}
+.home-more .entry {
+  width: 100%;
+  margin-top: 0;
+}
+@media (min-width: 900px) {
+  .home-mine {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    row-gap: 56px;
+    padding-top: 16px;
+  }
+  /* la scène tient la colonne de gauche sur la hauteur des classements */
+  .home-mine > .home-stage {
+    grid-row: 1 / span 2;
+    align-self: start;
+  }
+  .home-mine > .board {
+    grid-column: 2;
+  }
+  .home-mine > .primes-strip {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+}
+/* assez de hauteur pour la fiche et son bouton (665 px sous le haut de l'écran) : la scène reste
+   à l'écran pendant qu'on lit les classements */
+@media (min-width: 900px) and (min-height: 700px) {
+  .home-mine > .home-stage {
+    position: sticky;
+    top: 16px;
+  }
+}
+/* sous la fiche de sa propre personne (§18.90) : « Voir ma fiche », puis la dénonciation */
+.you-mine .home-return {
+  max-width: none;
+}
+.you-mine + .after-block {
+  margin-top: 16px;
 }
 /* /<pseudo> d'un autre, fiche déjà faite : le bloc « Dénonce un complice », son bouton en rose (le seul ici) */
 .home-denounce {
@@ -1895,6 +2010,38 @@ svg {
 .entry-or {
   gap: 0 10px;
   color: var(--c-text-2);
+}
+/* le retour de LinkedIn (§18.90) : le temps de retrouver le profil, une ligne, la barre de
+   l'attente (.load-bar) et sa durée, à la place des deux boutons, sur leur hauteur */
+.entry-find {
+  display: grid;
+  align-content: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 118px;
+  text-align: left;
+}
+.entry-find-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font: 600 var(--t-16) / 1.3 var(--f-text);
+  color: var(--c-text);
+}
+.entry-find-line svg {
+  flex: none;
+  width: 20px;
+  height: 20px;
+}
+.entry-find-note {
+  margin: 0;
+  font: 500 var(--t-14) / 1.4 var(--f-text);
+  color: var(--c-text-2);
+}
+/* où prendre le lien, sous la phrase qui dit que LinkedIn n'a rendu personne */
+.entry-help {
+  margin-top: 0;
 }
 
 /* « C'est toi ? » (§18.80) : au retour de LinkedIn, trois profils au plus. Une feuille au bas du

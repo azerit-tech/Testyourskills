@@ -1,0 +1,85 @@
+{
+  "type": "search",
+  "query": { "original": "site:linkedin.com/in \"Camille Ardent\" paysolde", "more_results_available": true },
+  "mixed": { "type": "mixed", "main": [{ "type": "web", "index": 0, "all": false }], "top": [], "side": [] },
+  "web": {
+    "type": "search",
+    "results": [
+      {
+        "title": "Camille Ardent - Paysolde | LinkedIn",
+        "url": "https://www.linkedin.com/in/camille-ardent/",
+        "is_source_local": false,
+        "is_source_both": false,
+        "description": "Senior Full-Stack Engineer chez <strong>Paysolde</strong> · Experience: Paysolde · Education: INSA Lyon · Location: Lyon · 500+ connections on LinkedIn. View <strong>Camille Ardent</strong>’s profile on LinkedIn, a professional community of 1 billion members.",
+        "page_age": "2026-10-02T00:00:00",
+        "profile": { "name": "LinkedIn", "url": "https://www.linkedin.com/in/camille-ardent/", "long_name": "linkedin.com", "img": "https://imgs.search.brave.com/exemple/rs:fit:32:32:1:0/g:ce/favicon" },
+        "language": "fr",
+        "family_friendly": true,
+        "type": "search_result",
+        "subtype": "generic",
+        "is_live": false,
+        "meta_url": { "scheme": "https", "netloc": "linkedin.com", "hostname": "www.linkedin.com", "favicon": "https://imgs.search.brave.com/exemple/favicon", "path": "› in  › camille-ardent" },
+        "thumbnail": { "src": "https://imgs.search.brave.com/exemple/rs:fit:200:200:1:0/g:ce/photo", "original": "https://media.licdn.com/dms/image/v2/exemple/profile-displayphoto-shrink_200_200/0/1", "logo": false },
+        "age": "2 octobre 2026"
+      },
+      {
+        "title": "Camille Ardent - Cheffe de projet &amp; formatrice | LinkedIn",
+        "url": "https://fr.linkedin.com/in/camille-ardent-2",
+        "is_source_local": false,
+        "is_source_both": false,
+        "description": "Cheffe de projet · Experience: Mairie de Nantes · Location: Nantes · 120 connections on LinkedIn. View <strong>Camille Ardent</strong>’s profile on LinkedIn.",
+        "profile": { "name": "LinkedIn", "url": "https://fr.linkedin.com/in/camille-ardent-2", "long_name": "fr.linkedin.com", "img": "https://imgs.search.brave.com/exemple/favicon" },
+        "language": "fr",
+        "family_friendly": true,
+        "type": "search_result",
+        "subtype": "generic",
+        "is_live": false,
+        "meta_url": { "scheme": "https", "netloc": "fr.linkedin.com", "hostname": "fr.linkedin.com", "favicon": "https://imgs.search.brave.com/exemple/favicon", "path": "› in  › camille-ardent-2" },
+        "extra_snippets": ["Formatrice en gestion de projet."]
+      },
+      {
+        "title": "Camille Ardent - -- | LinkedIn",
+        "url": "https://cl.linkedin.com/in/camille-ardent-ab30b2aa",
+        "is_source_local": false,
+        "is_source_both": false,
+        "description": "-- · Location: Chile · 15 connections on LinkedIn. View <strong>Camille Ardent</strong>’s profile on LinkedIn, a professional community of 1 billion members.",
+        "profile": { "name": "LinkedIn", "url": "https://cl.linkedin.com/in/camille-ardent-ab30b2aa", "long_name": "cl.linkedin.com", "img": "https://imgs.search.brave.com/exemple/favicon" },
+        "language": "es",
+        "family_friendly": true,
+        "type": "search_result",
+        "subtype": "generic",
+        "is_live": false,
+        "meta_url": { "scheme": "https", "netloc": "cl.linkedin.com", "hostname": "cl.linkedin.com", "favicon": "https://imgs.search.brave.com/exemple/favicon", "path": "› in  › camille-ardent-ab30b2aa" }
+      },
+      {
+        "title": "Camille Ardenne - Ingénieure données chez Solde &amp; Cie | LinkedIn",
+        "url": "https://www.linkedin.com/in/camille-ardenne-7b7b3188/",
+        "is_source_local": false,
+        "is_source_both": false,
+        "description": "Ingénieure données · Experience: Solde &amp; Cie · Location: Paris.",
+        "profile": { "name": "LinkedIn", "url": "https://www.linkedin.com/in/camille-ardenne-7b7b3188/", "long_name": "linkedin.com", "img": "https://imgs.search.brave.com/exemple/favicon" },
+        "language": "fr",
+        "family_friendly": true,
+        "type": "search_result",
+        "subtype": "generic",
+        "is_live": false,
+        "meta_url": { "scheme": "https", "netloc": "linkedin.com", "hostname": "www.linkedin.com", "favicon": "https://imgs.search.brave.com/exemple/favicon", "path": "› in  › camille-ardenne-7b7b3188" }
+      },
+      {
+        "title": "Paysolde recrute : l'équipe de Camille Ardent | LinkedIn",
+        "url": "https://www.linkedin.com/posts/paysolde_recrutement-activity-7250000000000000000",
+        "is_source_local": false,
+        "is_source_both": false,
+        "description": "Une publication, pas un profil.",
+        "profile": { "name": "LinkedIn", "url": "https://www.linkedin.com/posts/paysolde_recrutement-activity-7250000000000000000", "long_name": "linkedin.com", "img": "https://imgs.search.brave.com/exemple/favicon" },
+        "language": "fr",
+        "family_friendly": true,
+        "type": "search_result",
+        "subtype": "generic",
+        "is_live": false,
+        "meta_url": { "scheme": "https", "netloc": "linkedin.com", "hostname": "www.linkedin.com", "favicon": "https://imgs.search.brave.com/exemple/favicon", "path": "› posts" }
+      }
+    ],
+    "family_friendly": true
+  }
+}
