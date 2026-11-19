@@ -80,9 +80,8 @@ const fr = {
     rosterNone: "Personne pour l'instant. La place est libre.",
     unnamed: "Fiche sans profil",
     more: (k: number) => `Et ${n(k, "autre fiche", "autres fiches")}.`,
-    /* On vouvoie qui recrute, comme sous la fiche. */
-    recruiter: (label: string) => `Vous recrutez chez ${label} ?`,
-    recruiterText: "Azerit vous présente des devs lus comme leurs fiches : l'expérience d'abord, le code comme preuve.",
+    recruiter: (label: string) => `Tu recrutes chez ${label} ?`,
+    recruiterText: "Azerit te présente des devs lus comme leurs fiches : l'expérience d'abord, le code comme preuve.",
     recruiterLink: "azerit.tech",
     share: "Partager la bande",
     shareText: (label: string, rank: string) => `${label} : ${lowerFirst(rank)} Viens grossir les rangs :`,
