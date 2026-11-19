@@ -3300,7 +3300,8 @@ a.dossier-item:hover {
   color: var(--c-emphasis);
 }
 
-/* la barre du pouce (§18.27) : téléphone seulement (ShareDock ne la rend pas au-delà de 640 px), fond d'encre plat.
+/* la barre du pouce (§18.27, §18.82) : téléphone seulement (ShareDock ne la rend pas au-delà de 640 px), fond d'encre plat.
+   Deux rangs : « Dénonce un complice », dessiné comme un champ, puis le partage.
    Elle sort par le bas quand le bloc de partage est à l'écran ou qu'un champ a le focus. */
 .dock {
   position: fixed;
@@ -3309,6 +3310,7 @@ a.dossier-item:hover {
   left: 0;
   z-index: 70;
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 10px var(--gutter) calc(10px + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--c-line);
@@ -3327,6 +3329,27 @@ a.dossier-item:hover {
 .dock .dock-main {
   flex: 1;
   min-width: 0;
+}
+/* « Dénonce un complice » : le premier rang, un champ à toucher (44 px), le titre en crème, la flèche au bout */
+.dock-who {
+  display: flex;
+  flex: 0 0 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: var(--h-tap);
+  padding: 0 18px 0 20px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--s-field);
+  box-shadow: inset 0 0 0 1.5px var(--c-line);
+  font: 500 var(--t-16) / 1.2 var(--f-text);
+  color: var(--cream);
+  text-align: left;
+}
+.dock-who svg {
+  flex: none;
+  color: var(--c-text-2);
 }
 /* le second bouton de la barre est secondaire : 44 px (§18.48), centré face au rose de 52 */
 .dock > .pill-ghost {
@@ -3349,13 +3372,20 @@ a.dossier-item:hover {
 .dock.is-add > a.pill-ghost {
   display: none;
 }
-/* le toast passe au-dessus de la barre (10 + 52 + 10 px) */
+/* le toast passe au-dessus de la barre (10 + 52 + 10 px), et de son premier rang quand il est là (44 + 8 px) */
 .dock.is-on ~ .toast {
   bottom: calc(84px + env(safe-area-inset-bottom, 0px));
 }
-/* marge basse : la barre ne couvre jamais les derniers liens de la page */
+.dock.is-on:has(> .dock-who) ~ .toast {
+  bottom: calc(136px + env(safe-area-inset-bottom, 0px));
+}
+/* marge basse : la barre, à deux rangs, ne couvre jamais les derniers liens de la page */
 .has-dock .footer-links {
-  padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(144px + env(safe-area-inset-bottom, 0px));
+}
+/* le bloc « Dénonce un complice » monte au haut de l'écran quand on y vient par la barre : un peu d'air au-dessus */
+.after-block.denounce {
+  scroll-margin-top: 12px;
 }
 
 /* l'image en plein écran, là où rien ne se télécharge (navigateurs intégrés) : un appui long l'enregistre */

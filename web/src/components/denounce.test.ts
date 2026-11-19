@@ -9,7 +9,7 @@ import type { CardData } from "../../../shared/types";
 import { starsFor } from "../../../shared/types";
 import { starsLine } from "../../../shared/stars";
 import { DICTS, LangProvider } from "../i18n";
-import { Wanted } from "./Denounce";
+import { Denounce, Wanted, pendingPct } from "./Denounce";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -70,14 +70,53 @@ describe("Dénoncer : la fiche du complice", () => {
     expect(DICTS.en.denounce.lawyerLinkedinHint).toMatch(/^Take it back: /);
   });
 
-  it("le champ : un lien LinkedIn ou un pseudo GitHub quand le serveur lit LinkedIn, sinon le pseudo seul, et il le dit", () => {
+  it("le champ : un nom, un pseudo GitHub ou un lien LinkedIn quand le serveur lit LinkedIn, sinon GitHub seul, et il le dit", () => {
     const src = readFileSync(join(__dirname, "Denounce.tsx"), "utf8");
     expect(src).toContain("detectEntry(raw)");
     expect(src).toMatch(/entry\.kind === "linkedin" && !liOn\) return setState\(\{ s: "idle", error: d\.githubOnly \}\)/);
     expect(src).toMatch(/\{ linkedin: entry\.url \}\), lang, denouncedBy: cardId/);
-    expect(DICTS.fr.denounce.placeholderBoth).toBe("Lien LinkedIn ou pseudo GitHub");
-    expect(DICTS.en.denounce.placeholderBoth).toBe("LinkedIn link or GitHub username");
+    expect(DICTS.fr.denounce.placeholderBoth).toBe("Son nom, son pseudo ou un lien");
+    expect(DICTS.en.denounce.placeholderBoth).toBe("Their name, username or a link");
     expect(DICTS.fr.denounce.githubOnly).toBe("Pour l'instant, par pseudo GitHub seulement.");
+  });
+
+  it("rien à coller (§18.82) : le champ propose des personnes, comptes GitHub et profils LinkedIn mêlés, un toucher dénonce", () => {
+    vi.stubGlobal("localStorage", { getItem: () => "fr", setItem: () => undefined });
+    const html = renderToStaticMarkup(createElement(LangProvider, null, createElement(Denounce, { cardId: "AbCdEf1234", selfLogin: "leamd", toast: () => undefined })));
+    // Le titre, une ligne, le champ à suggestions (combobox), « Dénoncer » en contour. Plus de préfixe « @ ».
+    expect(html).toMatch(/^<section class="after-block denounce"[^>]*><h2[^>]*>Dénonce un complice<\/h2><p class="denounce-intro">On dresse sa fiche, tu la lui envoies\.<\/p><form class="denounce-form"/);
+    expect(html).toMatch(/<div class="field field-who"><label[^>]*>Nom, pseudo GitHub ou lien LinkedIn du complice<\/label><input[^>]*placeholder="Son nom, son pseudo ou un lien"[^>]*role="combobox"/);
+    expect(html).toContain('<button type="submit" class="pill">Dénoncer</button>');
+    expect(html).not.toContain("field-prefix");
+    const src = readFileSync(join(__dirname, "Denounce.tsx"), "utf8");
+    // Les deux sources dans une liste, chaque ligne dit la sienne ; son propre compte n'y est pas.
+    expect(src).toContain("useSuggestions(value, { github: true, linkedin: mixed }, state.s !== \"idle\")");
+    expect(src).toContain("useSuggestBox({ id: `${uid}-sg`, items: people, onPick: pickOne, mixed, label })");
+    expect(src).toContain('p.login.toLowerCase() === selfLogin.toLowerCase()');
+    // Un toucher : la dénonciation part, par le pseudo du compte ou l'adresse du profil.
+    expect(src).toMatch(/const pickOne = \(item: Suggestion\) => \{\s*setValue\(item\.title\);\s*void send\(item\.kind === "github" \? \{ kind: "github", login: item\.login \} : \{ kind: "linkedin", url: item\.url \}/);
+    // Un nom envoyé sans ligne choisie : une seule personne, c'est elle ; plusieurs, la liste ; aucune, l'erreur.
+    expect(src).toContain("if (people.length === 1) return pickOne(people[0]!);");
+    expect(src).toContain("if (people.length) return box.show();");
+  });
+
+  it("« @x est dans le viseur » tout de suite, avec sa barre qui avance, dans le bloc (§18.82)", () => {
+    const src = readFileSync(join(__dirname, "Denounce.tsx"), "utf8");
+    // L'attente porte déjà le titre de la fiche prête : la personne, « est dans le viseur », puis la barre.
+    expect(src).toMatch(/<section className="after-block denounce is-pending" aria-busy>\s*<h2 className="denounce-head">\s*<span className="denounce-who-name">\{state\.who\}<\/span> \{d\.inSights\}\s*<\/h2>/);
+    expect(src).toContain('style={{ "--p": `${pendingPct(now - state.since)}%` } as CSSProperties}');
+    // La barre avance sur la durée attendue, ralentit ensuite, et ne touche jamais le bout avant la fiche.
+    expect(pendingPct(0)).toBe(0);
+    expect(pendingPct(10_000)).toBe(41);
+    expect(pendingPct(20_000)).toBe(82);
+    const later = [30_000, 60_000, 5 * 60_000].map(pendingPct);
+    expect(later[0]).toBeGreaterThan(82);
+    expect(later[1]).toBeGreaterThanOrEqual(later[0]!);
+    expect(later[2]).toBeLessThan(100);
+    expect(DICTS.fr.denounce.pending).toBe("Interrogatoire en cours…");
+    expect(DICTS.en.denounce.pending).toBe("Interrogation under way…");
+    // Prête, elle garde « Envoyer à @x » en premier, seul rose : le partage juste dessous passe en contour.
+    expect(readFileSync(join(__dirname, "denounce.css"), "utf8")).toContain(".after-block.denounce.is-done ~ .after-block.out .out-main {");
   });
 
   it("« Droit de faire appel » ne s'écrit plus nulle part : faire appel, c'est contester la note", () => {
