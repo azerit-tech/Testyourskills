@@ -8,6 +8,7 @@ import type { LinkedinProfile, LinkedinProvider, ProviderResult } from "./profil
 import { LinkedinCache } from "./store";
 import { profileToText, asLinkedinCard } from "./text";
 import { linkedinFromGithub } from "./url";
+import { linkedinFromReadme, readmeSignal, type GithubSignal } from "./githubSignals";
 import { linkedinFindings } from "./findings";
 import { linkedinFact } from "../../../shared/linkedinText";
 
@@ -48,14 +49,15 @@ function fakeProvider(reply: (url: string) => ProviderResult | Error | Promise<P
   return { provider, calls };
 }
 
-function setup(reply: (url: string) => ProviderResult | Error | Promise<ProviderResult> = (u) => ({ profile: profile(u), githubLogin: null, githubChecked: true }), extra: { daily?: number; search?: (q: unknown) => Promise<{ url: string | null; credits: number }> } = {}) {
+function setup(reply: (url: string) => ProviderResult | Error | Promise<ProviderResult> = (u) => ({ profile: profile(u), githubLogin: null, githubChecked: true }), extra: { daily?: number; search?: (q: unknown) => Promise<{ url: string | null; credits: number }>; signal?: GithubSignal } = {}) {
   const db = new Database(":memory:");
   const cache = new LinkedinCache(db);
   const f = fakeProvider(reply);
   let now = NOW;
   const search = extra.search ? { searchByGithub: vi.fn(extra.search) } : undefined;
-  const finder = new LinkedinProfiles({ cache, provider: f.provider, dailyProfiles: extra.daily, search: search as never, now: () => now });
-  return { db, cache, finder, calls: f.calls, search, advance: (ms: number) => (now += ms) };
+  const signal = extra.signal ? vi.fn(extra.signal) : undefined;
+  const finder = new LinkedinProfiles({ cache, provider: f.provider, dailyProfiles: extra.daily, search: search as never, signal, now: () => now });
+  return { db, cache, finder, calls: f.calls, search, signal, advance: (ms: number) => (now += ms) };
 }
 
 describe("le LinkedIn qu'un GitHub affiche (gratuit)", () => {
@@ -173,6 +175,71 @@ describe("forGithub", () => {
   });
 });
 
+describe("le README de profil (SPEC §18.90)", () => {
+  it("son seul lien /in/ est le LinkedIn de la personne ; plusieurs liens ou un exemple de modèle, aucun", () => {
+    expect(linkedinFromReadme("### Salut\n[![LinkedIn](https://img.shields.io/badge/LinkedIn-blue)](https://www.linkedin.com/in/Camille-Ardent/)")).toBe(CAMILLE);
+    expect(linkedinFromReadme("Écris-moi : linkedin.com/in/camille-ardent, ou https://fr.linkedin.com/in/camille-ardent?trk=x")).toBe(CAMILLE);
+    expect(linkedinFromReadme("Merci à linkedin.com/in/alice-a et linkedin.com/in/bob-b")).toBeNull();
+    expect(linkedinFromReadme("[LinkedIn](https://linkedin.com/in/your-username) [moi](https://linkedin.com/in/yourname)")).toBeNull();
+    expect(linkedinFromReadme("Modèle : linkedin.com/in/username. Moi : linkedin.com/in/camille-ardent")).toBe(CAMILLE);
+    expect(linkedinFromReadme("linkedin.com/company/ardent")).toBeNull();
+    expect(linkedinFromReadme(null)).toBeNull();
+  });
+
+  it("lu chez GitHub avec le jeton, dépôt login/login ; 404 : rien ; panne : lève", async () => {
+    const asked: { url: string; auth: string | null; accept: string | null }[] = [];
+    const reply = (status: number, body = "") =>
+      (async (url: string, init?: RequestInit) => {
+        const h = new Headers(init?.headers);
+        asked.push({ url, auth: h.get("authorization"), accept: h.get("accept") });
+        return new Response(body, { status });
+      }) as unknown as typeof fetch;
+    const gh = { login: "camille-ardent" };
+    expect(await readmeSignal({ token: () => "JETON", fetchImpl: reply(200, "linkedin.com/in/camille-ardent") })(gh)).toBe(CAMILLE);
+    expect(asked).toEqual([{ url: "https://api.github.com/repos/camille-ardent/camille-ardent/readme", auth: "bearer JETON", accept: "application/vnd.github.raw" }]);
+    expect(await readmeSignal({ fetchImpl: reply(404) })(gh)).toBeNull();
+    expect(asked[1]!.auth).toBeNull();
+    await expect(readmeSignal({ fetchImpl: reply(403) })(gh)).rejects.toThrow("403");
+    // Un pseudo qui n'en est pas un ne part jamais dans une adresse.
+    expect(await readmeSignal({ fetchImpl: reply(200, "linkedin.com/in/x-y") })({ login: "../../orgs/x" })).toBeNull();
+    expect(asked).toHaveLength(3);
+  });
+
+  it("GitHub n'affiche rien : le README donne le profil, prouvé, gardé ; il passe avant la recherche payante", async () => {
+    const t = setup(undefined, { signal: async () => CAMILLE, search: async () => ({ url: "https://www.linkedin.com/in/autre", credits: 1 }) });
+    expect(await t.finder.forGithub(facts())).toMatchObject({ profile: { name: "Camille Ardent" }, proven: true });
+    expect(t.search!.searchByGithub).not.toHaveBeenCalled();
+    expect(t.cache.getLookup("camille-ardent", NOW)).toBe(CAMILLE);
+    expect(t.cache.readsToday(NOW)).toBe(1); // la lecture du profil, pas de recherche
+    await t.finder.forGithub(facts());
+    expect(t.signal).toHaveBeenCalledTimes(1);
+  });
+
+  it("le profil GitHub affiche déjà son LinkedIn : le README n'est pas lu", async () => {
+    const t = setup(undefined, { signal: async () => "https://www.linkedin.com/in/autre" });
+    await t.finder.forGithub(facts({ socialAccounts: [{ provider: "linkedin", url: CAMILLE }] }));
+    expect(t.signal).not.toHaveBeenCalled();
+    expect(t.calls.map((c) => c.url)).toEqual([CAMILLE]);
+  });
+
+  it("README muet : « rien » gardé sans recherche payante, sinon la recherche prend la suite ; GitHub en panne : rien n'est gardé", async () => {
+    const mute = setup(undefined, { signal: async () => null });
+    expect(await mute.finder.forGithub(facts())).toBeNull();
+    expect(await mute.finder.forGithub(facts())).toBeNull();
+    expect(mute.signal).toHaveBeenCalledTimes(1);
+    expect(mute.calls).toHaveLength(0);
+
+    const paid = setup(undefined, { signal: async () => null, search: async () => ({ url: CAMILLE, credits: 1 }) });
+    expect(await paid.finder.forGithub(facts())).toMatchObject({ proven: true });
+    expect(paid.search!.searchByGithub).toHaveBeenCalledTimes(1);
+
+    const down = setup(undefined, { signal: async () => Promise.reject(new Error("HTTP 403")) });
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    expect(await down.finder.forGithub(facts())).toBeNull();
+    expect(down.cache.getLookup("camille-ardent", NOW)).toBeUndefined();
+  });
+});
+
 describe("forUrl (entrée LinkedIn)", () => {
   it("trouvé, avec le GitHub que le profil donne ; puis en cache", async () => {
     const t = setup((u) => ({ profile: profile(u), githubLogin: "camille-ardent", githubChecked: true }));
@@ -203,6 +270,39 @@ describe("forUrl (entrée LinkedIn)", () => {
     expect(await setup(() => new Error("boom")).finder.forUrl(CAMILLE)).toEqual({ status: "unavailable" });
     expect(await setup(undefined, { daily: 0 }).finder.forUrl(CAMILLE)).toEqual({ status: "unavailable" });
     expect(await setup().finder.forUrl(CAMILLE, { spend: () => false })).toEqual({ status: "unavailable" });
+    warn.mockRestore();
+  });
+});
+
+describe("peek (retour d'une connexion LinkedIn, §18.90)", () => {
+  it("rend le nom, le titre et la photo ; le profil entre au cache, la fiche qui suit ne le repaie pas", async () => {
+    const t = setup((u) => ({ profile: profile(u), githubLogin: "camille-dev", githubChecked: true }));
+    expect(await t.finder.peek(CAMILLE)).toEqual({ name: "Camille Ardent", headline: "Senior Full-Stack Engineer", photoUrl: "https://media.example.invalid/camille.jpg" });
+    expect(await t.finder.forUrl(CAMILLE)).toMatchObject({ status: "found", githubLogin: "camille-dev" });
+    expect(t.calls).toEqual([{ url: CAMILLE, withGithub: true }]);
+    expect(JSON.stringify(t.db.prepare("SELECT * FROM linkedin_profiles").all())).not.toContain("camille.jpg");
+  });
+
+  it("un profil déjà gardé est relu pour sa photo, sans toucher à son lien avec un GitHub", async () => {
+    const t = setup();
+    await t.finder.forGithub(facts({ blog: CAMILLE }));
+    expect((await t.finder.peek(CAMILLE))?.photoUrl).toBe("https://media.example.invalid/camille.jpg");
+    expect(t.calls).toHaveLength(2);
+    expect(t.cache.getProfile(CAMILLE, NOW)).toMatchObject({ found: true, githubLogin: "camille-ardent" });
+  });
+
+  it("introuvable (lu ou déjà gardé comme tel), adresse invalide, panne, plafond, limite par IP : null", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const gone = setup(() => ({ profile: null, githubLogin: null, githubChecked: true }));
+    expect(await gone.finder.peek(CAMILLE)).toBeNull();
+    expect(await gone.finder.peek(CAMILLE)).toBeNull();
+    expect(gone.calls).toHaveLength(1);
+    expect(await setup().finder.peek("https://linkedin.com/company/brumes")).toBeNull();
+    expect(await setup(() => new Error("boom")).finder.peek(CAMILLE)).toBeNull();
+    expect(await setup(undefined, { daily: 0 }).finder.peek(CAMILLE)).toBeNull();
+    const limited = setup();
+    expect(await limited.finder.peek(CAMILLE, { spend: () => false })).toBeNull();
+    expect(limited.calls).toHaveLength(0);
     warn.mockRestore();
   });
 });

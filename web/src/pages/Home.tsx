@@ -32,7 +32,11 @@ import { useT } from "../i18n";
 import { ApiError, api, type Showcase } from "../lib/api";
 import { onLinkClick } from "../lib/router";
 import { homeHook, useAppConfig } from "../lib/season";
-import { clearPending, dropPrefill, filmOwed, myCard, peekPrefill, pendingFile, type MyCard } from "../lib/session";
+import { returnPending } from "../lib/entryApi";
+import { MINE_EVENT, clearPending, dropPrefill, filmOwed, myCard, peekPrefill, pendingFile, type MyCard } from "../lib/session";
+import { ReturnCall } from "../components/ReturnCall";
+
+export { ReturnCall };
 
 /** Dénoncer depuis l'accueil (/<pseudo> d'un autre) : le bloc de la fiche, chargé seulement ce jour-là. */
 const Denounce = lazy(() => import("../components/Denounce").then((m) => ({ default: m.Denounce })));
@@ -150,8 +154,12 @@ function useMemory(): Memory {
       }
     };
     void check();
+    // La fiche de qui s'est connecté ici, rendue par le serveur après le premier rendu (§18.90).
+    const on = () => setMem((m) => ({ ...m, mine: myCard() }));
+    window.addEventListener(MINE_EVENT, on);
     return () => {
       alive = false;
+      window.removeEventListener(MINE_EVENT, on);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -329,7 +337,9 @@ export function Home() {
   const direct = prefill?.direct && prefill.login ? prefill.login : null;
   const directIsMine = !!direct && direct.toLowerCase() === mineLogin;
   const fromPrefill = !!prefill && !directIsMine;
-  const [open, setOpen] = useState(fromPrefill);
+  // Une connexion LinkedIn ou GitHub revient sur l'accueil : le formulaire est là pour dire où elle en est (§18.90).
+  const [returnBack] = useState(returnPending);
+  const [open, setOpen] = useState(fromPrefill || returnBack);
   const returning = !!mem.mine && !owed && !mem.pending;
   // /<pseudo> d'un autre, pour qui a sa fiche : c'est une dénonciation (§18.52), avec ses gardes
   // (pas soi-même, la fiche part au nom du dénonciateur, aucun partage public), pas « Faire ma fiche ».
@@ -341,7 +351,7 @@ export function Home() {
   }, []);
   // Qui a déjà sa fiche (§18.89) : sa fiche, les classements, et le formulaire replié tout en bas
   // sous « Faire une autre fiche ».
-  const mineHome = returning && !denounce && !fromPrefill;
+  const mineHome = returning && !denounce && !fromPrefill && !returnBack;
   const showcase = useShowcase(!mineHome);
   const toast = useMiniToast();
 

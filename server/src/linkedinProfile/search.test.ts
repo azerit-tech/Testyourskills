@@ -6,11 +6,7 @@ import { describe, expect, it } from "vitest";
 import { parsePersonName, samePublicFullName } from "../names";
 import { CrustdataClient, CrustdataPeople } from "./crustdata";
 import {
-  ApifyPeopleSearch,
-  DEFAULT_APIFY_SEARCH_ACTOR,
   LinkedinSearch,
-  apifySearchInput,
-  candidateFromApifyItem,
   linkedinSearchFromEnv,
   rankCandidates,
   type LinkedinCandidate,
@@ -25,11 +21,11 @@ const CAMILLE: LinkedinCandidate = { url: "https://www.linkedin.com/in/camille-a
 const HOMONYM: LinkedinCandidate = { url: "https://www.linkedin.com/in/camille-ardent-2", name: "Camille Ardent", headline: "Cheffe de projet" };
 
 function fakeProvider(reply: () => LinkedinCandidate[] | Error) {
-  const calls: { full: string; strict: boolean }[] = [];
+  const calls: { full: string; strict: boolean; company?: string | null }[] = [];
   const provider: PeopleSearchProvider = {
-    name: "apify",
+    name: "brave",
     async searchByName(name, opts) {
-      calls.push({ full: name.full, strict: opts.strict });
+      calls.push({ full: name.full, strict: opts.strict, ...(opts.company ? { company: opts.company } : {}) });
       const r = reply();
       if (r instanceof Error) throw r;
       return r;
@@ -63,52 +59,6 @@ describe("le nom tapé", () => {
     expect(samePublicFullName("Camille", "Camille Ardent")).toBe(false);
     expect(samePublicFullName("Camille Ardent", "Camille Durand")).toBe(false);
     expect(samePublicFullName("Camille Ardent", "")).toBe(false);
-  });
-});
-
-describe("l'acteur Apify de recherche par nom", () => {
-  it("demande une page en mode Short, prénom et nom séparés, jeton en Bearer", async () => {
-    const calls: { url: string; headers: Headers; body: unknown }[] = [];
-    const impl = (async (input: RequestInfo | URL, init?: RequestInit) => {
-      calls.push({ url: String(input), headers: new Headers(init?.headers), body: JSON.parse(String(init?.body)) });
-      return json([
-        { publicIdentifier: "camille-ardent", linkedinUrl: "https://www.linkedin.com/in/ACoAAB1234567890abcdef", firstName: "Camille", lastName: "Ardent", headline: "Senior Full-Stack Engineer", photo: "https://media.licdn.com/dms/image/v2/D4E03AQabc/x/0/1" },
-        { linkedinUrl: "https://www.linkedin.com/in/ACoAAB1234567890abcdef", name: "LinkedIn Member" },
-        { error: "not found" },
-      ]);
-    }) as typeof fetch;
-    const provider = new ApifyPeopleSearch({ token: "apify-test", fetchImpl: impl });
-    const found = await provider.searchByName(parsePersonName("Camille Ardent")!, { strict: true });
-    expect(calls).toHaveLength(1);
-    expect(calls[0]!.url).toContain(`/acts/${DEFAULT_APIFY_SEARCH_ACTOR}/run-sync-get-dataset-items`);
-    expect(calls[0]!.headers.get("authorization")).toBe("Bearer apify-test");
-    expect(calls[0]!.body).toEqual({ profileScraperMode: "Short", firstName: "Camille", lastName: "Ardent", strictSearch: true, maxPages: 1, maxItems: 10 });
-    // L'adresse vient du nom public ; un profil sans nom public (ACoAA…) est écarté.
-    expect(found).toEqual([{ url: "https://www.linkedin.com/in/camille-ardent", name: "Camille Ardent", headline: "Senior Full-Stack Engineer", photoUrl: "https://media.licdn.com/dms/image/v2/D4E03AQabc/x/0/1" }]);
-  });
-
-  it("lit les formes voisines d'un élément, et refuse ce qui n'est pas un profil", () => {
-    expect(candidateFromApifyItem({ url: "https://fr.linkedin.com/in/Léa-M/", fullName: "Léa M", position: "CTO", profilePicture: { url: "https://media.licdn.com/p.jpg" } })).toEqual({
-      url: "https://www.linkedin.com/in/l%C3%A9a-m",
-      name: "Léa M",
-      headline: "CTO",
-      photoUrl: "https://media.licdn.com/p.jpg",
-    });
-    expect(candidateFromApifyItem({ url: "https://www.linkedin.com/company/azerit", name: "Azerit" })).toBeNull();
-    expect(candidateFromApifyItem({ publicIdentifier: "camille-ardent" })).toBeNull();
-    expect(candidateFromApifyItem(null)).toBeNull();
-  });
-
-  it("le modèle d'entrée se remplace, « {strict} » devient un booléen", () => {
-    const name = parsePersonName("Camille Ardent")!;
-    expect(apifySearchInput('{"q":"{name}","exact":"{strict}","n":[1,"{last}"]}', name, false)).toEqual({ q: "Camille Ardent", exact: false, n: [1, "Ardent"] });
-    expect(() => new ApifyPeopleSearch({ token: "t", inputTemplate: "{pas du json" })).toThrow();
-  });
-
-  it("une panne HTTP lève une erreur sans le jeton", async () => {
-    const provider = new ApifyPeopleSearch({ token: "apify-secret", fetchImpl: (async () => json({}, 402)) as typeof fetch });
-    await expect(provider.searchByName(parsePersonName("Camille Ardent")!, { strict: false })).rejects.toMatchObject({ status: 402 });
-    await provider.searchByName(parsePersonName("Camille Ardent")!, { strict: false }).catch((e: Error) => expect(e.message).not.toContain("apify-secret"));
   });
 });
 
@@ -190,6 +140,33 @@ describe("le service : cache, plafond du jour, limite par IP", () => {
     expect(down.cache.getSearch("n:lea martin", NOW)).toBeNull();
   });
 
+  it("l'employeur départage les homonymes : sa propre recherche, et dans la clé du cache son empreinte seulement", async () => {
+    const { provider, calls } = fakeProvider(() => [CAMILLE]);
+    const { search, db } = service(provider);
+    await search.byName("Camille Ardent", { strict: true, company: "Paysolde" });
+    await search.byName("Camille Ardent", { strict: true, company: "paysolde " });
+    await search.byName("Camille Ardent", { strict: true });
+    // Une saisie en cours ne porte jamais d'employeur.
+    await search.byName("Camille Ardent", { company: "Paysolde" });
+    expect(calls).toEqual([
+      { full: "Camille Ardent", strict: true, company: "paysolde" },
+      { full: "Camille Ardent", strict: true },
+      { full: "Camille Ardent", strict: false },
+    ]);
+    const keys = (db.prepare("SELECT key FROM linkedin_searches").all() as { key: string }[]).map((r) => r.key);
+    expect(keys).toHaveLength(3);
+    expect(keys.join(" ")).not.toContain("paysolde");
+  });
+
+  it("un fournisseur trop lent pour la frappe : la saisie en cours répond « off » sans rien payer, le nom exact part", async () => {
+    const { provider, calls } = fakeProvider(() => [CAMILLE]);
+    const { search, cache } = service({ ...provider, typing: false });
+    expect(await search.byName("Camille Ardent")).toEqual({ status: "off" });
+    expect(cache.searchesToday(NOW)).toBe(0);
+    expect((await search.byName("Camille Ardent", { strict: true })).status).toBe("ok");
+    expect(calls).toHaveLength(1);
+  });
+
   it("deux frappes du même nom en vol : une seule recherche", async () => {
     const { provider, calls } = fakeProvider(() => [CAMILLE]);
     const { search } = service(provider);
@@ -234,11 +211,22 @@ describe("le service : cache, plafond du jour, limite par IP", () => {
 
 describe("configuration", () => {
   const db = () => new Database(":memory:");
-  it("sans jeton : pas de recherche ; avec APIFY_TOKEN : Apify ; Crustdata à la demande", () => {
+  it("sans clé : pas de recherche ; les index web dans l'ordre Brave, Serper, Apify ; Crustdata à la demande", () => {
     expect(linkedinSearchFromEnv({}, db())).toBeNull();
-    expect(linkedinSearchFromEnv({ APIFY_TOKEN: "t" }, db())?.providerName).toBe("apify");
-    expect(linkedinSearchFromEnv({ APIFY_TOKEN: "t", LINKEDIN_SEARCH_PROVIDER: "crustdata" }, db())).toBeNull();
+    expect(linkedinSearchFromEnv({ APIFY_TOKEN: "t", SERPER_API_KEY: "s", BRAVE_SEARCH_API_KEY: "b" }, db())?.providerName).toBe("brave, serper, apify-google");
+    expect(linkedinSearchFromEnv({ SERPER_API_KEY: "s" }, db())?.providerName).toBe("serper");
+    // L'ancien nom du fournisseur par défaut reste lu.
+    expect(linkedinSearchFromEnv({ APIFY_TOKEN: "t", LINKEDIN_SEARCH_PROVIDER: "apify" }, db())?.providerName).toBe("apify-google");
+    expect(linkedinSearchFromEnv({ BRAVE_SEARCH_API_KEY: "b", LINKEDIN_SEARCH_PROVIDER: "crustdata" }, db())).toBeNull();
     expect(linkedinSearchFromEnv({ CRUSTDATA_API_KEY: "k", LINKEDIN_SEARCH_PROVIDER: "crustdata" }, db())?.providerName).toBe("crustdata");
     expect(linkedinSearchFromEnv({ CRUSTDATA_API_KEY: "k", LINKEDIN_PROVIDER: "crustdata" }, db())?.providerName).toBe("crustdata");
+    expect(linkedinSearchFromEnv({ CRUSTDATA_API_KEY: "k", LINKEDIN_PROVIDER: "crustdata", LINKEDIN_SEARCH_PROVIDER: "web", BRAVE_SEARCH_API_KEY: "b" }, db())?.providerName).toBe("brave");
+  });
+
+  it("avec le seul jeton Apify : pas de suggestions pendant la frappe", async () => {
+    const search = linkedinSearchFromEnv({ APIFY_TOKEN: "t" }, db(), (async () => {
+      throw new Error("aucun appel attendu");
+    }) as typeof fetch)!;
+    expect(await search.byName("Camille Ardent")).toEqual({ status: "off" });
   });
 });

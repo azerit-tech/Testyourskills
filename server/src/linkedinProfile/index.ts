@@ -19,6 +19,8 @@ import { CrustdataClient, CrustdataProvider } from "./crustdata";
 import type { LinkedinProfile, LinkedinProvider } from "./profile";
 import { LinkedinCache } from "./store";
 import { githubDeclaredOf, linkedinFromGithub, normalizeLinkedinUrl } from "./url";
+import { tokensFromEnv } from "../github/tokens";
+import { readmeSignal, type GithubSignal } from "./githubSignals";
 
 export type { LinkedinProfile, LinkedinProvider } from "./profile";
 export { normalizeLinkedinUrl } from "./url";
@@ -53,10 +55,19 @@ export interface GithubLookup {
   proven: boolean;
 }
 
+/** Ce qui reconnaît une personne sur son profil : son nom, son titre, sa photo (jamais gardée). */
+export interface ProfilePeek {
+  name: string;
+  headline: string;
+  photoUrl?: string;
+}
+
 /** Ce que le pipeline demande ; les tests en donnent un faux. */
 export interface LinkedinFinder {
   forGithub(facts: unknown, opts?: LookupOptions & { url?: string }): Promise<GithubLookup | null>;
   forUrl(url: string, opts?: LookupOptions): Promise<UrlLookup>;
+  /** Le profil lu pour sa photo, au retour d'une connexion LinkedIn (§18.90). null : introuvable, plafond, panne. */
+  peek?(url: string, opts?: LookupOptions): Promise<ProfilePeek | null>;
 }
 
 export interface LinkedinProfilesOptions {
@@ -66,6 +77,8 @@ export interface LinkedinProfilesOptions {
   dailyProfiles?: number;
   /** Recherche payante du LinkedIn d'un GitHub qui n'en affiche pas (LINKEDIN_AUTOFIND=crustdata). */
   search?: Pick<CrustdataClient, "searchByGithub">;
+  /** Signal gratuit quand le profil GitHub n'affiche aucun LinkedIn : le README de profil (§18.90). */
+  signal?: GithubSignal;
   now?: () => number;
 }
 
@@ -91,7 +104,7 @@ export class LinkedinProfiles implements LinkedinFinder {
   }
 
   async forGithub(facts: unknown, opts: LookupOptions & { url?: string } = {}): Promise<GithubLookup | null> {
-    const { cache, provider, search } = this.opts;
+    const { cache, provider, search, signal: free } = this.opts;
     const gh = githubDeclaredOf(facts);
     if (!gh) return null;
     const explicit = opts.url ? normalizeLinkedinUrl(opts.url) : null;
@@ -100,18 +113,34 @@ export class LinkedinProfiles implements LinkedinFinder {
     // un GitHub : seuls ce que GitHub affiche (cette même adresse) et la recherche le font.
     let url = explicit ?? declared;
     let proves = !!declared && (!explicit || explicit === declared);
-    if (!url && search) {
+    if (!url && (free || search)) {
       const prev = cache.getLookup(gh.login, this.now());
       if (prev !== undefined) url = prev;
-      else if (this.take(opts)) {
-        try {
-          const r = await search.searchByGithub({ login: gh.login, name: gh.name, createdAt: gh.createdAt }, opts.signal);
-          cache.putLookup(gh.login, r.url, this.now());
-          url = r.url;
-        } catch (err) {
-          warn("recherche", err);
-          return null;
+      else {
+        // Le README de profil d'abord : gratuit, et la personne l'a écrit elle-même.
+        let readme: string | null | undefined;
+        if (free) {
+          try {
+            readme = await free(gh, opts.signal);
+          } catch (err) {
+            warn("README de profil", err);
+          }
         }
+        if (readme) {
+          cache.putLookup(gh.login, readme, this.now());
+          url = readme;
+        } else if (search) {
+          if (this.take(opts)) {
+            try {
+              const r = await search.searchByGithub({ login: gh.login, name: gh.name, createdAt: gh.createdAt }, opts.signal);
+              cache.putLookup(gh.login, r.url, this.now());
+              url = r.url;
+            } catch (err) {
+              warn("recherche", err);
+              return null;
+            }
+          }
+        } else if (readme === null) cache.putLookup(gh.login, null, this.now());
       }
       proves = !!url;
     }
@@ -130,6 +159,29 @@ export class LinkedinProfiles implements LinkedinFinder {
       const link = proves ? gh.login : r.githubChecked ? r.githubLogin : undefined;
       cache.putProfile(url, r.profile, r.profile ? link : undefined, this.now());
       return r.profile ? { profile: r.profile, proven: proves } : null;
+    } catch (err) {
+      warn("profil", err);
+      return null;
+    }
+  }
+
+  /**
+   * Toujours une lecture chez le fournisseur : le cache ne garde pas la photo. Le
+   * profil lu y entre s'il n'y était pas, et la fiche qui part ensuite ne le repaie pas.
+   */
+  async peek(raw: string, opts: LookupOptions = {}): Promise<ProfilePeek | null> {
+    const { cache, provider } = this.opts;
+    const url = normalizeLinkedinUrl(raw);
+    if (!url) return null;
+    const hit = cache.getProfile(url, this.now());
+    if (hit && !hit.found) return null;
+    if (!this.take(opts)) return null;
+    try {
+      const r = await provider.fetchProfile(url, { withGithub: true, signal: opts.signal });
+      // Un profil déjà gardé garde son lien avec un GitHub, que cette lecture ne sait pas prouver.
+      if (!hit) cache.putProfile(url, r.profile, r.profile ? r.githubLogin : undefined, this.now());
+      const p = r.profile;
+      return p ? { name: p.name, headline: p.headline, ...(p.photoUrl ? { photoUrl: p.photoUrl } : {}) } : null;
     } catch (err) {
       warn("profil", err);
       return null;
@@ -214,5 +266,6 @@ export function linkedinProfilesFromEnv(env: NodeJS.ProcessEnv, db: Database.Dat
     provider,
     dailyProfiles: cfg.dailyProfiles,
     search: cfg.searchKey ? new CrustdataClient({ apiKey: cfg.searchKey, fetchImpl }) : undefined,
+    signal: readmeSignal({ token: () => tokensFromEnv(env)[0], fetchImpl }),
   });
 }

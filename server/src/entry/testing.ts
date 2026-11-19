@@ -10,7 +10,7 @@ import type { CvReading } from "../../../shared/readings";
 import type { CardData, JobState } from "../../../shared/types";
 import { createApp, type AppOptions } from "../app";
 import { Store } from "../db";
-import type { LinkedinFinder, UrlLookup } from "../linkedinProfile/index";
+import type { LinkedinFinder, ProfilePeek, UrlLookup } from "../linkedinProfile/index";
 import type { LinkedinProfile } from "../linkedinProfile/profile";
 import type { LinkedinCandidate, LinkedinPeople, SearchResult } from "../linkedinProfile/search";
 import type { CardBody, Deps } from "../pipeline";
@@ -65,12 +65,14 @@ export interface EntrySetup {
   people?: { byName?: (raw: string, strict: boolean) => SearchResult | Promise<SearchResult>; byEmail?: (email: string) => LinkedinCandidate | null } | null;
   /** Ce que la lecture d'un profil rend (défaut : le profil de Camille, sans GitHub). */
   forUrl?: (url: string) => UrlLookup | Promise<UrlLookup>;
+  /** Le profil lu pour sa photo au retour d'une connexion ; absent : le serveur ne sait pas le lire. */
+  peek?: (url: string) => ProfilePeek | null | Promise<ProfilePeek | null>;
   app?: Partial<AppOptions>;
 }
 
 export function setupEntry(o: EntrySetup = {}) {
   const store = new Store(":memory:");
-  const calls = { collect: [] as string[], byName: [] as { raw: string; strict: boolean; spent: boolean }[], byEmail: [] as string[], forUrl: [] as string[] };
+  const calls = { collect: [] as string[], byName: [] as { raw: string; strict: boolean; spent: boolean; company?: string }[], byEmail: [] as string[], forUrl: [] as string[], peek: [] as string[] };
   const deps: Deps = {
     async collectGithub(login) {
       calls.collect.push(login);
@@ -113,6 +115,15 @@ export function setupEntry(o: EntrySetup = {}) {
       calls.forUrl.push(url);
       return o.forUrl ? o.forUrl(url) : { status: "found", profile: { ...PROFILE, url }, githubLogin: null };
     },
+    ...(o.peek
+      ? {
+          async peek(url, opts) {
+            if (!(opts?.spend?.() ?? true)) return null;
+            calls.peek.push(url);
+            return o.peek!(url);
+          },
+        }
+      : {}),
   };
   const p = o.people;
   const linkedinPeople: LinkedinPeople | undefined =
@@ -121,7 +132,7 @@ export function setupEntry(o: EntrySetup = {}) {
       : {
           async byName(raw, opts) {
             const spent = opts?.spend?.() ?? true;
-            calls.byName.push({ raw, strict: !!opts?.strict, spent });
+            calls.byName.push({ raw, strict: !!opts?.strict, spent, ...(opts?.company ? { company: opts.company } : {}) });
             if (!spent) return { status: "off" };
             return p?.byName ? p.byName(raw, !!opts?.strict) : { status: "ok", results: [CAMILLE, HOMONYM] };
           },

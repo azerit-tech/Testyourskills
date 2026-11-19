@@ -26,6 +26,21 @@ export function recentLinkedinCard(db: Database.Database, by: { url?: string; lo
   return r?.id ?? null;
 }
 
+/**
+ * La dernière fiche tirée de ce profil LinkedIn, quel que soit son âge (§18.90,
+ * « Voir ma fiche ») : jugée avec la lecture IA de préférence. L'id, ou null.
+ */
+export function latestLinkedinCard(db: Database.Database, url: string): string | null {
+  const r = db
+    .prepare(
+      `SELECT id FROM cards
+       WHERE parent_id IS NULL AND json_extract(facts_json, '$.linkedinUrl') = ?
+       ORDER BY degraded ASC, created_at DESC LIMIT 1`,
+    )
+    .get(url) as { id: string } | undefined;
+  return r?.id ?? null;
+}
+
 /** Fiche supprimée : son profil LinkedIn en cache part avec elle. */
 export function forgetLinkedinOfCard(db: Database.Database, facts: unknown): void {
   const url = (facts as { linkedinUrl?: unknown } | null)?.linkedinUrl;

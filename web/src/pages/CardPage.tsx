@@ -12,6 +12,7 @@ import { Denounce } from "../components/Denounce";
 import { Denounced, useRemake } from "../components/Denounced";
 import { Duel, useDuelSend } from "../components/Duel";
 import { EntryForm } from "../components/EntryForm";
+import { ReturnCall } from "../components/ReturnCall";
 import { PrimeRace } from "../components/Primes";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { CardNotFound, Unreachable } from "../components/ErrorPage";
@@ -31,6 +32,7 @@ import type { WalkoutControl } from "../components/Walkout3D";
 import { Waiting } from "../components/Waiting";
 import { pick, useT } from "../i18n";
 import { api, ApiError, tokens, type CaseInfo } from "../lib/api";
+import { onMine } from "../lib/entryApi";
 import { isClosed, isInputError } from "../lib/errors";
 import { useHold, type SceneState } from "../lib/hold";
 import { gaveUp, nextPatience, type Patience } from "../lib/patience";
@@ -570,7 +572,9 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
   const [claimOn, setClaimOn] = useState(() => api.knownConfig()?.claim ?? false);
   // Le serveur lit LinkedIn : « Ajoute ton LinkedIn » existe (AddLinkedin.tsx lit la même valeur).
   const [liOn, setLiOn] = useState(() => api.knownConfig()?.linkedinEntry ?? true);
-  const [mine] = useState<MyCard | null>(() => myCard());
+  // Relue quand elle change : le serveur peut la rendre après le premier rendu (qui s'est connecté ici, §18.90).
+  const [mine, setMine] = useState<MyCard | null>(() => myCard());
+  useEffect(() => onMine(() => setMine(myCard())), []);
   useEffect(() => {
     let alive = true;
     void api.getConfig().then((c) => {
@@ -605,6 +609,10 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
     if (visitor && settled && kase && !wantedYou && !main.sealed) rememberVisited({ id: main.id, login: main.login ?? null, name: main.name, overall: main.overall });
   }, [visitor, settled, kase, wantedYou, main.id, main.login, main.name, main.sealed, main.overall]);
   const other = mine && mine.id !== id && !(mine.login && main.login && mine.login === main.login.toLowerCase()) ? mine : null;
+  // La fiche de sa propre personne, regardée sans le jeton de cet appareil (la vitrine sous son pseudo,
+  // sa fiche faite par un autre) : « Voir ma fiche » et la dénonciation, pas les boutons de connexion (§18.90).
+  const self = visitor && mine && !other ? mine : null;
+  const [another, setAnother] = useState(false);
   const proveFirst = item.kind === "card" && declaredOf(item.card) === "linkedin";
   const who = main.login ? `@${main.login}` : main.name;
   // Au-dessus de la fiche, sur téléphone : « @pseudo », ou le prénom seul.
@@ -638,6 +646,15 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
   // Qui a déjà sa fiche : le duel à la place, avec le score à envoyer.
   const turn = !visitor ? null : other ? (
     <Duel mine={other} card={main} duel={duel} strong />
+  ) : self && !another ? (
+    <>
+      {self.id !== id && (
+        <section className="you you-mine" id="you" aria-label={t.home.back.see}>
+          <ReturnCall mine={self} onAnother={() => setAnother(true)} />
+        </section>
+      )}
+      <Denounce cardId={self.id} selfLogin={self.login ?? undefined} toast={toast.show} />
+    </>
   ) : (
     <section className="you" id="you" aria-labelledby="you-title">
       <h2 id="you-title">{t.denounce.andYou}</h2>
@@ -686,7 +703,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
             ) : (
               <>
                 {t.result.leadShort(whoShort)}
-                {!other && (
+                {!other && !self && (
                   <>
                     <br />
                     <span className="lead-yours">{t.result.leadYours}</span>
@@ -817,7 +834,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
       {/* La barre du pouce (§18.27) : mêmes conditions que le bloc de partage, une fois la fiche posée. Avant le toast, qui se cale dessus. */}
       {!visitor && !(claimed && me?.hidden) && <ShareDock item={item} ready={settled} toast={toast.show} add={addFirst} />}
       {/* La barre fixe du visiteur sur téléphone (§18.48) : « Faire ma fiche », « C'est moi » sur une fiche dénoncée, ou « Lui envoyer mon score ». */}
-      {visitor && settled && (!other || duel.send) && <MakeYours watch={wantedYou} onLawyer={lawyer} onSend={other ? duel.send : null} />}
+      {!(self && !another) && visitor && settled && (!other || duel.send) && <MakeYours watch={wantedYou} onLawyer={lawyer} onSend={other ? duel.send : null} />}
       {toast.node}
     </main>
   );
