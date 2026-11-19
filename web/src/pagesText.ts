@@ -308,7 +308,8 @@ const fr = {
         h: "Entrer sans rien coller",
         blocks: [
           "« Se connecter avec LinkedIn » : LinkedIn nous donne ton nom, ta photo et ton email vérifié. Le nom et la photo servent à retrouver ton profil public ; l'email, à retrouver ton GitHub par la recherche publique de GitHub. Ton email est gardé avec ta fiche, comme si tu l'avais laissé dessous : il rejoint les contacts d'Azerit et part avec la fiche. Aucun jeton de connexion n'est gardé.",
-          "La recherche par nom passe par un service tiers de collecte de profils publics (nom, titre, photo) et par la recherche publique de GitHub ; ses résultats sont gardés 24 heures.",
+          "La recherche par nom passe par un moteur de recherche web (Brave Search, ou Google par Serper) : le nom tapé, ou celui que LinkedIn nous donne, y est envoyé, avec l'employeur lu dans le domaine de ton email s'il y en a un, jamais l'email. Les premiers profils trouvés sont lus par un service tiers de collecte de profils publics (nom, titre, photo). Les comptes GitHub viennent de la recherche publique de GitHub. Les résultats sont gardés 24 heures.",
+          "Après une connexion LinkedIn, un cookie signé, valable 90 jours, retient ton nom, l'adresse de ton profil et ta fiche, pour te la remontrer à ta prochaine visite. Il ne contient ni email ni photo, et part quand tu supprimes ta fiche.",
           "« Se connecter avec GitHub » : GitHub nous donne ton pseudo, rien d'autre.",
         ],
       },
@@ -504,7 +505,8 @@ const en: PagesDict = {
         h: "Getting in without pasting",
         blocks: [
           "“Sign in with LinkedIn”: LinkedIn gives us your name, picture and verified email. The name and picture are used to find your public profile; the email, to find your GitHub through GitHub's public search. Your email is kept with your sheet, as if you had left it underneath: it joins Azerit's contacts and is deleted with the sheet. No sign-in token is kept.",
-          "The name search goes through a third-party service that collects public profiles (name, headline, picture) and through GitHub's public search; its results are kept for 24 hours.",
+          "The name search goes through a web search engine (Brave Search, or Google via Serper): the name you type, or the one LinkedIn gives us, is sent to it, with the employer read from your email's domain if there is one, never the email. The first profiles found are read by a third-party service that collects public profiles (name, headline, picture). GitHub accounts come from GitHub's public search. Results are kept for 24 hours.",
+          "After a LinkedIn sign-in, a signed cookie, valid for 90 days, remembers your name, your profile's address and your sheet, to show it to you again on your next visit. It holds neither your email nor your picture, and is removed when you delete your sheet.",
           "“Sign in with GitHub”: GitHub gives us your username, nothing else.",
         ],
       },
