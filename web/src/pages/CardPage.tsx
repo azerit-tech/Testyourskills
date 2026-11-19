@@ -31,7 +31,8 @@ import { Spin } from "../components/Spin";
 import type { WalkoutControl } from "../components/Walkout3D";
 import { Waiting } from "../components/Waiting";
 import { pick, useT } from "../i18n";
-import { api, ApiError, tokens, type CaseInfo } from "../lib/api";
+import { api, ApiError, isMine, tokens, type CaseInfo } from "../lib/api";
+import { signOut, useAccount } from "../lib/account";
 import { onMine } from "../lib/entryApi";
 import { isClosed, isInputError } from "../lib/errors";
 import { useHold, type SceneState } from "../lib/hold";
@@ -565,7 +566,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
   // Revendiquée par la personne connectée (§18.1) : sa fiche, même sans le jeton de cet appareil.
   const cardLogin = main.login;
   const claimed = !!me && !!cardLogin && me.login === cardLogin.toLowerCase();
-  const visitor = !owner && !claimed;
+  // Sa fiche par le compte (§18.91) : le serveur la dit `mine`, sans jeton sur cet appareil.
+  const visitor = !owner && !claimed && !isMine(id);
 
   // Dénonciation (§18.6) et page partagée (§18.7).
   // La configuration est déjà dans la page (ou en mémoire) : « C'est moi » est là dès la première image, rien ne pousse le bloc.
@@ -613,6 +615,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
   // sa fiche faite par un autre) : « Voir ma fiche » et la dénonciation, pas les boutons de connexion (§18.90).
   const self = visitor && mine && !other ? mine : null;
   const [another, setAnother] = useState(false);
+  // Connecté (§18.91) : « Se déconnecter » à côté de « Faire une autre fiche ».
+  const acct = useAccount();
   const proveFirst = item.kind === "card" && declaredOf(item.card) === "linkedin";
   const who = main.login ? `@${main.login}` : main.name;
   // Au-dessus de la fiche, sur téléphone : « @pseudo », ou le prénom seul.
@@ -650,7 +654,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
     <>
       {self.id !== id && (
         <section className="you you-mine" id="you" aria-label={t.home.back.see}>
-          <ReturnCall mine={self} onAnother={() => setAnother(true)} />
+          <ReturnCall mine={self} onAnother={() => setAnother(true)} onSignOut={acct ? () => void signOut() : undefined} />
         </section>
       )}
       <Denounce cardId={self.id} selfLogin={self.login ?? undefined} mine={self.overall} toast={toast.show} />
@@ -663,7 +667,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
       </p>
       {/* Les critères sont repliés (§18.76) : la question ne parle pas de « ces huit critères ». */}
       <p className="you-turn">{t.result.yourTurnBare}</p>
-      <EntryForm variant="inline" />
+      <EntryForm variant="inline" another={another} />
     </section>
   );
   // Au bureau, l'ordre du document suit l'écran : « À ton tour » avant la colonne, sauf sous une fiche dénoncée (son bloc d'abord).

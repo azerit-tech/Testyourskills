@@ -1,9 +1,9 @@
-// Les tableaux de l'accueil (§18.48) : le top de la semaine et celui des bandes,
+// Les tableaux de l'accueil (§18.48, §18.92) : le top de la semaine et ceux des bandes,
 // et la ligne de mémoire, rendus en chaîne, sans navigateur ni serveur.
 import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { BandStanding } from "../../../shared/bands";
+import type { BandsTop, BandStanding } from "../../../shared/bands";
 import type { TopEntry, WeekTop } from "../../../shared/types";
 import { LangProvider } from "../i18n";
 import { BackLine } from "../pages/Home";
@@ -127,16 +127,65 @@ describe("la ligne de mémoire au-dessus du formulaire", () => {
   });
 });
 
-describe("les bandes sur l'accueil", () => {
-  const band = (id: string) => ({ type: "ecole", id, label: id, score: 12, members: 3, rank: 1, missing: 0, gap: null, ahead: null }) as BandStanding;
+describe("les bandes sur l'accueil : un classement par ligue (§18.92)", () => {
+  const band = (type: "ecole" | "boite", id: string, label: string, score: number, members: number, rank: number | null = null) =>
+    ({ type, id, label, score, members, rank, missing: Math.max(0, 3 - members), gap: null, ahead: null, hasPage: true }) as BandStanding;
+  const view = (top: BandsTop, mine: Partial<Record<"ecole" | "boite", string | null>> = {}, language?: string) => render(createElement(BandsTopView, { top, mine, onPlay: () => undefined }), language);
+  // La prod du 20 novembre : une école au tableau, une en formation, une boîte au tableau.
+  const prod: BandsTop = {
+    ecole: [band("ecole", "centralesupelec", "CentraleSupélec", 11, 3, 1), band("ecole", "centrale-mediterranee", "Centrale Méditerranée", 7, 2)],
+    boite: [band("boite", "azerit", "Azerit", 13, 3, 1)],
+  };
+  const league = (html: string, type: "ecole" | "boite") => html.slice(html.indexOf(`league-${type}-title`), type === "ecole" ? html.indexOf("league-boite-title") : undefined);
 
-  it("aucune bande : pas de section", () => {
-    expect(render(createElement(BandsTopView, { top: { ecole: [], boite: [] }, lead: "Fais ta fiche." }))).toBe("");
+  it("deux tableaux faits comme le top de la semaine : le nom de la ligue, l'onglet « Top 5 », l'unité « Étoiles »", () => {
+    const html = view(prod);
+    expect(html).toMatch(/<h2 id="league-ecole-title">Écoles<\/h2><div class="board-top"><p class="board-tag">Top 5<\/p><span class="board-scale" aria-hidden="true">Étoiles<\/span><ol class="board-list is-top">/);
+    expect(html).toMatch(/<h2 id="league-boite-title">Boîtes<\/h2>/);
+    expect(count(html, '<section class="board league"')).toBe(2);
+    expect(view(prod, {}, "en-US")).toMatch(/<h2 id="league-ecole-title">Schools<\/h2>.*>Stars<\/span>/);
   });
 
-  it("une bande : le titre, la phrase qui dit pourquoi, puis le tableau", () => {
-    const html = render(createElement(BandsTopView, { top: { ecole: [band("ecole-a")], boite: [] }, lead: "Fais ta fiche. Fais gagner ta bande." }));
-    expect(html).toMatch(/<h2[^>]*>Top des bandes<\/h2><p class="board-meta">Fais ta fiche\. Fais gagner ta bande\.<\/p>/);
-    expect(count(html, "board-tag")).toBe(1);
+  it("le tableau d'abord, puis la bande en formation à la place suivante : sa place, son nom, ses fiches, ses étoiles, le lien vers sa page", () => {
+    const html = league(view(prod), "ecole");
+    expect(count(html, 'class="board-row band-row league-row"')).toBe(2);
+    expect(html).toContain('href="/bandes/ecole/centralesupelec"');
+    expect(html).toContain('<span class="board-rank">1</span><span class="band-name"><span class="board-login">CentraleSupélec</span><span class="band-count">3\u00a0fiches</span></span><span class="band-score">11</span>');
+    expect(html).toContain('<span class="board-rank">2</span><span class="band-name"><span class="board-login">Centrale Méditerranée</span><span class="band-count">2\u00a0fiches, en formation</span></span><span class="band-score">7</span>');
+    expect(html).toMatch(/aria-label="Place 2\s: Centrale Méditerranée, 7\u00a0étoiles, 2\u00a0fiches, en formation"/);
+    expect(league(view({ ...prod, ecole: [band("ecole", "utc", "UTC", 3, 1)] }), "ecole")).toContain("1\u00a0fiche, en formation");
+    expect(league(view(prod, {}, "en-US"), "ecole")).toContain("2\u00a0sheets, forming");
+  });
+
+  it("les places libres en une seule ligne, qui ramène au formulaire, comme au top de la semaine", () => {
+    const html = view(prod);
+    expect(league(html, "ecole")).toMatch(/<button type="button" class="board-row band-row league-row is-free">.*Places 3 à 5 libres<\/span><span class="board-take">Prends-en une<\/span>/);
+    expect(league(html, "boite")).toContain("Places 2 à 5 libres");
+    const four = view({ ecole: [1, 2, 3, 4].map((r) => band("ecole", `e${r}`, `École ${r}`, 20 - r, 3, r)), boite: [] });
+    expect(league(four, "ecole")).toMatch(/Place 5 libre<\/span><span class="board-take">Prends-la/);
+    // une ligue sans bande : les cinq places sont libres
+    expect(league(four, "boite")).toContain("Places 1 à 5 libres");
+    expect(count(league(four, "boite"), "board-row")).toBe(1);
+    const full = view({ ecole: [1, 2, 3, 4, 5, 6].map((r) => band("ecole", `e${r}`, `École ${r}`, 20 - r, 3, r)), boite: [] });
+    expect(league(full, "ecole")).not.toContain("is-free");
+    expect(count(league(full, "ecole"), "league-row")).toBe(5);
+  });
+
+  it("sa bande est mise en évidence, comme sa ligne au top de la semaine ; plus bas que la cinquième place, elle vient après un filet", () => {
+    const html = view(prod, { ecole: "centrale-mediterranee", boite: null });
+    expect(count(html, "is-me")).toBe(1);
+    expect(html).toMatch(/class="board-row band-row league-row is-me" href="\/bandes\/ecole\/centrale-mediterranee"[^>]*aria-current="true"/);
+    const five = [1, 2, 3, 4, 5].map((r) => band("ecole", `e${r}`, `École ${r}`, 20 - r, 3, r));
+    const low = view({ ecole: five, boite: [], mine: { ecole: { place: 8, band: band("ecole", "utc", "UTC", 4, 3, 8) } } }, { ecole: "utc" });
+    expect(league(low, "ecole")).toMatch(/<ol class="board-list is-rest" start="8"><li><a class="board-row band-row league-row is-me" href="\/bandes\/ecole\/utc"[^>]*><span class="board-rank">8<\/span>/);
+    expect(league(low, "boite")).not.toContain("is-rest");
+    // déjà dans les cinq lignes : pas de doublon
+    expect(view({ ecole: five, boite: [], mine: { ecole: { place: 2, band: five[1]! } } }, { ecole: "e2" })).not.toContain("is-rest");
+  });
+
+  it("rien que le classement : ni « Ta bande », ni emplacements, ni partage, ni phrase « Encore N fiches », et le lien vers /bandes dessous", () => {
+    const html = view(prod, { ecole: "centrale-mediterranee" });
+    for (const gone of ["Ta bande", "band-slots", "band-slot", "Partager", "Encore", "En formation", "Top des bandes", "board-meta", "band-mine"]) expect(html).not.toContain(gone);
+    expect(html).toMatch(/<a class="link-alt bands-top-all" href="\/bandes">Toutes les bandes<\/a><\/div>$/);
   });
 });

@@ -23,5 +23,13 @@ export const realDeps: Deps = {
   readCv,
   scoreCv,
   scoreDossier,
-  renderImage,
+  // Le rendu d'une image (à la première demande de /og, hors du délai de la fiche) dit sa durée au journal.
+  async renderImage(input) {
+    const t0 = performance.now();
+    try {
+      return await renderImage(input);
+    } finally {
+      console.log(`[image] ${input.format} ${Math.round(performance.now() - t0)} ms`);
+    }
+  },
 };

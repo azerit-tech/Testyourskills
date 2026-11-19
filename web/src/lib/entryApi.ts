@@ -3,7 +3,9 @@
 // Aucune de ces fonctions ne lève : au moindre doute, une liste vide, et le
 // champ reste celui où un lien ou un pseudo se tape.
 import type { GithubSuggestion, LinkedinSuggestion } from "../../../shared/entry";
-import { isMock } from "./api";
+import { api, isMock } from "./api";
+import { fileOf } from "../../../shared/caseFile";
+import { loadAccount, mockSignIn, resetAccount } from "./account";
 import { MINE_EVENT, myCard, rememberMine, type MyCard } from "./session";
 
 // --- Mode démo -----------------------------------------------------------------
@@ -62,26 +64,30 @@ function here(): string {
   return u.pathname + u.search;
 }
 
-/** Part chez LinkedIn ; le serveur revient sur cette page avec ?li=1. */
-export function startLinkedinLogin(): void {
-  if (isMock()) {
-    const u = new URL(here(), window.location.origin);
-    u.searchParams.set("li", "1");
-    window.location.assign(u.pathname + u.search);
-    return;
-  }
-  window.location.assign(`/auth/linkedin/enter?return=${encodeURIComponent(here())}`);
+/** `redo` : « Refaire ma fiche », le parcours d'aujourd'hui même avec une fiche au compte (§18.91). */
+export interface LoginOpts {
+  redo?: boolean;
 }
 
-/** Part chez GitHub ; le serveur revient sur cette page avec ?gh=1. */
-export function startGithubLogin(): void {
-  if (isMock()) {
-    const u = new URL(here(), window.location.origin);
-    u.searchParams.set("gh", "1");
-    window.location.assign(u.pathname + u.search);
-    return;
-  }
-  window.location.assign(`/auth/github/enter?return=${encodeURIComponent(here())}`);
+/** Démo : la connexion crée le compte ; avec une fiche, droit dessus, comme le serveur. */
+function mockLogin(source: "linkedin" | "github", flag: "li" | "gh", o: LoginOpts) {
+  const card = mockSignIn(source);
+  if (card && !o.redo) return window.location.assign(`/c/${card}`);
+  const u = new URL(here(), window.location.origin);
+  u.searchParams.set(flag, "1");
+  window.location.assign(u.pathname + u.search);
+}
+
+/** Part chez LinkedIn ; le serveur revient sur cette page avec ?li=1, ou sur la fiche du compte. */
+export function startLinkedinLogin(o: LoginOpts = {}): void {
+  if (isMock()) return mockLogin("linkedin", "li", o);
+  window.location.assign(`/auth/linkedin/enter?return=${encodeURIComponent(here())}${o.redo ? "&redo=1" : ""}`);
+}
+
+/** Part chez GitHub ; le serveur revient sur cette page avec ?gh=1, ou sur la fiche du compte. */
+export function startGithubLogin(o: LoginOpts = {}): void {
+  if (isMock()) return mockLogin("github", "gh", o);
+  window.location.assign(`/auth/github/enter?return=${encodeURIComponent(here())}${o.redo ? "&redo=1" : ""}`);
 }
 
 // --- Le retour d'une connexion (§18.90) --------------------------------------------
@@ -243,47 +249,43 @@ export function releaseReturn(owner: object): void {
 /** Pour les tests : comme une page qui vient de se charger. */
 export function resetReturn(): void {
   mineAsked = null;
+  resetAccount();
   phase = null;
   started = false;
   leader = null;
   listeners.clear();
 }
 
-// --- Qui s'est connecté ici (SPEC §18.90) ---
-// Le serveur garde dans un cookie httpOnly le profil et la fiche de qui s'est connecté. Le
-// témoin `tys_known=1`, lisible ici, dit qu'il y a quelque chose à demander : sans lui, rien
-// ne part. La fiche rendue devient « Ma fiche » si le navigateur n'en retient aucune.
-
-const knownHere = (): boolean => {
-  try {
-    return /(?:^|;\s*)tys_known=1(?:;|$)/.test(document.cookie);
-  } catch {
-    return false;
-  }
-};
-
-function knownCardOf(body: unknown): MyCard | null {
-  const c = (body as { card?: Partial<MyCard> | null } | null)?.card;
-  if (!c || typeof c.id !== "string" || typeof c.overall !== "number" || !Number.isFinite(c.overall)) return null;
-  return { id: c.id, login: typeof c.login === "string" ? c.login : null, overall: c.overall };
-}
+// --- Qui est là (SPEC §18.90, §18.91) ---
+// Un seul appel, /api/me : le compte (`tys_acct`) d'abord ; sans compte valide, le serveur
+// répond avec le repli sans droit de `tys_who` (`known`). Sa fiche devient « Ma fiche » :
+// celle du compte passe devant la mémoire du navigateur, celle du repli seulement s'il n'en
+// retient aucune (ou la même, qui y gagne son pseudo).
 
 let mineAsked: Promise<void> | null = null;
 
-/** Une fois par page : demande au serveur la fiche de qui s'est connecté dans ce navigateur. */
+/** Une fois par page : demande au serveur qui est là, et sa fiche. */
 export function syncMine(): Promise<void> {
   mineAsked ??= (async () => {
-    if (isMock() || !knownHere()) return;
-    try {
-      const res = await fetch("/api/entry/me", { headers: { Accept: "application/json" } });
-      const card = res.ok ? knownCardOf(await res.json()) : null;
-      if (!card) return;
-      const mine = myCard();
-      // Celle que le navigateur retient déjà passe devant ; la même fiche y gagne son pseudo.
-      if (!mine || (mine.id === card.id && !mine.login && card.login)) rememberMine(card);
-    } catch {
-      /* réseau : la mémoire du navigateur suffit */
+    const a = await loadAccount();
+    if (!a?.cardId) return;
+    let overall = a.overall;
+    let login = a.cardLogin;
+    if (overall === null) {
+      // La démo ne connaît pas la note d'avance : la fiche la dit.
+      try {
+        const job = await api.getJob(a.cardId);
+        if (job.state !== "done") return;
+        const main = job.kind === "card" ? job.card : fileOf(job.comparison);
+        overall = main.overall;
+        login = main.login ?? null;
+      } catch {
+        return;
+      }
     }
+    const card: MyCard = { id: a.cardId, login, overall };
+    const mine = myCard();
+    if (!mine || (a.known ? mine.id === card.id && !mine.login && !!card.login : mine.id !== card.id || mine.overall !== card.overall)) rememberMine(card);
   })();
   return mineAsked;
 }

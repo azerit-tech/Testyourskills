@@ -15,14 +15,12 @@ interface Props {
   forming: BandStanding[];
   /** La bande de la page où l'on est : sa ligne est marquée, sans lien vers elle-même. */
   current?: string;
-  /** Sa propre bande, sur l'accueil (§18.89) : sa ligne est mise en évidence, et mène à sa page. */
-  mine?: string;
 }
 
-export function BandLists({ entries, lower = null, forming, current, mine }: Props) {
+export function BandLists({ entries, lower = null, forming, current }: Props) {
   const { t } = useT();
   const tb = t.bands.board;
-  const row = (b: BandStanding) => <BandRow key={b.id} b={b} current={b.id === current} me={b.id === mine} />;
+  const row = (b: BandStanding) => <BandRow key={b.id} b={b} current={b.id === current} />;
   return (
     <>
       {entries.length > 0 && (

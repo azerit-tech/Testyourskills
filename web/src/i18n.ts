@@ -116,8 +116,6 @@ const fr = frTypoDeep({
     next: "Voir la suite",
     /** Le dernier formulaire de l'accueil, avant le pied de page (§18.48). */
     lastTitle: "À toi.",
-    /** Au-dessus du tableau des bandes : pourquoi une bande. */
-    bandsLead: "Fais ta fiche. Fais gagner ta bande.",
     /** L'accueil se souvient (§18.48) : la fiche déjà faite, ou le dossier encore en cours. */
     back: {
       mine: "Ta fiche\u00a0:",
@@ -130,6 +128,12 @@ const fr = frTypoDeep({
       /** Qui a déjà sa fiche (§18.52) : le bouton principal y ramène, le formulaire se replie dessous. */
       see: "Voir ma fiche",
       another: "Faire une autre fiche",
+    },
+    /** Connecté avec une fiche au compte (§18.91) : le rose y mène, la petite ligne dessous. */
+    account: {
+      see: "Voir ma fiche",
+      redo: "Refaire ma fiche",
+      out: "Se déconnecter",
     },
     /* Mur des 13 profils (§18.28) */
     wall: {
@@ -325,9 +329,9 @@ const fr = frTypoDeep({
     leadDenounced: (who: string, by: string | null) => (by ? `@${by} a dénoncé ${who}.` : `Quelqu'un a dénoncé ${who}.`),
     /** Sans bloc des critères au-dessus (fiche dénoncée sans grille) : la même question, sans « ces huit critères ». */
     yourTurnBare: "Et toi, tu vaux combien d'étoiles\u00a0? Ton LinkedIn ou ton GitHub suffit.",
-    /** Sous la fiche d'un dossier à deux sources (§18.36) : d'où vient la preuve, une seule note. */
+    /** Sous la fiche d'un dossier à deux sources (§18.36, §18.93) : une fiche, une note, lue « d'après LinkedIn et GitHub ». */
     pieces: {
-      line: (labels: string) => `Sources au dossier\u00a0: ${labels}`,
+      line: (labels: string) => `D'après ${labels.replace(/^CV\b/, "le CV")}`,
       /* « LinkedIn et GitHub » : une phrase, pas un point médian. */
       pair: (a: string, b: string) => `${a} et ${b}`,
       unproven: "Code à prouver",
@@ -984,7 +988,6 @@ const en: Dict = {
     exampleFrom: (labels) => `based on ${labels}`,
     next: "See more",
     lastTitle: "Your turn.",
-    bandsLead: "Get your rap sheet. Make your crew win.",
     back: {
       mine: "Your sheet:",
       mineGo: "See it again",
@@ -994,6 +997,11 @@ const en: Dict = {
       owedGo: "Watch it",
       see: "See my sheet",
       another: "Make another sheet",
+    },
+    account: {
+      see: "See my sheet",
+      redo: "Redo my sheet",
+      out: "Sign out",
     },
     wall: {
       title: "Which profile are you?",
@@ -1155,7 +1163,7 @@ const en: Dict = {
     leadDenounced: (who, by) => (by ? `@${by} turned in ${who}.` : `Someone turned in ${who}.`),
     yourTurnBare: "What about you, how many stars? Your LinkedIn or your GitHub is all it takes.",
     pieces: {
-      line: (labels) => `Sources on file: ${labels}`,
+      line: (labels) => `Based on ${labels.replace(/^Résumé\b/, "the résumé")}`,
       pair: (a, b) => `${a} and ${b}`,
       unproven: "Code still unproven",
       link: "Link between the two sources: to be confirmed",

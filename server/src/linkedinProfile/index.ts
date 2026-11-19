@@ -21,6 +21,7 @@ import { LinkedinCache } from "./store";
 import { githubDeclaredOf, linkedinFromGithub, normalizeLinkedinUrl } from "./url";
 import { tokensFromEnv } from "../github/tokens";
 import { readmeSignal, type GithubSignal } from "./githubSignals";
+import { count, phase } from "../timing";
 
 export type { LinkedinProfile, LinkedinProvider } from "./profile";
 export { normalizeLinkedinUrl } from "./url";
@@ -121,7 +122,7 @@ export class LinkedinProfiles implements LinkedinFinder {
         let readme: string | null | undefined;
         if (free) {
           try {
-            readme = await free(gh, opts.signal);
+            readme = await phase("linkedin_readme", () => free(gh, opts.signal));
           } catch (err) {
             warn("README de profil", err);
           }
@@ -132,7 +133,7 @@ export class LinkedinProfiles implements LinkedinFinder {
         } else if (search) {
           if (this.take(opts)) {
             try {
-              const r = await search.searchByGithub({ login: gh.login, name: gh.name, createdAt: gh.createdAt }, opts.signal);
+              const r = await phase("linkedin_recherche", () => search.searchByGithub({ login: gh.login, name: gh.name, createdAt: gh.createdAt }, opts.signal));
               cache.putLookup(gh.login, r.url, this.now());
               url = r.url;
             } catch (err) {
@@ -148,6 +149,7 @@ export class LinkedinProfiles implements LinkedinFinder {
 
     const hit = cache.getProfile(url, this.now());
     if (hit) {
+      count("linkedin_cache");
       if (!hit.found) return null;
       if (proves && hit.githubLogin == null) cache.linkGithub(url, gh.login);
       return { profile: hit.profile, proven: proves };
@@ -155,7 +157,7 @@ export class LinkedinProfiles implements LinkedinFinder {
     if (!this.take(opts)) return null;
     try {
       opts.onSlow?.(provider.timeoutMs);
-      const r = await provider.fetchProfile(url, { signal: opts.signal });
+      const r = await phase("linkedin", () => provider.fetchProfile(url, { signal: opts.signal }));
       const link = proves ? gh.login : r.githubChecked ? r.githubLogin : undefined;
       cache.putProfile(url, r.profile, r.profile ? link : undefined, this.now());
       return r.profile ? { profile: r.profile, proven: proves } : null;
@@ -193,12 +195,13 @@ export class LinkedinProfiles implements LinkedinFinder {
     const url = normalizeLinkedinUrl(raw);
     if (!url) return { status: "not_found" };
     const hit = cache.getProfile(url, this.now());
+    if ((hit && !hit.found) || (hit?.found && hit.githubLogin !== undefined)) count("linkedin_cache");
     if (hit && !hit.found) return { status: "not_found" };
     if (hit?.found && hit.githubLogin !== undefined) return { status: "found", profile: hit.profile, githubLogin: hit.githubLogin };
     if (!this.take(opts)) return { status: "unavailable" };
     try {
       opts.onSlow?.(provider.timeoutMs);
-      const r = await provider.fetchProfile(url, { withGithub: true, signal: opts.signal });
+      const r = await phase("linkedin", () => provider.fetchProfile(url, { withGithub: true, signal: opts.signal }));
       cache.putProfile(url, r.profile, r.profile ? r.githubLogin : undefined, this.now());
       return r.profile ? { status: "found", profile: r.profile, githubLogin: r.githubLogin } : { status: "not_found" };
     } catch (err) {
