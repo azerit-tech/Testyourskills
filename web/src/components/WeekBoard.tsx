@@ -5,6 +5,7 @@
 // qu'occupées. Mat, sans dégradé : celui de l'écran est la fiche.
 // Le tableau porte l'ancre « semaine » ; la ligne de la fiche en mémoire y est mise en évidence.
 import { useEffect, useRef, useState } from "react";
+import { personLabel } from "../../../shared/boardPerson";
 import type { TopEntry, WeekTop } from "../../../shared/types";
 import { useT } from "../i18n";
 import { api } from "../lib/api";
@@ -34,30 +35,17 @@ function useMinute(): number {
 const isMine = (e: TopEntry, mine: MyCard | null | undefined) => !!mine && (e.cardId === mine.id || (!!mine.login && e.login?.toLowerCase() === mine.login));
 
 function Row({ e, me }: { e: TopEntry; me: boolean }) {
-  const { t, lang } = useT();
-  // Une fiche LinkedIn seule : classée sur sa note, sans nom, sans portrait, sans lien.
-  if (!e.login || !e.cardId) {
-    const name = e.profile ? e.profile[lang] : t.home.top.anon;
-    return (
-      <li>
-        <div className="board-row" aria-label={t.home.top.rowLabelAnon(e.rank, e.overall)}>
-          <span className="board-rank">{e.rank}</span>
-          <Avatar login="in" src="" />
-          <span className="board-login">{name}</span>
-          <Stars n={e.stars} size={14} />
-          <span className="board-score">{e.overall}</span>
-        </div>
-      </li>
-    );
-  }
+  const { t } = useT();
+  // La vraie personne (§18.88) : le nom de sa fiche, une fiche LinkedIn seule comprise ; sans nom, son @pseudo.
+  const who = personLabel(e) || e.initials;
   const href = `/c/${e.cardId}`;
   return (
     <li>
-      <a className={`board-row${me ? " is-me" : ""}`} href={href} onClick={(ev) => onLinkClick(ev, href)} aria-label={t.home.top.rowLabel(e.rank, e.login, e.overall)} aria-current={me ? "true" : undefined}>
+      <a className={`board-row${me ? " is-me" : ""}`} href={href} onClick={(ev) => onLinkClick(ev, href)} aria-label={t.home.top.rowLabel(e.rank, who, e.overall)} aria-current={me ? "true" : undefined}>
         <span className="board-rank">{e.rank}</span>
-        {/* sans photo sûre, l'initiale (Avatar.tsx) */}
-        <Avatar login={e.login} src={e.avatarUrl ?? ""} />
-        <span className="board-login">@{e.login}</span>
+        {/* sans photo sûre, les initiales de la fiche (Avatar.tsx) */}
+        <Avatar login={e.login} src={e.avatarUrl ?? ""} initials={e.initials} />
+        <span className="board-login">{who}</span>
         <Stars n={e.stars} size={14} />
         <span className="board-score">{e.overall}</span>
       </a>

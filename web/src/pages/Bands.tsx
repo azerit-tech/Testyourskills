@@ -1,19 +1,27 @@
-// Les bandes (§18.38) : /bandes, le tableau des écoles et celui des boîtes ;
-// /bandes/ecole/:id et /bandes/boite/:id, la page d'une bande. Même système que
-// le top de la semaine (WeekBoard) : lignes sur aplat marine, titres crème.
-// Jamais un nom de personne, jamais un rang d'école du barème.
+// Les bandes (§18.38) : /bandes, le tableau des écoles et celui des boîtes, puis
+// les bandes en formation (§18.85) ; /bandes/ecole/:id et /bandes/boite/:id, la
+// page d'une bande. Même système que le top de la semaine (WeekBoard) : lignes
+// sur aplat marine, titres crème.
+// Jamais un rang d'école du barème. Les membres d'une bande sont les vraies
+// personnes (§18.88) : leur nom, leur visage, le lien vers leur fiche ; seule une
+// fiche née d'une dénonciation et pas encore revendiquée reste anonyme.
 //
 // La page d'une bande a trois états (SPEC §18.48) : sans fiche (le formulaire,
 // et la bande suit jusqu'à la fiche posée), avec une fiche (« Rejoindre avec ma
 // fiche »), membre (son apport, « Partager la bande » en bouton principal).
+// Sous ses fiches (à côté, au bureau), le classement de sa ligue, sa ligne
+// marquée (§18.87).
 // Serveur muet : « le commissariat ne répond pas », jamais « introuvable ».
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
+import { personLabel } from "../../../shared/boardPerson";
 import type { BandBoard, BandMember, BandPage as BandPageData, BandStanding, BandType, MyBands } from "../../../shared/bands";
-import { BAND_MIN_MEMBERS, BAND_TYPES, bandPath } from "../../../shared/bands";
+import { BAND_TYPES, bandPath } from "../../../shared/bands";
 import { Avatar } from "../components/Avatar";
+import { MineForming } from "../components/BandMine";
 import { useBandShare } from "../components/BandPick";
-import { BandRow } from "../components/BandRow";
+import { BandLists } from "../components/BandLists";
+import { BandSlots } from "../components/BandSlots";
 import { BusyDots } from "../components/Busy";
 import { BandNotFound, Unreachable } from "../components/ErrorPage";
 import { StarMark, Stars } from "../components/Stars";
@@ -31,40 +39,31 @@ import "../components/bands.css";
 
 /* ---------- /bandes ---------- */
 
-/** Le tableau d'une ligue : ses lignes, ou une phrase si elle est vide ; puis sa propre bande, plus bas. */
-function BoardPanel({ board, type, on }: { board: BandBoard; type: BandType; on: boolean }) {
+interface PanelProps {
+  board: BandBoard;
+  type: BandType;
+  on: boolean;
+  onShare: (band: BandStanding) => void;
+  native: boolean;
+}
+
+/**
+ * Une ligue (§18.85) : sa propre bande en formation d'abord ; les bandes au tableau ;
+ * sa propre bande classée plus bas ; puis les bandes en formation, sans étoiles.
+ * La phrase « aucune … au tableau » ne sort que si la ligue n'a rien à montrer.
+ */
+export function BoardPanel({ board, type, on, onShare, native }: PanelProps) {
   const { t } = useT();
   const tb = t.bands.board;
+  const mine = board.extra;
+  const nothing = board.entries.length === 0 && board.forming.length === 0 && !mine;
   return (
     <section className={`bands-panel${on ? " is-on" : ""}`} id={`bands-panel-${type}`} role="tabpanel" aria-labelledby={`bands-tab-${type}`}>
-      <div className="board-top">
-        <p className="board-tag bands-panel-tag">{t.bands.league[type]}</p>
-        {board.entries.length > 0 && (
-          <span className="board-scale" aria-hidden>
-            {tb.scale}
-          </span>
-        )}
-        {board.entries.length === 0 ? (
-          <p className="bands-empty">{t.bands.none.league[type]}</p>
-        ) : (
-          <ol className="board-list is-top">
-            {board.entries.map((b) => (
-              <BandRow key={b.id} b={b} />
-            ))}
-          </ol>
-        )}
-      </div>
-      {board.extra && (
-        <div className="board-top bands-yours">
-          <p className="board-tag">{tb.yours}</p>
-          <span className="board-scale" aria-hidden>
-            {tb.scale}
-          </span>
-          <ol className="board-list is-top">
-            <BandRow b={board.extra} />
-          </ol>
-        </div>
-      )}
+      {/* au bureau, le titre de la colonne ; au téléphone, l'onglet le dit déjà */}
+      <h2 className="bands-league">{t.bands.league[type]}</h2>
+      {mine && mine.rank === null && <MineForming band={mine} onShare={onShare} native={native} />}
+      <BandLists entries={board.entries} lower={mine && mine.rank !== null ? { tag: tb.yours, band: mine } : null} forming={board.forming} />
+      {nothing && <p className="bands-empty">{t.bands.none.league[type]}</p>}
     </section>
   );
 }
@@ -75,6 +74,8 @@ export function Bands() {
   const [type, setType] = useState<BandType>(() => (new URLSearchParams(window.location.search).get("t") === "boite" ? "boite" : "ecole"));
   const [mine] = useState<MyCard | null>(() => myCard());
   const tabs = useRef<(HTMLButtonElement | null)[]>([]);
+  const toast = useToast();
+  const { share, native } = useBandShare(toast.show);
 
   useEffect(() => {
     document.title = t.meta.titlePage(tb.title);
@@ -91,7 +92,10 @@ export function Bands() {
   if (boards.s === "wait") return <main className="page page-bands" id="main" aria-busy />;
 
   const data = boards.data;
-  const empty = BAND_TYPES.every((k) => data[k].entries.length === 0 && !data[k].extra);
+  // Rien à montrer : ni bande au tableau, ni bande en formation, ni la sienne.
+  const empty = BAND_TYPES.every((k) => data[k].entries.length === 0 && data[k].forming.length === 0 && !data[k].extra);
+  // Le partage de sa bande en formation : le même que sur sa page.
+  const shareBand = (band: BandStanding) => void share(band, t.bands.page.shareText(band), mine?.id ?? null);
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
     const next = type === "ecole" ? "boite" : "ecole";
@@ -129,7 +133,7 @@ export function Bands() {
             </div>
             <div className="bands-cols">
               {BAND_TYPES.map((k) => (
-                <BoardPanel key={k} board={data[k]} type={k} on={type === k} />
+                <BoardPanel key={k} board={data[k]} type={k} on={type === k} onShare={shareBand} native={native} />
               ))}
             </div>
           </>
@@ -148,19 +152,77 @@ export function Bands() {
           <EntryForm />
         )}
       </section>
+      {toast.node}
     </main>
   );
 }
 
 /* ---------- /bandes/:type/:id ---------- */
 
+/** Le tableau de la ligue vu depuis une bande : dix lignes au tableau, cinq en formation, et la bande elle-même, toujours. */
+export const PAGE_BOARD_ROWS = 10;
+export const PAGE_FORMING_ROWS = 5;
+
+/**
+ * Les listes du classement d'une page de bande. La bande de la page fait foi pour sa propre
+ * place (plus fraîche que le tableau, gardé une minute) : au tableau dans les dix premières,
+ * sinon seule sous « Cette bande » ; en formation, à sa place parmi les bandes en formation.
+ */
+export function boardAround(board: BandBoard, band: BandStanding): { entries: BandStanding[]; lower: BandStanding | null; forming: BandStanding[] } {
+  const others = (list: BandStanding[]) => list.filter((b) => b.id !== band.id);
+  const waiting = others(board.forming).slice(0, PAGE_FORMING_ROWS);
+  if (band.rank !== null) {
+    const top = board.entries.slice(0, PAGE_BOARD_ROWS);
+    const inTop = top.some((b) => b.id === band.id);
+    return { entries: top.map((b) => (b.id === band.id ? band : b)), lower: inTop ? null : band, forming: waiting };
+  }
+  // En formation : devant les bandes qui n'ont pas plus de dossiers ni plus d'étoiles qu'elle.
+  const at = waiting.findIndex((b) => b.members < band.members || (b.members === band.members && b.score <= band.score));
+  const forming = at < 0 ? [...waiting.slice(0, PAGE_FORMING_ROWS - 1), band] : [...waiting.slice(0, at), band, ...waiting.slice(at)].slice(0, PAGE_FORMING_ROWS);
+  return { entries: others(board.entries).slice(0, PAGE_BOARD_ROWS), lower: null, forming };
+}
+
+/** L'adresse de /bandes ouverte sur une ligue ; la requête en cours (?mock=1, ?lang=) est gardée. */
+function leagueHref(type: BandType): string {
+  const q = new URLSearchParams(typeof window === "undefined" ? "" : window.location.search);
+  q.set("t", type);
+  return `/bandes?${q.toString()}`;
+}
+
+/** « Le classement » sur la page d'une bande : sa ligue, sa ligne marquée, puis le lien vers tous les tableaux. */
+export function BandBoardSection({ board, band }: { board: BandBoard | null; band: BandStanding }) {
+  const { t } = useT();
+  const tp = t.bands.page;
+  const href = leagueHref(band.type);
+  const lists = board ? boardAround(board, band) : null;
+  return (
+    <section className="band-board" aria-labelledby="band-board-title" aria-busy={!lists}>
+      <h2 id="band-board-title">{tp.board}</h2>
+      {lists && (
+        <>
+          {/* rien au tableau : la règle d'abord, puis les bandes en formation */}
+          {lists.entries.length === 0 && !lists.lower && <p className="band-board-note">{t.bands.board.rule}</p>}
+          <BandLists entries={lists.entries} lower={lists.lower ? { tag: tp.thisBand, band: lists.lower } : null} forming={lists.forming} current={band.id} />
+        </>
+      )}
+      <a className="link-alt" href={href} onClick={(e) => onLinkClick(e, href)}>
+        {tp.all}
+      </a>
+    </section>
+  );
+}
+
 /** Le nombre de signes du plus long mot d'un nom : « CentraleSupélec » → 15. */
 export function longestWord(label: string): number {
   return Math.max(1, ...label.split(/[\s-]+/).map((w) => [...w].length));
 }
 
-/** Une fiche revendiquée : son visage, son pseudo, son profil, ses étoiles ; la ligne mène à la fiche. */
-function Member({ m }: { m: BandMember & { login: string; cardId: string } }) {
+/** Un membre montré : le serveur a rendu sa personne (son nom ou son pseudo, son visage, sa fiche). */
+type Shown = BandMember & { cardId: string };
+const isShown = (m: BandMember): m is Shown => !!m.cardId;
+
+/** La vraie personne (§18.88) : son visage, son nom (le @pseudo d'une fiche GitHub sans nom), son profil, ses étoiles ; la ligne mène à sa fiche. */
+function Member({ m }: { m: Shown }) {
   const { t, lang } = useT();
   // Le poste à côté du profil : deux fiches du même profil ne se lisent pas comme un doublon.
   const about = [m.profile ? pick(m.profile, lang) : null, m.position ? t.positions[m.position] : null].filter(Boolean).join(", ");
@@ -168,9 +230,10 @@ function Member({ m }: { m: BandMember & { login: string; cardId: string } }) {
   return (
     <li>
       <a className="board-row band-member" href={href} onClick={(e) => onLinkClick(e, href)}>
-        <Avatar login={m.login} />
+        {/* la photo de la fiche ; sans photo sûre, ses initiales (Avatar.tsx) */}
+        <Avatar login={m.login} src={m.avatarUrl ?? ""} initials={m.initials} />
         <span className="band-name">
-          <span className="board-login">@{m.login}</span>
+          <span className="board-login">{personLabel(m) || m.initials}</span>
           {about && <span className="band-count">{about}</span>}
         </span>
         <Stars n={m.stars} size={14} label={t.bands.score(m.stars)} />
@@ -187,10 +250,12 @@ export function starSpread(members: BandMember[]): [number, number][] {
 }
 
 /**
- * Les fiches sans pseudo, en dernière ligne de la liste : une pile de silhouettes (huit au
+ * Les fiches que la liste ne nomme pas, en dernière ligne : une pile de silhouettes (huit au
  * plus), leur nombre, et leur répartition en étoiles quand la page les a toutes reçues.
+ * `label` : « 2 fiches anonymes » (nées d'une dénonciation, pas encore revendiquées), ou
+ * « 12 autres fiches » quand la bande compte plus de fiches que la page n'en a reçu.
  */
-function Anonymous({ count, spread }: { count: number; spread: [number, number][] | null }) {
+function Anonymous({ count, label, spread }: { count: number; label: string; spread: [number, number][] | null }) {
   const { t } = useT();
   const ts = t.bands.states;
   return (
@@ -206,7 +271,7 @@ function Anonymous({ count, spread }: { count: number; spread: [number, number][
         ))}
       </span>
       <span className="band-anon-text">
-        <span className="band-anon-count">{ts.anonymous(count)}</span>
+        <span className="band-anon-count">{label}</span>
         {spread && spread.length > 0 && (
           <span className="band-anon-spread" role="img" aria-label={ts.spread(spread)}>
             {/* « 6★ × 2 » : le nombre d'étoiles, puis combien de fiches ; rien à compter à l'œil */}
@@ -221,20 +286,6 @@ function Anonymous({ count, spread }: { count: number; spread: [number, number][
         )}
       </span>
     </li>
-  );
-}
-
-/** Moins de trois fiches : trois emplacements à remplir, pas un « ★ 0 ». */
-function Slots({ members }: { members: number }) {
-  const { t } = useT();
-  return (
-    <p className="band-slots" role="img" aria-label={t.bands.states.slots(members)}>
-      {Array.from({ length: BAND_MIN_MEMBERS }, (_, i) => (
-        <span key={i} className={`band-slot${i < members ? " is-on" : ""}`}>
-          {i < members && <StarMark />}
-        </span>
-      ))}
-    </p>
   );
 }
 
@@ -338,6 +389,8 @@ export function BandPage({ type, id }: { type: BandType; id: string }) {
   const toast = useToast();
   const { share, native } = useBandShare(toast.show);
   const page = useRemote<BandPageData>(() => bandsApi.page(type, id), [type, id]);
+  // Le tableau de sa ligue, avec elle dedans même plus bas ou en formation ; muet, la section ne sort pas.
+  const league = useRemote<BandBoard>(() => bandsApi.board(type, id), [type, id]);
   const [mine] = useState<MyCard | null>(() => myCard());
   const [mb, setMb] = useState<MyBands | null | undefined>(undefined);
 
@@ -377,18 +430,22 @@ export function BandPage({ type, id }: { type: BandType; id: string }) {
 
   const rank = t.bands.rank(band);
   const aheadHref = band.ahead ? bandPath({ type: band.type, id: band.ahead.id }) : null;
-  const named = data.members.filter((m): m is BandMember & { login: string; cardId: string } => !!m.login && !!m.cardId);
-  const anonymous = Math.max(0, band.members - named.length);
-  // La répartition seulement si la page a reçu toutes les fiches anonymes (le serveur en envoie 50 au plus).
-  const anonList = data.members.filter((m) => !m.login || !m.cardId);
-  const spread = anonList.length === anonymous ? starSpread(anonList) : null;
-  const shareBand = () => void share(band, tp.shareText(band.label, rank), mine?.id ?? null);
+  const named = data.members.filter(isShown);
+  // Ce que la liste ne nomme pas : les fiches anonymes reçues, et celles que la page n'a pas reçues (le serveur en envoie 50 au plus).
+  const anonList = data.members.filter((m) => !isShown(m));
+  const unnamed = Math.max(0, band.members - named.length);
+  const allAnonymous = anonList.length === unnamed;
+  // La répartition seulement si la page a reçu toutes ces fiches.
+  const spread = allAnonymous ? starSpread(anonList) : null;
+  const shareBand = () => void share(band, tp.shareText(band), mine?.id ?? null);
+  // Le retour ouvre /bandes sur sa ligue.
+  const backHref = leagueHref(band.type);
 
   return (
     <main className="page page-band" id="main">
       <div className="band-side">
         <section className="band">
-          <a className="link-back" href="/bandes" onClick={(e) => onLinkClick(e, "/bandes")}>
+          <a className="link-back" href={backHref} onClick={(e) => onLinkClick(e, backHref)}>
             ← {tp.all}
           </a>
           <p className="label">{t.bands.kicker[band.type]}</p>
@@ -404,7 +461,7 @@ export function BandPage({ type, id }: { type: BandType; id: string }) {
               <span className="band-total-count">{t.bands.dossiers(band.members)}</span>
             </p>
           ) : (
-            <Slots members={band.members} />
+            <BandSlots members={band.members} />
           )}
           <p className="band-rank">{withSup(rank)}</p>
           {band.ahead && aheadHref && (
@@ -434,13 +491,14 @@ export function BandPage({ type, id }: { type: BandType; id: string }) {
               {named.map((m) => (
                 <Member key={m.cardId} m={m} />
               ))}
-              {/* les fiches sans pseudo : dans le même bloc, en dernière ligne, comptées et réparties */}
-              {anonymous > 0 && <Anonymous count={anonymous} spread={spread} />}
+              {/* les fiches non nommées : dans le même bloc, en dernière ligne, comptées et réparties */}
+              {unnamed > 0 && <Anonymous count={unnamed} label={allAnonymous ? t.bands.states.anonymous(unnamed) : t.bands.states.others(unnamed)} spread={spread} />}
             </ol>
           )}
-          {anonymous > 0 && named.length === 0 && <p className="band-more">{t.bands.states.claimHint}</p>}
+          {anonList.length > 0 && named.length === 0 && <p className="band-more">{t.bands.states.claimHint}</p>}
           {band.members === 0 && <p className="bands-empty">{tp.rosterNone}</p>}
         </section>
+        {league.s !== "down" && league.s !== "none" && <BandBoardSection board={league.s === "ok" ? league.data : null} band={band} />}
         {/* une bande de boîte : le bloc recruteur de la page d'une fiche, au nom de la boîte */}
         {band.type === "boite" && (
           <section className="after-block hire band-hire" aria-labelledby="band-hire-title">

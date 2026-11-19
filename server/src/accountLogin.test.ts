@@ -1,4 +1,4 @@
-// Le compte léger (SPEC §18.85), de bout en bout avec de faux LinkedIn et GitHub :
+// Le compte léger (SPEC §18.91), de bout en bout avec de faux LinkedIn et GitHub :
 // connexion = compte, la fiche liée au lancement, revenir droit sur sa fiche, et
 // rien sans SESSION_SECRET.
 
@@ -25,7 +25,7 @@ describe("connexion = compte", () => {
     expect(row).toMatchObject({ linkedin_key: linkedinKey(SECRET, SUB), github_id: null, card_id: null });
     const dump = JSON.stringify(ctx.store.db.prepare(`SELECT * FROM accounts`).all());
     for (const secretBit of [SUB, EMAIL, "Camille", PICTURE]) expect(dump).not.toContain(secretBit);
-    expect(await me(ctx, jar)).toEqual({ login: null, hidden: false, cardId: null, avatarUrl: null, initial: null, sources: ["linkedin"] });
+    expect(await me(ctx, jar)).toEqual({ login: null, hidden: false, cardId: null, cardLogin: null, overall: null, avatarUrl: null, initial: null, sources: ["linkedin"] });
   });
 
   it("LinkedIn : la fiche lancée par l'entrée connectée va au compte ; revenir mène droit dessus, sans recherche ni calcul", async () => {

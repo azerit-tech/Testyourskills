@@ -1,4 +1,4 @@
-// Le compte léger (SPEC §18.85) : la table, l'empreinte LinkedIn, le cookie, et
+// Le compte léger (SPEC §18.91) : la table, l'empreinte LinkedIn, le cookie, et
 // ce qu'une connexion fait d'un compte (création, retour, rattachement, fusion).
 
 import { afterEach, describe, expect, it } from "vitest";

@@ -76,6 +76,13 @@ const fr = frTypoDeep({
     linkLabel: "Lien LinkedIn, lien GitHub ou pseudo GitHub",
     linkPlaceholder: "Lien LinkedIn, GitHub ou pseudo",
     backToLogin: "Se connecter",
+    /** Au retour de LinkedIn (§18.90) : le temps de retrouver le profil, puis, sans personne, la phrase qui le dit. */
+    finding: "On te retrouve sur LinkedIn…",
+    findingNote: "30 secondes au plus.",
+    lostNone: "On ne t'a pas retrouvé sur LinkedIn. Colle le lien de ton profil.",
+    lostError: "La connexion LinkedIn n'a pas abouti. Colle le lien de ton profil.",
+    lostGithub: "La connexion GitHub n'a pas abouti. Tape ton pseudo.",
+    linkHelp: "Dans l'app LinkedIn\u00a0: ton profil, ⋯, copier le lien.",
     errPick: "Choisis ton compte dans la liste, ou tape ton pseudo GitHub.",
     /** Sous le champ, tant qu'il n'y a pas d'erreur : ce que chaque porte sait lire. */
     linkedinHint: "Profil public seulement.",
@@ -124,7 +131,7 @@ const fr = frTypoDeep({
       see: "Voir ma fiche",
       another: "Faire une autre fiche",
     },
-    /** Connecté avec une fiche au compte (§18.85) : le rose y mène, la petite ligne dessous. */
+    /** Connecté avec une fiche au compte (§18.91) : le rose y mène, la petite ligne dessous. */
     account: {
       see: "Voir ma fiche",
       redo: "Refaire ma fiche",
@@ -151,9 +158,8 @@ const fr = frTypoDeep({
       take: (n: number): string => (n === 1 ? "Prends-la" : "Prends-en une"),
       free: "Place libre",
       freeLabel: (rank: number) => `Place ${rank} libre : fais ta fiche`,
-      rowLabel: (rank: number, login: string, overall: number) => `Place ${rank} : @${login}, note ${overall}/100`,
-      rowLabelAnon: (rank: number, overall: number) => `Place ${rank} : une fiche LinkedIn, note ${overall}/100`,
-      anon: "Fiche LinkedIn",
+      /** `who` : le nom de la fiche, ou son « @pseudo ». */
+      rowLabel: (rank: number, who: string, overall: number) => `Place ${rank} : ${who}, note ${overall}/100`,
     },
     errLogin: "Ce pseudo ne ressemble pas à un pseudo GitHub.",
     errEmptyLogin: "Donne-nous un pseudo GitHub (ou une URL de profil).",
@@ -494,8 +500,8 @@ const fr = frTypoDeep({
       error: "Ça n'a pas pris. Réessaie.",
       note: "Laisse ton email : ta fiche reste en ligne, et Azerit peut t'écrire pour un poste.",
     },
-    /* le bloc recruteur, en fin de page : on vouvoie qui recrute */
-    cta: { title: "Vous recrutez ?", text: "Azerit vous présente des devs lus comme ici : l'expérience d'abord, le code comme preuve.", link: "azerit.tech" },
+    /* le bloc recruteur, en fin de page : on tutoie partout, qui recrute compris (§18.86) */
+    cta: { title: "Tu recrutes ?", text: "Azerit te présente des devs lus comme ici : l'expérience d'abord, le code comme preuve.", link: "azerit.tech" },
     del: {
       link: "Supprimer ma fiche",
       confirm: "Supprimer définitivement ?",
@@ -932,6 +938,12 @@ const en: Dict = {
     linkLabel: "LinkedIn link, GitHub link or GitHub username",
     linkPlaceholder: "LinkedIn link, GitHub link or username",
     backToLogin: "Sign in",
+    finding: "Finding you on LinkedIn…",
+    findingNote: "30 seconds at most.",
+    lostNone: "We couldn't find you on LinkedIn. Paste your profile link.",
+    lostError: "LinkedIn sign-in didn't go through. Paste your profile link.",
+    lostGithub: "GitHub sign-in didn't go through. Type your username.",
+    linkHelp: "In the LinkedIn app: your profile, ⋯, copy link.",
     linkedinHint: "Public profile only.",
     githubHint: "Public repos only.",
     errLinkedin: "Pick your profile from the list, or paste its LinkedIn link.",
@@ -991,9 +1003,7 @@ const en: Dict = {
       take: (n) => (n === 1 ? "Take it" : "Take one"),
       free: "Open spot",
       freeLabel: (rank) => `Spot ${rank} is open: get your rap sheet`,
-      rowLabel: (rank, login, overall) => `Spot ${rank}: @${login}, rating ${overall}/100`,
-      rowLabelAnon: (rank, overall) => `Spot ${rank}: a LinkedIn rap sheet, rating ${overall}/100`,
-      anon: "LinkedIn rap sheet",
+      rowLabel: (rank, who, overall) => `Spot ${rank}: ${who}, rating ${overall}/100`,
     },
     errLogin: "That doesn't look like a GitHub username.",
     errEmptyLogin: "Give us a GitHub username (or profile URL).",

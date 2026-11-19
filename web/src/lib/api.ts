@@ -249,7 +249,7 @@ function startLinkedInPhoto(id: string, token: string | null) {
 
 let mockMe: Me | null = null;
 
-/** Ce que /api/me rend : la revendication (login, hidden) et le compte léger (§18.85). */
+/** Ce que /api/me rend : la revendication (login, hidden) et le compte léger (§18.91). */
 interface MeBody {
   login?: unknown;
   hidden?: unknown;
@@ -257,6 +257,9 @@ interface MeBody {
   sources?: unknown;
   avatarUrl?: unknown;
   initial?: unknown;
+  cardLogin?: unknown;
+  overall?: unknown;
+  known?: unknown;
 }
 let meFlight: Promise<MeBody | null> | null = null;
 /** Une seule demande à la fois : la barre, l'entrée et l'après-fiche la partagent. */
@@ -275,7 +278,7 @@ async function getMe(): Promise<Me | null> {
   return me && typeof me.login === "string" ? { login: me.login, hidden: me.hidden === true } : null;
 }
 
-// --- Le compte léger (§18.85) ------------------------------------------------
+// --- Le compte léger (§18.91) ------------------------------------------------
 // Se connecter par LinkedIn ou GitHub crée le compte ; le cookie est httpOnly, le
 // front demande /api/me. En démo, le compte vit dans sessionStorage (une connexion
 // de démo recharge la page) ; ?compte=li ou ?compte=gh en pose un avec sa fiche.
@@ -284,29 +287,39 @@ export type AccountSource = "linkedin" | "github";
 export interface Account {
   /** « Ma fiche », ou null : jamais faite, expirée, supprimée. */
   cardId: string | null;
+  /** Le pseudo et la note de cette fiche ; null quand le serveur ne les dit pas (démo). */
+  cardLogin: string | null;
+  overall: number | null;
   sources: AccountSource[];
   avatarUrl: string | null;
   initial: string | null;
+  /** Pas de compte : le repli sans droit de `tys_who` (§18.90), seulement « Voir ma fiche ». */
+  known: boolean;
 }
 
 const MOCK_ACCOUNT_KEY = "tys_mock_acct";
 let mockAccountMem: Account | null = null;
 let mockAccountUrlRead = false;
 const MOCK_ACCOUNTS: Record<string, Account> = {
-  li: { cardId: "m-licmp-compte01", sources: ["linkedin"], avatarUrl: "/mock-linkedin.svg", initial: "L" },
-  gh: { cardId: "m-gold-compte01", sources: ["github"], avatarUrl: null, initial: "L" },
+  li: { cardId: "m-licmp-compte01", cardLogin: null, overall: null, sources: ["linkedin"], avatarUrl: "/mock-linkedin.svg", initial: "L", known: false },
+  gh: { cardId: "m-gold-compte01", cardLogin: null, overall: null, sources: ["github"], avatarUrl: null, initial: "L", known: false },
 };
 
 function parseAccount(raw: unknown): Account | null {
   if (!raw || typeof raw !== "object") return null;
   const b = raw as MeBody;
   const sources = Array.isArray(b.sources) ? b.sources.filter((s): s is AccountSource => s === "linkedin" || s === "github") : [];
-  if (!sources.length) return null;
+  const known = b.known === true;
+  const cardId = typeof b.cardId === "string" ? b.cardId : null;
+  if (!sources.length && !(known && cardId)) return null;
   return {
-    cardId: typeof b.cardId === "string" ? b.cardId : null,
+    cardId,
+    cardLogin: typeof b.cardLogin === "string" ? b.cardLogin : null,
+    overall: typeof b.overall === "number" && Number.isFinite(b.overall) ? b.overall : null,
     sources,
     avatarUrl: typeof b.avatarUrl === "string" && b.avatarUrl ? b.avatarUrl : null,
     initial: typeof b.initial === "string" && b.initial ? b.initial : null,
+    known,
   };
 }
 
@@ -379,7 +392,7 @@ async function setHidden(hidden: boolean): Promise<Me> {
   return { login: body.login, hidden: body.hidden };
 }
 
-/** Se déconnecter : la revendication et le compte (§18.85), les deux cookies. */
+/** Se déconnecter : la revendication et le compte (§18.91), les deux cookies. */
 async function logout(): Promise<void> {
   mine.clear();
   if (isMock()) {
@@ -568,7 +581,7 @@ async function requestRemoval(cardId: string, email: string): Promise<"sent" | "
   throw await readError(res);
 }
 
-/** Supprimer sa fiche : par son jeton, ou par sa session (`token` null) ; par le compte, le compte part avec (§18.85). */
+/** Supprimer sa fiche : par son jeton, ou par sa session (`token` null) ; par le compte, le compte part avec (§18.91). */
 async function deleteCard(id: string, token: string | null): Promise<void> {
   if (isMock()) {
     await (await demoApi()).deleteCard(id, token ?? "");

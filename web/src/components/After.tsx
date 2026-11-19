@@ -861,7 +861,7 @@ export function EmailForm({ cardId }: { cardId: string }) {
 
 /* ---------- le bloc recruteur ---------- */
 
-/** En fin de page, pour le visiteur comme pour qui a fait la fiche : « Vous recrutez ? », une phrase, une pilule. */
+/** En fin de page, pour le visiteur comme pour qui a fait la fiche : « Tu recrutes ? », une phrase, une pilule. */
 export function Hiring({ cardId }: { cardId: string | null }) {
   const { t } = useT();
   const c = t.result.cta;
@@ -892,7 +892,7 @@ export function DeleteCard({ cardId, onDeleted }: { cardId: string; onDeleted: (
     try {
       await api.deleteCard(cardId, token);
       tokens.remove(cardId);
-      // Supprimée par le compte : il part avec (§18.85) ; la barre et l'entrée le relisent.
+      // Supprimée par le compte : il part avec (§18.91) ; la barre et l'entrée le relisent.
       void loadAccount(true);
       onDeleted();
     } catch {

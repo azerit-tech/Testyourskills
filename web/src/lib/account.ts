@@ -1,4 +1,4 @@
-// Le compte léger côté front (SPEC §18.85) : ce que /api/me en dit, gardé en mémoire
+// Le compte léger côté front (SPEC §18.91) : ce que /api/me en dit, gardé en mémoire
 // et en indice local pour que la barre et l'entrée l'aient dès la première image,
 // puis vérifié auprès du serveur. Jamais d'erreur : au moindre doute, pas de compte.
 import { useEffect, useState } from "react";
@@ -18,12 +18,15 @@ function readHint(): Account | null {
     const raw = localStorage.getItem(HINT_KEY);
     if (!raw) return null;
     const a = JSON.parse(raw) as Partial<Account>;
-    if (!Array.isArray(a.sources) || !a.sources.length) return null;
+    if (!Array.isArray(a.sources)) return null;
     return {
       cardId: typeof a.cardId === "string" ? a.cardId : null,
+      cardLogin: typeof a.cardLogin === "string" ? a.cardLogin : null,
+      overall: typeof a.overall === "number" ? a.overall : null,
       sources: a.sources.filter((s): s is AccountSource => s === "linkedin" || s === "github"),
       avatarUrl: typeof a.avatarUrl === "string" ? a.avatarUrl : null,
       initial: typeof a.initial === "string" ? a.initial : null,
+      known: a.known === true,
     };
   } catch {
     return null;
@@ -63,6 +66,12 @@ export function loadAccount(force = false): Promise<Account | null> {
   return loading;
 }
 
+/** Pour les tests : comme une page qui vient de se charger. */
+export function resetAccount() {
+  mem = undefined;
+  loading = null;
+}
+
 /** Le compte, relu dès qu'il change. */
 export function useAccount(): Account | null {
   const [a, setA] = useState<Account | null>(knownAccount);
@@ -90,7 +99,7 @@ export function mockSignIn(source: AccountSource): string | null {
   const a = mockAccount();
   const next: Account = a
     ? { ...a, sources: a.sources.includes(source) ? a.sources : [...a.sources, source] }
-    : { cardId: null, sources: [source], avatarUrl: source === "linkedin" ? "/mock-linkedin.svg" : null, initial: "L" };
+    : { cardId: null, cardLogin: null, overall: null, sources: [source], avatarUrl: source === "linkedin" ? "/mock-linkedin.svg" : null, initial: "L", known: false };
   setMockAccount(next);
   return next.cardId;
 }

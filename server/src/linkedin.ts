@@ -206,7 +206,7 @@ export interface OidcProfile {
 export interface LinkedinEnterHook {
   /** Peut-on lancer une connexion depuis cette adresse (limite par IP) ? */
   allow(c: Context): boolean;
-  /** Le retour de LinkedIn : ce qu'il rend de la personne, puis la page où revenir. `accountId` : son compte (§18.85). */
+  /** Le retour de LinkedIn : ce qu'il rend de la personne, puis la page où revenir. `accountId` : son compte (§18.91). */
   finish(c: Context, returnPath: string, profile: OidcProfile, accountId?: string): Response | Promise<Response>;
 }
 
@@ -264,7 +264,7 @@ export interface LinkedinRoutesOptions {
   stateSecret?: string;
   /** « Se connecter avec LinkedIn » (§18.80). Absent : /auth/linkedin/enter n'existe pas. */
   enter?: LinkedinEnterHook;
-  /** Le compte léger (§18.85) : la connexion par l'entrée le trouve ou le crée. Absent : pas de compte. */
+  /** Le compte léger (§18.91) : la connexion par l'entrée le trouve ou le crée. Absent : pas de compte. */
   account?: AccountKit | null;
 }
 
@@ -310,7 +310,7 @@ export function mountLinkedin(app: Hono, o: LinkedinRoutesOptions) {
         );
       }
     } else if (!o.tokenMatches(c.req.query("token"), row.deleteToken) && !o.account?.owns(c, row)) {
-      // Ni le jeton de la fiche, ni le compte dont c'est la fiche (§18.85).
+      // Ni le jeton de la fiche, ni le compte dont c'est la fiche (§18.91).
       return c.json({ ok: false, message: { fr: "Changer la photo est réservé à qui a créé la fiche.", en: "Only the sheet's creator can change its photo." } }, 403);
     }
     const state = states.create(id);
@@ -371,7 +371,7 @@ export function mountLinkedin(app: Hono, o: LinkedinRoutesOptions) {
       try {
         const profile = await fetchProfile(code, o.config, redirectUri, o.fetchImpl);
         if (!profile.name) throw new PhotoError("pas de nom");
-        // Connexion = compte (§18.85) : trouvé ou créé d'après l'empreinte du sub.
+        // Connexion = compte (§18.91) : trouvé ou créé d'après l'empreinte du sub.
         const kit = o.account;
         const account = kit && profile.sub ? kit.signIn(c, { linkedinKey: linkedinKey(kit.secret, profile.sub) }) : null;
         // Sa fiche est en ligne : droit dessus, sans recherche ni calcul. « Refaire ma fiche » passe outre.

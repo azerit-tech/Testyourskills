@@ -154,7 +154,7 @@ declare module "hono" {
 
 /**
  * Propriétaire connecté (voir l'en-tête du module), sinon null. Le compte léger
- * (§18.85) dont le GitHub est prouvé le reste au-delà des 30 jours de `tys_owner`.
+ * (§18.91) dont le GitHub est prouvé le reste au-delà des 30 jours de `tys_owner`.
  */
 export function ownerFromRequest(c: Context): Owner | null {
   const auth = c.get("ownerAuth");
@@ -233,16 +233,20 @@ export interface AuthRoutesOptions {
   fetchImpl: typeof fetch;
   /** Invalide les PNG en cache des ids donnés (fiches masquées). */
   removeImages(ids: string[]): Promise<void>;
-  /** Le compte léger (§18.85). Absent : /api/me ne parle que de la revendication. */
+  /** Le compte léger (§18.91). Absent : /api/me ne parle que de la revendication. */
   account?: AccountKit | null;
+  /** Le repli sans droit (`tys_who`, §18.90) : la fiche de qui s'est connecté, lue seulement sans compte valide. */
+  known?: (c: Context) => { id: string; login: string | null; overall: number } | null;
+  /** Efface les cookies de l'entrée LinkedIn (`tys_who`, `tys_known`, `tys_enter`). */
+  forget?: (c: Context) => void;
 }
 
-/** Ce que /api/me dit du compte : sa fiche, et de quoi la montrer dans la barre du haut (photo ou initiale). */
-function accountCard(row: CardRow | null): { cardId: string | null; avatarUrl: string | null; initial: string | null } {
-  if (!row) return { cardId: null, avatarUrl: null, initial: null };
+/** Ce que /api/me dit de la fiche : son id, son pseudo et sa note (« Ma fiche »), et de quoi la montrer dans la barre du haut (photo ou initiale). */
+function accountCard(row: CardRow | null): { cardId: string | null; cardLogin: string | null; overall: number | null; avatarUrl: string | null; initial: string | null } {
+  if (!row) return { cardId: null, cardLogin: null, overall: null, avatarUrl: null, initial: null };
   const main = row.kind === "comparison" ? fileOf(row.data as ComparisonData) : (row.data as CardData);
   const initial = (main.name || main.login || "").trim().charAt(0).toLocaleUpperCase("fr") || null;
-  return { cardId: row.id, avatarUrl: main.avatarUrl || null, initial };
+  return { cardId: row.id, cardLogin: main.login ? main.login.toLowerCase() : null, overall: main.overall, avatarUrl: main.avatarUrl || null, initial };
 }
 
 type ClaimResult = "ok" | "mismatch" | "error" | "limited";
@@ -262,23 +266,29 @@ export function mountAuth(app: Hono, o: AuthRoutesOptions) {
   }
 
   // Toujours là : le front ne sait pas encore si l'OAuth est configuré quand il demande.
-  // Se déconnecter efface les deux cookies : la revendication et le compte (§18.85).
+  // Se déconnecter efface tout : la revendication, le compte (§18.91) et ce que l'entrée LinkedIn retient (§18.90).
   app.post("/auth/logout", (c) => {
     c.header("Cache-Control", "no-store");
     if (!sameOrigin(c, o.baseUrl)) return c.json({ ok: false }, 403);
     clearSession(c);
     o.account?.clear(c);
+    o.forget?.(c);
     return c.json({ ok: true });
   });
 
-  // Qui est connecté : le propriétaire revendiqué (login, hidden, comme avant), et le compte
-  // (§18.85) : sa fiche et ses sources. Non nul dès qu'un compte est valide, LinkedIn seul compris.
+  // Qui est là, en un seul appel : le propriétaire revendiqué (login, hidden, comme avant), le
+  // compte (§18.91) : sa fiche et ses sources, non nul dès qu'un compte est valide, LinkedIn seul
+  // compris. Sans l'un ni l'autre, le repli sans droit de `tys_who` (§18.90) : sa fiche, `known`.
   app.get("/api/me", (c) => {
     c.header("Cache-Control", "no-store");
     const owner = ownerFromRequest(c);
     const kit = o.account ?? null;
     const account = kit?.fromRequest(c) ?? null;
-    if (!owner && !account) return c.json(null);
+    if (!owner && !account) {
+      const k = o.known?.(c) ?? null;
+      const row = k ? o.store.getCard(k.id) : null;
+      return c.json(row && k ? { login: null, hidden: false, ...accountCard(row), cardLogin: k.login, overall: k.overall, sources: [], known: true } : null);
+    }
     if (account) kit!.accounts.touch(account);
     const sources: ("linkedin" | "github")[] = [];
     if (account?.linkedinKey) sources.push("linkedin");
@@ -358,7 +368,7 @@ export function mountAuth(app: Hono, o: AuthRoutesOptions) {
       return c.redirect(back(st.r, "error"), 302);
     }
 
-    // Connexion = compte (§18.85) : le GitHub vient d'être prouvé, quelle que soit la fiche.
+    // Connexion = compte (§18.91) : le GitHub vient d'être prouvé, quelle que soit la fiche.
     o.account?.signIn(c, { githubId: user.githubId });
 
     if (user.login !== cardLogin.toLowerCase()) return c.redirect(back(st.r, "mismatch", user.login), 302);

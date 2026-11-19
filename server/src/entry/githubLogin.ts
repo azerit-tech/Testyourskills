@@ -49,7 +49,7 @@ export interface GithubEnterOptions {
   config?: GithubLoginConfig;
   /** La revendication (§18.1), si elle est configurée : la connexion vaut « C'est moi ». */
   claim?: GithubAuthConfig;
-  /** Le compte léger (§18.85) : la connexion le trouve ou le crée. Absent : pas de compte. */
+  /** Le compte léger (§18.91) : la connexion le trouve ou le crée. Absent : pas de compte. */
   account?: AccountKit | null;
   baseUrl: string;
   secure: boolean;
@@ -77,7 +77,7 @@ export function mountGithubEnter(app: Hono, o: GithubEnterOptions): void {
     const p = unsign(secret, "gh-login", getCookie(c, GH_ENTER_COOKIE));
     if (getCookie(c, GH_ENTER_COOKIE)) clearLogin(c);
     if (!p || typeof p.l !== "string" || typeof p.e !== "number" || p.e < Date.now()) return c.json({ signedIn: false });
-    // La fiche que le front lance pour ce pseudo est celle de l'entrée connectée : elle ira au compte (§18.85).
+    // La fiche que le front lance pour ce pseudo est celle de l'entrée connectée : elle ira au compte (§18.91).
     const account = accountFromRequest(c);
     if (account) o.account?.expectGithub(account.id, p.l);
     return c.json({ signedIn: true, login: p.l });
@@ -97,7 +97,7 @@ export function mountGithubEnter(app: Hono, o: GithubEnterOptions): void {
     const returnPath = safeReturnPath(c.req.query("return")) ?? "/";
     if (!o.limiter.take("gh-enter", clientIp(c), GH_ENTER_STARTS_PER_DAY)) return c.redirect(back(returnPath, "error"), 302);
     const state = randomBytes(24).toString("base64url");
-    // `d` : « Refaire ma fiche » (§18.85), le retour ne mène pas droit à la fiche du compte.
+    // `d` : « Refaire ma fiche » (§18.91), le retour ne mène pas droit à la fiche du compte.
     const redo = c.req.query("redo") === "1";
     setCookie(c, GH_ENTER_STATE_COOKIE, sign(secret, "gh-enter", { s: state, r: returnPath, e: Date.now() + STATE_TTL_MS, ...(redo ? { d: 1 } : {}) }), {
       ...cookieBase,
@@ -132,7 +132,7 @@ export function mountGithubEnter(app: Hono, o: GithubEnterOptions): void {
         const owner = o.store.claimOwner(user.login, user.githubId);
         setCookie(c, SESSION_COOKIE, signSession(o.claim.sessionSecret, owner), { ...cookieBase, path: "/", maxAge: SESSION_TTL_MS / 1000 });
       }
-      // Connexion = compte (§18.85). Sa fiche est en ligne : droit dessus, sans nouveau calcul.
+      // Connexion = compte (§18.91). Sa fiche est en ligne : droit dessus, sans nouveau calcul.
       const account = o.account?.signIn(c, { githubId: user.githubId }) ?? null;
       const mine = account && st.d !== 1 ? o.account!.cardOf(account) : null;
       if (mine) return c.redirect(`${o.baseUrl}/c/${mine.id}`, 302);

@@ -6,18 +6,21 @@
 // (§18.22), les primes si elles sont ouvertes (§18.4), les bandes (§18.38), le
 // mur des 13 profils (§18.28), et un dernier formulaire avant le pied de page.
 // Rien d'autre. La couverture en mosaïque du §18.31 a disparu (§18.81).
-// L'accueil se souvient : la fiche déjà faite (ou le dossier encore en cours) tient
-// en une ligne au-dessus du formulaire, à la place de la promesse.
+// L'accueil se souvient : le dossier encore en cours tient en une ligne au-dessus du
+// formulaire, à la place de la promesse.
+// Qui a déjà sa fiche a un autre accueil (§18.89) : sa fiche en haut, les classements
+// dessous (le top de la semaine, les primes ouvertes, les bandes), et rien d'autre.
 // L'exemple est la vraie fiche de Jacques (fondateur d'Azerit) : la maquette
 // s'affiche d'abord, la fiche calculée par le serveur la remplace dès qu'elle existe.
 // Aucun dégradé dans la page : seul celui de la fiche.
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { LEVEL_LABELS, starsFor } from "../../../shared/types";
+import { LEVEL_LABELS, starsFor, type CardData } from "../../../shared/types";
 import { fileOf, pieceLabel } from "../../../shared/caseFile";
 import { FIXTURES } from "../../../shared/fixtures";
 import { CardView } from "../card/CardView";
 import { EntryForm } from "../components/EntryForm";
+import { HomeBands } from "../components/HomeBands";
 import { ProfileWall } from "../components/ProfileWall";
 import { Spin } from "../components/Spin";
 import { Sunset } from "../components/Sunset";
@@ -29,8 +32,12 @@ import { useT } from "../i18n";
 import { ApiError, api, type Showcase } from "../lib/api";
 import { onLinkClick } from "../lib/router";
 import { homeHook, useAppConfig } from "../lib/season";
-import { clearPending, dropPrefill, filmOwed, myCard, peekPrefill, pendingFile, rememberMine, type MyCard } from "../lib/session";
-import { useAccount } from "../lib/account";
+import { returnPending } from "../lib/entryApi";
+import { MINE_EVENT, clearPending, dropPrefill, filmOwed, myCard, peekPrefill, pendingFile, type MyCard } from "../lib/session";
+import { ReturnCall } from "../components/ReturnCall";
+import { signOut, useAccount } from "../lib/account";
+
+export { ReturnCall };
 
 /** Dénoncer depuis l'accueil (/<pseudo> d'un autre) : le bloc de la fiche, chargé seulement ce jour-là. */
 const Denounce = lazy(() => import("../components/Denounce").then((m) => ({ default: m.Denounce })));
@@ -42,11 +49,12 @@ const TOP_WAIT_MS = 3000;
  * vraie (§18.35) : la légende a ses deux lignes dès le premier rendu, rien ne saute dessous. */
 const SHOWCASE_MOCKUP: Showcase = { card: FIXTURES.jmougeot, href: `/${FIXTURES.jmougeot.login ?? "jmougeot"}`, pieces: ["linkedin", "github"] };
 
-/** La fiche de Jacques : la maquette d'abord, la vraie dès que le serveur l'a. */
-function useShowcase(): Showcase {
+/** La fiche de Jacques : la maquette d'abord, la vraie dès que le serveur l'a. `on` : l'accueil la montre (pas celui de qui a sa fiche). */
+function useShowcase(on: boolean): Showcase {
   const [showcase, setShowcase] = useState<Showcase>(SHOWCASE_MOCKUP);
 
   useEffect(() => {
+    if (!on) return;
     let alive = true;
     api
       .getShowcase()
@@ -57,7 +65,7 @@ function useShowcase(): Showcase {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [on]);
 
   return showcase;
 }
@@ -84,35 +92,23 @@ interface Memory {
   mine: MyCard | null;
   /** Le dossier demandé dans cet onglet, pas encore sorti. */
   pending: string | null;
+  /** Sa fiche elle-même, pour la montrer (§18.89). `undefined` : pas encore lue ; `null` : le serveur ne l'a pas rendue. */
+  card?: CardData | null;
 }
+
+/** La dernière fiche lue ici : revenir sur l'accueil (depuis sa fiche, depuis /bandes) la montre sans attendre. */
+let seen: { id: string; card: CardData } | null = null;
 
 /**
  * La mémoire de l'accueil : lue d'emblée (la ligne a sa place au premier rendu), puis
  * vérifiée auprès du serveur. Un dossier sorti entre-temps devient « Ta fiche », un
  * dossier échoué ou une fiche retirée disparaît.
  */
-function useMemory(accountCard: string | null): Memory {
-  const [mem, setMem] = useState<Memory>(() => ({ mine: myCard(), pending: pendingFile() }));
-
-  // Connecté (§18.85) : la fiche du compte devient « Ta fiche », même faite sur un autre appareil.
-  useEffect(() => {
-    if (!accountCard || accountCard === mem.mine?.id) return;
-    let alive = true;
-    void api
-      .getJob(accountCard)
-      .then((job) => {
-        if (!alive || job.state !== "done") return;
-        const main = job.kind === "card" ? job.card : fileOf(job.comparison);
-        const mine = { id: accountCard, login: main.login ?? null, overall: main.overall };
-        rememberMine(mine);
-        setMem((m) => ({ ...m, mine }));
-      })
-      .catch(() => undefined);
-    return () => {
-      alive = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accountCard]);
+function useMemory(): Memory {
+  const [mem, setMem] = useState<Memory>(() => {
+    const mine = myCard();
+    return { mine, pending: pendingFile(), card: mine && seen?.id === mine.id ? seen.card : undefined };
+  });
 
   useEffect(() => {
     let alive = true;
@@ -128,7 +124,8 @@ function useMemory(accountCard: string | null): Memory {
           if (job.state === "done") {
             const main = job.kind === "card" ? job.card : fileOf(job.comparison);
             mine = { id: pending, login: main.login ?? null, overall: main.overall };
-            if (alive) setMem({ mine, pending: null });
+            seen = { id: pending, card: main };
+            if (alive) setMem({ mine, pending: null, card: main });
             return;
           }
         } catch (e) {
@@ -143,16 +140,27 @@ function useMemory(accountCard: string | null): Memory {
       const id = mine.id;
       try {
         const job = await api.getJob(id);
-        if (!alive || job.state !== "done") return;
+        if (!alive) return;
+        if (job.state !== "done") {
+          setMem((m) => ({ ...m, card: m.card ?? null }));
+          return;
+        }
         const main = job.kind === "card" ? job.card : fileOf(job.comparison);
-        setMem((m) => ({ ...m, mine: { id, login: main.login ?? null, overall: main.overall } }));
+        seen = { id, card: main };
+        setMem((m) => ({ ...m, mine: { id, login: main.login ?? null, overall: main.overall }, card: main }));
       } catch (e) {
-        if (alive && gone(e)) setMem((m) => ({ ...m, mine: null }));
+        if (!alive) return;
+        // Fiche retirée : l'accueil redevient celui d'un visiteur. Réseau capricieux : la ligne de la note, sans la fiche.
+        setMem((m) => (gone(e) ? { ...m, mine: null, card: null } : { ...m, card: m.card ?? null }));
       }
     };
     void check();
+    // La fiche de qui s'est connecté ici, rendue par le serveur après le premier rendu (§18.90).
+    const on = () => setMem((m) => ({ ...m, mine: myCard() }));
+    window.addEventListener(MINE_EVENT, on);
     return () => {
       alive = false;
+      window.removeEventListener(MINE_EVENT, on);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -189,27 +197,43 @@ export function BackLine({ mine, pending, owed = false }: Pick<Memory, "mine" | 
 }
 
 /**
- * Qui revient avec sa fiche (§18.52) : la ligne de sa fiche, le bouton rose « Voir ma fiche », et
- * dessous le lien qui ouvre le formulaire. Revenir sert d'abord à retrouver sa fiche, son rang, son partage.
+ * Qui revient avec sa fiche (§18.89) : sa fiche debout sur le crépuscule, là où le visiteur voit
+ * celle de Jacques, et dessous le seul bouton rose de la page. La fiche entière mène à sa page.
+ * `card` pas encore lue : son cadre vide, à sa taille (rien ne saute) ; illisible : la ligne de sa note.
  */
-export function ReturnCall({ mine, onAnother }: { mine: MyCard; onAnother: () => void }) {
-  const { t } = useT();
+export function MineCard({ mine, card }: { mine: MyCard; card: CardData | null | undefined }) {
+  const { t, lang } = useT();
   const b = t.home.back;
   const href = `/c/${mine.id}`;
   const stars = starsFor(mine.overall);
+  const see = (
+    <a className="pill pill-big home-see" href={href} onClick={(e) => onLinkClick(e, href)}>
+      {b.see}
+    </a>
+  );
+  if (card === null) {
+    return (
+      <div className="home-mine-line">
+        <p className="home-back">
+          <span>
+            {b.mine} <Stars n={stars} label={t.plea.count(stars)} /> {mine.overall}/100.
+          </span>
+        </p>
+        {see}
+      </div>
+    );
+  }
   return (
-    <div className="home-return">
-      <p className="home-back">
-        <span>
-          {b.mine} <Stars n={stars} label={t.plea.count(stars)} /> {mine.overall}/100.
-        </span>
-      </p>
-      <a className="pill pill-big home-see" href={href} onClick={(e) => onLinkClick(e, href)}>
-        {b.see}
-      </a>
-      <button type="button" className="link-alt home-another" aria-expanded={false} onClick={onAnother}>
-        {b.another}
-      </button>
+    <div className="home-stage">
+      <div className="home-stage-in">
+        <Sunset />
+        <div className="showcase home-mine-card">
+          <a className="home-mine-link" href={href} onClick={(e) => onLinkClick(e, href)} aria-label={`${b.see}, ${t.tierCard(LEVEL_LABELS[stars][lang])}`}>
+            {card ? <CardView card={card} lang={lang} interactive idPrefix="mine" /> : <span className="home-mine-wait" />}
+          </a>
+          {see}
+        </div>
+      </div>
     </div>
   );
 }
@@ -293,11 +317,10 @@ export function Home() {
   const { t } = useT();
   const h = t.home;
   const inputRef = useRef<HTMLInputElement>(null);
-  const showcase = useShowcase();
+  /** Le bas de l'accueil de qui a sa fiche : « Faire une autre fiche », puis le formulaire à sa place. */
+  const moreRef = useRef<HTMLDivElement>(null);
   const topKnown = useTopKnown();
-  // Connecté avec une fiche au compte (§18.85) : la ligne de sa fiche, puis l'entrée connectée (« Voir ma fiche »).
-  const acct = useAccount();
-  const mem = useMemory(acct?.cardId ?? null);
+  const mem = useMemory();
   // La ligne sous le titre (lib/season.ts) : l'entretien seulement si une prime est ouverte.
   const hook = homeHook(h, useAppConfig());
   // Revenu en plein film : la fiche existe, sa note attend la poursuite.
@@ -308,13 +331,16 @@ export function Home() {
     document.title = t.meta.title;
   }, [t]);
 
-  // Qui a déjà sa fiche (§18.52) : « Voir ma fiche » en rose, le formulaire replié sous « Faire une
-  // autre fiche ». Il s'ouvre d'emblée quand un préremplissage l'attend (« Réessayer », pseudo inconnu).
+  // Un préremplissage attend (« Réessayer », pseudo inconnu) : le formulaire est ouvert d'emblée,
+  // en haut de la page, même pour qui a déjà sa fiche.
   const [prefill] = useState(peekPrefill);
   const mineLogin = mem.mine?.login?.toLowerCase() ?? null;
   const direct = prefill?.direct && prefill.login ? prefill.login : null;
   const directIsMine = !!direct && direct.toLowerCase() === mineLogin;
-  const [open, setOpen] = useState(() => !!prefill && !directIsMine);
+  const fromPrefill = !!prefill && !directIsMine;
+  // Une connexion LinkedIn ou GitHub revient sur l'accueil : le formulaire est là pour dire où elle en est (§18.90).
+  const [returnBack] = useState(returnPending);
+  const [open, setOpen] = useState(fromPrefill || returnBack);
   const returning = !!mem.mine && !owed && !mem.pending;
   // /<pseudo> d'un autre, pour qui a sa fiche : c'est une dénonciation (§18.52), avec ses gardes
   // (pas soi-même, la fiche part au nom du dénonciateur, aucun partage public), pas « Faire ma fiche ».
@@ -324,12 +350,24 @@ export function Home() {
     if (prefill?.direct && (denounce || directIsMine)) dropPrefill(prefill);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // Qui a déjà sa fiche (§18.89) : sa fiche, les classements, et le formulaire replié tout en bas
+  // sous « Faire une autre fiche ».
+  const mineHome = returning && !denounce && !fromPrefill && !returnBack;
+  // Connecté (§18.91) : « Se déconnecter » à côté de « Faire une autre fiche ». Une fiche déjà là :
+  // les formulaires de l'accueil gardent leurs boutons, la ligne de sa fiche dit déjà où elle est.
+  const acct = useAccount();
+  const another = !!mem.mine || !!mem.pending;
+  const showcase = useShowcase(!mineHome);
   const toast = useMiniToast();
 
   /** « Faire une autre fiche » : le formulaire s'ouvre sur place, le champ prend le focus dans le geste. */
   const openForm = () => {
     flushSync(() => setOpen(true));
-    inputRef.current?.focus({ preventScroll: true });
+    // Rien à taper (deux boutons, §18.80) : le premier bouton du formulaire prend le focus que le lien vient de perdre.
+    const first = inputRef.current ?? moreRef.current?.querySelector<HTMLElement>("button, a[href], input");
+    first?.focus({ preventScroll: true });
+    // Tout en bas de la page : le formulaire, plus haut que le lien, reste entier à l'écran.
+    moreRef.current?.scrollIntoView({ block: "nearest" });
   };
 
   /** Une place libre, « Découvre le tien » : retour au champ du pseudo,
@@ -339,12 +377,48 @@ export function Home() {
     if (returning && !open && !denounce) flushSync(() => setOpen(true));
     const input = inputRef.current;
     if (!input) {
-      window.scrollTo({ top: 0, behavior });
+      // Rien à taper (deux boutons, §18.80) : le formulaire lui-même, en haut de la page, ou en bas pour qui a sa fiche.
+      if (moreRef.current) moreRef.current.scrollIntoView({ block: "center", behavior });
+      else window.scrollTo({ top: 0, behavior });
       return;
     }
     input.scrollIntoView({ block: "center", behavior });
     input.focus({ preventScroll: true });
   };
+
+  if (mineHome && mem.mine) {
+    return (
+      <main className="page page-home is-mine" id="main">
+        {/* Sa fiche, puis les classements : le top de la semaine (sa ligne en évidence), les primes ouvertes, les bandes. */}
+        <div className="home-mine">
+          <MineCard mine={mem.mine} card={mem.card} />
+          <WeekBoard onPlay={play} />
+          <PrimesStrip />
+          <HomeBands cardId={mem.mine.id} toast={toast.show} />
+        </div>
+        <div className="home-more" ref={moreRef}>
+          {open ? (
+            <EntryForm inputRef={inputRef} another />
+          ) : acct ? (
+            <div className="entry-foot entry-or home-another">
+              <button type="button" className="link-alt" aria-expanded={false} onClick={openForm}>
+                {h.back.another}
+              </button>
+              <span aria-hidden>·</span>
+              <button type="button" className="link-alt" onClick={() => void signOut()}>
+                {h.account.out}
+              </button>
+            </div>
+          ) : (
+            <button type="button" className="link-alt home-another" aria-expanded={false} onClick={openForm}>
+              {h.back.another}
+            </button>
+          )}
+        </div>
+        {toast.node}
+      </main>
+    );
+  }
 
   return (
     <main className="page page-home" id="main">
@@ -367,12 +441,10 @@ export function Home() {
                 </Suspense>
               </div>
             </>
-          ) : returning && !open && mem.mine && !acct?.cardId ? (
-            <ReturnCall mine={mem.mine} onAnother={openForm} />
           ) : (
             <>
               {mem.mine || mem.pending ? <BackLine mine={mem.mine} pending={mem.pending} owed={owed} /> : <p className="hero-hook">{hook}</p>}
-              <EntryForm inputRef={inputRef} />
+              <EntryForm inputRef={inputRef} another={another} />
             </>
           )}
         </section>
@@ -403,7 +475,7 @@ export function Home() {
           </h2>
           <p>{hook}</p>
         </div>
-        <EntryForm secondary />
+        <EntryForm secondary another={another} />
       </section>
     </main>
   );

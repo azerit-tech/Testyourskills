@@ -112,10 +112,10 @@ startCreditsWatch();
 const linkedinProfiles = linkedinProfilesFromEnv(process.env, store.db) ?? undefined;
 if (linkedinProfiles) console.log(`LinkedIn : profils lus par ${linkedinProfiles.providerName}.`);
 else console.warn("Fournisseur LinkedIn sans jeton : LinkedIn contre GitHub et l'entrée LinkedIn désactivés.");
-// La recherche d'un profil par nom (§18.80) : le même jeton, un autre acteur.
+// La recherche d'un profil par nom (§18.80, §18.90) : un index web, Brave puis Serper.
 const linkedinPeople = (linkedinProfiles && linkedinSearchFromEnv(process.env, store.db)) || undefined;
 if (linkedinPeople) console.log(`LinkedIn : recherche par nom par ${linkedinPeople.providerName}.`);
-else if (linkedinProfiles) console.warn("Recherche LinkedIn par nom sans jeton : le champ « Ton nom » n'accepte qu'un lien collé.");
+else if (linkedinProfiles) console.warn("Recherche LinkedIn par nom sans clé (BRAVE_SEARCH_API_KEY, SERPER_API_KEY) : pas de « Se connecter avec LinkedIn », le champ ne prend qu'un lien collé.");
 const { app, pipeline, refreshShowcase } = createApp({
   linkedinProfiles,
   linkedinPeople,
@@ -140,7 +140,7 @@ const { app, pipeline, refreshShowcase } = createApp({
   linkedin,
   githubAuth,
   githubLogin,
-  // Le compte léger (§18.85) : sans SESSION_SECRET, pas de compte, tout marche comme avant.
+  // Le compte léger (§18.91) : sans SESSION_SECRET, pas de compte, tout marche comme avant.
   accountSecret: process.env.SESSION_SECRET?.trim() || undefined,
   secureCookies: prod,
   avatarDir,

@@ -91,8 +91,8 @@ describe("weekTop", () => {
       [2, "Kevin", 75, b.id],
     ]);
     expect(top.entries[0]!.stars).toBe(5);
-    // Rien de privé dans une ligne.
-    const allowed = ["avatarUrl", "cardId", "login", "overall", "profile", "rank", "stars"];
+    // Rien de privé dans une ligne : la personne telle que sa fiche la montre (§18.88), sa note, son profil.
+    const allowed = ["avatarUrl", "cardId", "initials", "login", "name", "overall", "profile", "rank", "stars"];
     for (const e of top.entries) expect(Object.keys(e).every((k) => allowed.includes(k))).toBe(true);
     expect(JSON.stringify(top)).not.toMatch(/"tok"|email|followers/);
   });
@@ -160,14 +160,18 @@ describe("weekTop", () => {
     expect(weekRank(store.db, alone.id, NOW)).toMatchObject({ rank: 1, total: 1 });
   });
 
-  it("une fiche LinkedIn seule entre sur sa note, sans nom, sans portrait, sans lien", () => {
+  it("une fiche LinkedIn seule entre sur sa note, sous le nom de sa fiche, avec ses initiales et le lien vers elle (§18.88)", () => {
     const store = newStore();
     const solo = li("camille", 70, W46 + H);
-    store.insertCards([solo, gh("dev", 60, W46 + H)]);
+    // Une fiche GitHub sans nom (le bandeau répète le pseudo) : la ligne n'a que son pseudo.
+    store.insertCards([solo, gh("dev", 60, W46 + H, {}, { name: "dev", initials: "DE" })]);
     const top = weekTop(store.db, { now: NOW });
     expect(top.total).toBe(2);
-    expect(top.entries[0]).toEqual({ rank: 1, overall: 70, stars: 4, ...(top.entries[0]!.profile ? { profile: top.entries[0]!.profile } : {}) });
-    expect(JSON.stringify(top.entries[0])).not.toContain(solo.id);
+    expect(top.entries[0]).toEqual({ rank: 1, cardId: solo.id, name: FIXTURES.cv.name, initials: FIXTURES.cv.initials, overall: 70, stars: 4, ...(top.entries[0]!.profile ? { profile: top.entries[0]!.profile } : {}) });
+    expect(top.entries[1]).toMatchObject({ rank: 2, login: "dev", initials: "DE" });
+    expect(top.entries[1]!.name).toBeUndefined();
+    // Rien d'autre de la fiche ne part : ni l'adresse LinkedIn, ni l'employeur.
+    expect(JSON.stringify(top.entries)).not.toMatch(/linkedin\.com|"club"/);
     expect(weekRank(store.db, solo.id, NOW)).toMatchObject({ rank: 1, total: 2 });
     // Son dossier arrive (même adresse LinkedIn, lien prouvé) : une seule ligne, celle du dossier.
     store.insertCards(dossier("cmp00004", "camille-dev", 65, W46 + 2 * H, { facts: { linkedinUrl: "https://www.linkedin.com/in/camille", linkedinProven: true } }));

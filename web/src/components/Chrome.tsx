@@ -5,6 +5,7 @@ import { useT } from "../i18n";
 import { api, isMock } from "../lib/api";
 import { onLinkClick, usePath } from "../lib/router";
 import { seasonLine, useAppConfig } from "../lib/season";
+import { syncMine } from "../lib/entryApi";
 import { MINE_EVENT, myCard } from "../lib/session";
 import { useAccount } from "../lib/account";
 import { AzeritMark, Brand } from "./Brand";
@@ -90,12 +91,16 @@ export function TopBar() {
   useEffect(() => {
     const on = () => reread((n) => n + 1);
     window.addEventListener(MINE_EVENT, on);
+    // Qui s'est connecté ici retrouve « Ma fiche », même mémoire vidée (§18.90).
+    void syncMine();
     return () => window.removeEventListener(MINE_EVENT, on);
   }, []);
-  // Connecté avec une fiche au compte (§18.85) : « Ma fiche » en pastille, avec son visage.
-  const acct = useAccount();
+  // Connecté avec une fiche au compte (§18.91) : « Ma fiche » en pastille, avec son visage. Le repli
+  // sans compte (§18.90) garde le lien texte, vers la fiche que le navigateur retient.
+  const got = useAccount();
+  const acct = got && !got.known ? got : null;
   const mine = myCard();
-  const mineHref = acct?.cardId ? `/c/${acct.cardId}` : mine ? `/c/${mine.id}` : null;
+  const mineHref = acct?.cardId ? `/c/${acct.cardId}` : mine ? `/c/${mine.id}` : got?.cardId ? `/c/${got.cardId}` : null;
   const onBands = /^\/bandes(\/|$)/.test(path);
   return (
     <header className="topbar">

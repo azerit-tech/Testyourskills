@@ -311,13 +311,25 @@ export interface WeekRank {
   closed: boolean;
 }
 
-/** Une ligne du top de la semaine (GET /api/top). Rien de privé : ce qui est déjà sur la fiche publique. */
-export interface TopEntry {
-  rank: number;
-  /** La fiche du dossier de la personne. Absente, comme `login` et le portrait, pour une fiche LinkedIn seule : ni nom ni lien au classement. */
-  cardId?: string;
+/**
+ * La personne d'une ligne de classement (top de la semaine, page d'une bande, §18.88) :
+ * ce que sa fiche montre déjà. Construite par shared/boardPerson.ts.
+ */
+export interface BoardPerson {
+  /** L'adresse de la fiche : /c/{cardId}. */
+  cardId: string;
+  /** Le nom de la fiche. Absent quand elle n'a que son pseudo. */
+  name?: string;
+  /** Pseudo GitHub, si la fiche en a un. */
   login?: string;
+  /** La photo de la fiche. Absente : les initiales. */
   avatarUrl?: string;
+  initials: string;
+}
+
+/** Une ligne du top de la semaine (GET /api/top) : la personne de la fiche (son nom, son visage, sa fiche, §18.88) et sa note. Rien de privé : ce qui est déjà sur la fiche publique. */
+export interface TopEntry extends BoardPerson {
+  rank: number;
   overall: number;
   stars: Stars;
   /** Nom du profil criminel (§18.2), si la fiche en a un. */

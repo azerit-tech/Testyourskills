@@ -277,7 +277,7 @@ export function migrate(db: Database.Database) {
   ensureBandTables(db);
   // Les primes (§18.4) : une inscription par login et par prime, posée par « Concourir ».
   ensurePrimeTables(db);
-  // Le compte léger (§18.85) : une ligne par personne connectée, rien qui la nomme.
+  // Le compte léger (§18.91) : une ligne par personne connectée, rien qui la nomme.
   ensureAccountTables(db);
 }
 

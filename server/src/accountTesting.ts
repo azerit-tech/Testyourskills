@@ -1,4 +1,4 @@
-// Banc d'essai du compte léger (SPEC §18.85) : l'application avec de faux LinkedIn
+// Banc d'essai du compte léger (SPEC §18.91) : l'application avec de faux LinkedIn
 // et GitHub, et les tours de connexion d'un navigateur. Aucun appel réel.
 
 import { expect, vi } from "vitest";

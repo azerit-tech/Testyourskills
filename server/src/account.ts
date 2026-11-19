@@ -1,4 +1,4 @@
-// Le compte léger (SPEC §18.85) : se connecter avec LinkedIn ou GitHub suffit,
+// Le compte léger (SPEC §18.91) : se connecter avec LinkedIn ou GitHub suffit,
 // sans inscription, sans mot de passe, sans page de profil. La personne retrouve
 // sa fiche sur n'importe quel appareil.
 //

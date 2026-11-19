@@ -1,4 +1,4 @@
-// Le compte léger (SPEC §18.85) : la session du compte vaut le jeton de la fiche
+// Le compte léger (SPEC §18.91) : la session du compte vaut le jeton de la fiche
 // pour la personne fichée, depuis un navigateur qui n'a pas ce jeton ; jamais pour
 // la fiche d'un autre. Supprimer sa fiche par son compte emporte le compte.
 
@@ -138,5 +138,46 @@ describe("se déconnecter", () => {
     expect(await me(ctx, after)).toBeNull();
     // Le compte, lui, reste : se reconnecter le retrouve.
     expect(rows(ctx)).toHaveLength(1);
+  });
+
+  it("après LinkedIn : efface tout, le compte, la session d'entrée, tys_who et son témoin (§18.90) ; plus rien ne la reconnaît", async () => {
+    const ctx = setupAccount();
+    const li = await linkedinIn(ctx);
+    const card = await linkedinCard(ctx, li.jar);
+    for (const name of [ACCOUNT_COOKIE, "tys_who", "tys_known"]) expect(card.jar).toContain(`${name}=`);
+    // La session d'entrée (15 minutes) est encore là si la personne se déconnecte avant d'aller au bout.
+    const jar = card.jar.includes("tys_enter=") ? card.jar : `${card.jar}; ${li.jar.split(/;\s*/).find((kv) => kv.startsWith("tys_enter="))}`;
+    const out = await ctx.app.request("/auth/logout", { method: "POST", headers: { cookie: jar, origin: BASE } });
+    expect(out.status).toBe(200);
+    const after = cookiesOf(out, jar);
+    for (const name of [ACCOUNT_COOKIE, SESSION_COOKIE, "tys_enter", "tys_who", "tys_known"]) expect(after).not.toContain(`${name}=`);
+    expect(await me(ctx, after)).toBeNull();
+  });
+});
+
+describe("le repli tys_who (§18.90)", () => {
+  it("sans compte valide : /api/me rend sa fiche, sans source ni droit ; avec le compte, le compte passe devant", async () => {
+    const ctx = setupAccount();
+    const li = await linkedinIn(ctx);
+    const card = await linkedinCard(ctx, li.jar);
+    const whoOnly = card.jar.split(/;\s*/).filter((kv) => kv.startsWith("tys_who=") || kv.startsWith("tys_known=")).join("; ");
+    expect(await me(ctx, whoOnly)).toMatchObject({ login: null, cardId: card.json.id, sources: [], known: true });
+    // Aucun droit : la fiche n'est pas `mine` pour ce navigateur.
+    expect((await get(ctx, card.json.id, whoOnly)).mine).toBeFalsy();
+    const full = await me(ctx, card.jar);
+    expect(full).toMatchObject({ cardId: card.json.id, sources: ["linkedin"] });
+    expect(full).not.toHaveProperty("known");
+  });
+
+  it("supprimer sa fiche par son compte efface aussi tys_who et son témoin", async () => {
+    const ctx = setupAccount();
+    const li = await linkedinIn(ctx);
+    const card = await linkedinCard(ctx, li.jar);
+    const del = await send(ctx, `/api/card/${card.json.id}`, { method: "DELETE", cookie: onlyAccount(card.jar) + "; " + card.jar.split(/;\s*/).filter((kv) => /^tys_(who|known|enter)=/.test(kv)).join("; "), origin: BASE });
+    expect(del.status).toBe(200);
+    const after = cookiesOf(del, card.jar);
+    for (const name of [ACCOUNT_COOKIE, "tys_who", "tys_known", "tys_enter"]) expect(after).not.toContain(`${name}=`);
+    expect(await me(ctx, after)).toBeNull();
+    expect(rows(ctx)).toHaveLength(0);
   });
 });
