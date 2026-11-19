@@ -325,7 +325,7 @@ const fr = frTypoDeep({
     leadDenounced: (who: string, by: string | null) => (by ? `@${by} a dénoncé ${who}.` : `Quelqu'un a dénoncé ${who}.`),
     /** Sans bloc des critères au-dessus (fiche dénoncée sans grille) : la même question, sans « ces huit critères ». */
     yourTurnBare: "Et toi, tu vaux combien d'étoiles\u00a0? Ton LinkedIn ou ton GitHub suffit.",
-    /** Sous la fiche d'un dossier à deux sources (§18.36, §18.89) : une fiche, une note, lue « d'après LinkedIn et GitHub ». */
+    /** Sous la fiche d'un dossier à deux sources (§18.36, §18.92) : une fiche, une note, lue « d'après LinkedIn et GitHub ». */
     pieces: {
       line: (labels: string) => `D'après ${labels.replace(/^CV\b/, "le CV")}`,
       /* « LinkedIn et GitHub » : une phrase, pas un point médian. */

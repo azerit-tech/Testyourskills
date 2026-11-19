@@ -1,4 +1,4 @@
-// Le chronométrage d'une fiche (SPEC §18.89) : où passent ses secondes, phase par
+// Le chronométrage d'une fiche (SPEC §18.92) : où passent ses secondes, phase par
 // phase, et une ligne compacte au journal quand elle sort. Le pipeline ouvre une
 // trace par fiche ; les modules du moteur (collecte GitHub, lecture du profil,
 // appels IA) y versent leurs temps sans rien recevoir en paramètre : la trace

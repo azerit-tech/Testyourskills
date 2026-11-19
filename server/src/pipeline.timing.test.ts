@@ -1,4 +1,4 @@
-// Le chronométrage d'une fiche (SPEC §18.89) : une ligne par fiche, sortie ou en
+// Le chronométrage d'une fiche (SPEC §18.92) : une ligne par fiche, sortie ou en
 // échec, avec ses phases et ses appels IA.
 
 import { afterEach, describe, expect, it } from "vitest";

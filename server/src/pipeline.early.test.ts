@@ -1,4 +1,4 @@
-// Rien n'attend ce qui ne lui sert pas (SPEC §18.89) : la lecture du code et celle
+// Rien n'attend ce qui ne lui sert pas (SPEC §18.92) : la lecture du code et celle
 // du LinkedIn partent pendant la collecte GitHub, dès que leurs entrées existent ;
 // à l'entrée LinkedIn, le GitHub prouvé par l'email se collecte pendant la lecture
 // du profil. Mêmes fiches, mêmes replis.

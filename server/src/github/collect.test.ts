@@ -217,7 +217,7 @@ describe("collecte complète, faux GitHub", () => {
   });
 });
 
-describe("faits donnés en avance (SPEC §18.89)", () => {
+describe("faits donnés en avance (SPEC §18.92)", () => {
   it("onProfile : le profil seul, une fois, avant la fin de la collecte", async () => {
     const f = fakeGithub();
     vi.stubGlobal("fetch", f.impl);
