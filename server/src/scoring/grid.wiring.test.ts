@@ -236,7 +236,7 @@ describe("la liste des employeurs à forte barre → Parcours, niveau 10", () =>
     const withList = declaredGrid(declaredInput(reading, { profile: declaredLinkedin(profile), now: NOW, highBar: list })).criteria.find((c) => c.code === "EMP")!;
     expect(list.employers.length).toBe(3);
     expect(withList.score).toBe(10);
-    expect(withList.reached.fr).toBe("3,9 ans chez Fictiva Labs Paris, employeur à forte barre d'embauche, et une équipe encadrée.");
+    expect(withList.reached.fr).toBe("3,9 ans chez Fictiva Labs Paris, employeur très sélectif à l'embauche, et une équipe encadrée.");
     expect(crit(input(profile, reading), "EMP").score).toBe(6);
   });
 

@@ -54,6 +54,8 @@ export interface GithubMetrics {
   firstCommitDate: string | null;
   firstCommitYears: number | null;
   maxRepoCommits: number | null;
+  /** Les commits de tous les dépôts publics ; null si l'un d'eux n'a pas été compté. */
+  allRepoCommits: number | null;
   languageBytes: Record<string, number>;
   languagesOverMin: string[];
   mainLanguage: string | null;
@@ -117,6 +119,7 @@ export function deriveGithub(f: GithubFacts): GithubMetrics {
   const firstCommitYears = firstCommitDate ? Math.max(0, (now - Date.parse(firstCommitDate)) / YEAR) : null;
   const counts = f.repos.map((r) => r.commitCount).filter((n): n is number => n !== null);
   const maxRepoCommits = counts.length ? Math.max(...counts) : null;
+  const allRepoCommits = counts.length && counts.length === f.repos.length && f.repoCount <= f.repos.length ? counts.reduce((s, n) => s + n, 0) : null;
 
   // Langages (octets agrégés sur les repos mesurés)
   const languageBytes: Record<string, number> = {};
@@ -198,6 +201,7 @@ export function deriveGithub(f: GithubFacts): GithubMetrics {
     firstCommitDate,
     firstCommitYears,
     maxRepoCommits,
+    allRepoCommits,
     languageBytes,
     languagesOverMin,
     mainLanguage,

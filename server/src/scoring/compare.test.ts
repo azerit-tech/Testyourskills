@@ -43,8 +43,8 @@ describe("un dossier à deux pièces : les pièces telles quelles, la note du do
     });
   }
 
-  it("Jacques : la note du dossier, 65 ; Lumine : 66, code non prouvé", () => {
-    expect(compareCards(jacques().linkedin, jacques().github).grid!.overall).toBe(65);
+  it("Jacques : la note du dossier, 72 ; Lumine : 66, code non prouvé", () => {
+    expect(compareCards(jacques().linkedin, jacques().github).grid!.overall).toBe(72);
     const l = compareCards(lumine().linkedin, lumine().github).grid!;
     expect(l.overall).toBe(66);
     expect(l.rule).toBe("capped_unproven");

@@ -38,11 +38,11 @@ function lumine() {
 
 describe("les fiches prennent la note de la grille", () => {
   // Barème 0.4.0 : 41, 61, 57. L'expérience donne le niveau (« Junior ») et ne pèse plus (0.5.0).
-  it("Jacques : LinkedIn 60, GitHub 67, dossier 65 (à un point près)", () => {
+  it("Jacques : LinkedIn 60, GitHub 77, dossier 72 (à un point près)", () => {
     const { github, linkedin, cmp } = jacques();
     expect(Math.abs(linkedin.overall - 60)).toBeLessThanOrEqual(1);
-    expect(Math.abs(github.overall - 67)).toBeLessThanOrEqual(1);
-    expect(Math.abs(cmp.grid!.overall - 65)).toBeLessThanOrEqual(1);
+    expect(Math.abs(github.overall - 77)).toBeLessThanOrEqual(1);
+    expect(Math.abs(cmp.grid!.overall - 72)).toBeLessThanOrEqual(1);
     expect(cmp.grid!.seniority?.code).toBe("junior");
     expect(linkedin.overall).toBe(linkedin.grid!.overall);
     expect(github.overall).toBe(github.grid!.overall);
@@ -77,7 +77,7 @@ describe("les fiches prennent la note de la grille", () => {
     const own = cmp.grid!.criteria.find((c) => c.code === "OWN")!;
     expect(own.source).toBe("both");
     expect(own.declared).toBe(4);
-    expect(own.proven).toBe(6);
+    expect(own.proven).toBe(8);
     // Les fiches gardent chacune leur propre grille.
     expect(cmp.cv.grid?.overall).toBe(cmp.cv.overall);
     expect(cmp.github.grid?.overall).toBe(cmp.github.overall);

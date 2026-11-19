@@ -202,7 +202,7 @@ describe("la liste des employeurs à forte barre, lue dans son fichier, va au sc
     expect(ctx.seen[0]!.highBar?.source).toBe(file);
     expect(ctx.seen[0]!.highBar?.employers.map((e) => e.name)).toEqual(["Fictiva Labs", "Orbe Quantique", "Nimbus Atelier"]);
     expect(emp(s.card).score).toBe(10);
-    expect(emp(s.card).reached.fr).toMatch(/employeur à forte barre d'embauche, et une trajectoire qui monte\.$/);
+    expect(emp(s.card).reached.fr).toMatch(/employeur très sélectif à l'embauche, et une trajectoire qui monte\.$/);
   });
 
   it("comparaison : la même liste, sur la fiche déclarée", async () => {

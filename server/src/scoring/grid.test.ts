@@ -119,24 +119,25 @@ describe("les deux fondateurs (§7), à un point près", () => {
   const lCase = caseGrid(lLinkedin, lGithub);
 
   // Barème 0.4.0 : LinkedIn 41, GitHub 61, dossier 57. L'expérience (3, puis 4 estimée) pesait 1,5 ;
-  // elle donne maintenant le niveau, « Junior », et le parcours se lit à ce niveau : Azerit fondée
-  // et tenue 7 mois, 6 au lieu de 4.
-  it("Jacques, niveau « Junior » : LinkedIn 60, GitHub 67, dossier 65", () => {
+  // elle donne maintenant le niveau, « Junior », et le parcours, la stack et l'ownership se lisent à ce
+  // niveau : Azerit fondée et tenue 7 mois, 6 au lieu de 4 ; 329 commits depuis deux ans et une autre
+  // famille de langages, 8 au lieu de 6 ; un projet porté 17 mois avec de quoi mettre en production, 8 au lieu de 6.
+  it("Jacques, niveau « Junior » : LinkedIn 60, GitHub 77, dossier 72", () => {
     expect(scores(jLinkedin)).toEqual({ EDU: 6, XP: 3, EMP: 6, STK: null, CODE: null, ACT: null, OWN: 4, OSS: null });
-    expect(scores(jGithub)).toEqual({ EDU: null, XP: 4, EMP: null, STK: 6, CODE: 7, ACT: 8, OWN: 6, OSS: 6 });
-    expect(scores(jCase)).toEqual({ EDU: 6, XP: 3, EMP: 6, STK: 6, CODE: 7, ACT: 8, OWN: 6, OSS: 6 });
+    expect(scores(jGithub)).toEqual({ EDU: null, XP: 4, EMP: null, STK: 8, CODE: 7, ACT: 8, OWN: 8, OSS: 6 });
+    expect(scores(jCase)).toEqual({ EDU: 6, XP: 3, EMP: 6, STK: 8, CODE: 7, ACT: 8, OWN: 8, OSS: 6 });
     expect(jLinkedin.seniority).toEqual({ code: "junior", months: 13.5, source: "linkedin" });
     expect(jGithub.seniority).toEqual({ code: "junior", months: 24, source: "github" });
     expect(jCase.seniority).toEqual(jLinkedin.seniority);
     expect(jLinkedin.overall).toBe(60);
-    expect(jGithub.overall).toBe(67);
-    expect(jCase.overall).toBe(65);
+    expect(jGithub.overall).toBe(77);
+    expect(jCase.overall).toBe(72);
     // L'expérience ne pèse plus, nulle part : elle garde sa lecture, hors moyenne.
     for (const g of [jLinkedin, jGithub, jCase]) expect(crit(g, "XP").counted).toBe(false);
     // L'ownership seulement déclaré (4) est sous le parcours (6) : hors moyenne, comme l'école (6, pas au-dessus).
     expect(crit(jLinkedin, "OWN").counted).toBe(false);
     expect(crit(jLinkedin, "EDU").counted).toBe(false);
-    // L'open source (6) n'est au-dessus ni de 6,7 sur la fiche GitHub ni de 6,5 au dossier : hors moyenne.
+    // L'open source (6) n'est au-dessus ni de 7,7 sur la fiche GitHub ni de 7,2 au dossier : hors moyenne.
     expect(crit(jGithub, "OSS").counted).toBe(false);
     expect(crit(jCase, "OSS").counted).toBe(false);
     expect(jLinkedin.rule).toBe("capped_unproven");
@@ -168,7 +169,9 @@ describe("les deux fondateurs (§7), à un point près", () => {
     // La table lue est celle du niveau, portée par la grille : la ligne obtenue y figure.
     expect(crit(jLinkedin, "EMP").table?.map((r) => r.score)).toEqual(GRID.EMP.tables.junior.map((r) => r.score));
     expect(sp(crit(jLinkedin, "EMP").table?.find((r) => r.score === 6)?.text.fr)).toBe("6 mois dans une équipe produit exigeante (startup, scale-up), ou une entreprise fondée tenue 6 mois, ou un poste tenu 2 ans.");
-    expect(crit(jGithub, "STK").next?.fr).toBe("Pour 8 : 500 commits dans ton langage principal (tu en as 329).");
+    expect(sp(crit(jGithub, "STK").next?.fr)).toBe("Pour 10 : 600 commits dans ton langage principal (tu en as 329).");
+    expect(sp(crit(jGithub, "OWN").reached.fr)).toBe("Un projet porté 6 mois ou plus (50 commits), et de quoi mettre en production (sequence-mail).");
+    expect(sp(crit(jGithub, "OWN").next?.fr)).toBe("Pour 10 : un projet porté un an ou plus (100 commits), publié, utilisé par d'autres (25 stars GitHub ou 2 comptes externes qui contribuent).");
     expect(crit(jGithub, "STK").evidence?.text.fr).toMatch(/^TypeScript : 329 commits dans 7 repos depuis novembre 2024, dernier push hier \(sequence-mail\)\. Agda aussi dans le code\.$/);
     expect(crit(jGithub, "CODE").reached.fr).toBe("Niveau moyen lu 3,6 sur 5, sur 3 repos.");
     expect(crit(jGithub, "CODE").evidence?.text.fr).toMatch(/^sequence-mail, `src\/services\/outreach\.test\.ts` : niveau 4 sur 5\./);
@@ -180,9 +183,9 @@ describe("les deux fondateurs (§7), à un point près", () => {
 
   it("la comparaison garde les deux notes de chaque critère, et retient le prouvé", () => {
     const own = crit(jCase, "OWN");
-    expect([own.declared, own.proven, own.score, own.source]).toEqual([4, 6, 6, "both"]);
+    expect([own.declared, own.proven, own.score, own.source]).toEqual([4, 8, 8, "both"]);
     const stk = crit(jCase, "STK");
-    expect([stk.declared, stk.proven, stk.score, stk.source]).toEqual([null, 6, 6, "github"]);
+    expect([stk.declared, stk.proven, stk.score, stk.source]).toEqual([null, 8, 8, "github"]);
     const xp = crit(jCase, "XP");
     expect([xp.declared, xp.proven, xp.score, xp.source]).toEqual([3, 4, 3, "linkedin"]);
   });
@@ -654,7 +657,7 @@ describe("des débuts de carrière différents n'ont plus la même note (les tro
     for (const g of [one, two, product, highBar]) expect(g.seniority).toMatchObject({ code: "student", months: 4 });
     expect([one, two, product, highBar].map((g) => score(g, "EMP"))).toEqual([5, 6, 7, 10]);
     expect([one, two, product, highBar].map((g) => g.overall)).toEqual([53, 60, 70, 85]);
-    expect(sp(crit(highBar, "EMP").reached.fr)).toBe("Un stage ou une alternance de 6 mois chez Fictiva Labs, employeur à forte barre d'embauche.");
+    expect(sp(crit(highBar, "EMP").reached.fr)).toBe("Un stage ou une alternance de 6 mois chez Fictiva Labs, employeur très sélectif à l'embauche.");
   });
 
   it("le parcours se lit à ce niveau : dix mois chez un employeur très sélectif passent devant dix mois ailleurs, qui passent devant un stage long", () => {

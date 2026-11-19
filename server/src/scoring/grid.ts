@@ -17,8 +17,8 @@ import { CRITERION_CODES, type CriterionCode, type Fact, type Grid, type GridCri
 import type { ExternalMergedPR, GithubFacts, GithubRepo } from "../github/facts";
 import type { LinkedinRole } from "../linkedinProfile/profile";
 import { df, nf } from "./common";
-import { GRID, type EmpCondition, type GridRoleKind } from "./config";
-import { isTutorialRepo, type GithubMetrics } from "./derive";
+import { GRID, type EmpCondition, type GridRoleKind, type OwnRow, type StkRow } from "./config";
+import { deriveGithub, isTutorialRepo, type GithubMetrics } from "./derive";
 import { highBarEmployer, type HighBarList } from "./employers";
 import { normSchool, rankedSchools, schoolListNames, schoolTier, type RankedSchoolList } from "./school";
 import { EDU_NEXT, EDU_NEXT_GITHUB, SCHOOL_COUNTED, schoolCounted } from "../../../shared/schoolRank";
@@ -215,10 +215,17 @@ const missing = (code: CriterionCode, source: GridSource, reached: Fact, next?: 
 const repoUrl = (r: Pick<GithubRepo, "fullName">) => `https://github.com/${r.fullName}`;
 const profileUrl = (login: string) => `https://github.com/${login}`;
 
-/** GitHub trop mince pour juger : moins de 3 dépôts publics et aucun de 10 commits. */
+/**
+ * GitHub trop mince pour juger, ni en bien ni en mal : moins de 3 dépôts publics et aucun
+ * de 10 commits ; ou (0.5.0) moins de 50 commits en tout, tous dépôts publics comptés.
+ * Ses critères sont alors non prouvés : quelques commits de cours ne font pas baisser un dossier.
+ */
 export function thinGithub(m: GithubMetrics): boolean {
-  return m.repoCount < GRID.thinGithub.minRepos && (m.maxRepoCommits ?? 0) < GRID.thinGithub.repoCommits;
+  const T = GRID.thinGithub;
+  if (m.repoCount < T.minRepos && (m.maxRepoCommits ?? 0) < T.repoCommits) return true;
+  return m.allRepoCommits != null && m.allRepoCommits < T.minCommits;
 }
+const TOO_THIN = () => f("GitHub trop mince pour juger.", "GitHub too thin to judge.");
 
 // --- Les postes ------------------------------------------------------------------
 
@@ -602,7 +609,7 @@ const capFirst = (x: Fact): Fact => ({ fr: x.fr.charAt(0).toUpperCase() + x.fr.s
 function empConditionText(c: EmpCondition): Fact {
   const at =
     c.at === "highBar"
-      ? f(" chez un employeur à forte barre d'embauche", " at a high-bar employer")
+      ? f(" chez un employeur très sélectif à l'embauche", " at an employer with a high hiring bar")
       : c.at === "product"
         ? f(" dans une équipe produit exigeante (startup, scale-up)", " in a demanding product team (startup, scale-up)")
         : f("", "");
@@ -620,7 +627,7 @@ function empConditionText(c: EmpCondition): Fact {
         ? f(`un stage ou une alternance de ${m} mois ou plus${at.fr}`, `an internship or apprenticeship of ${m} months or more${at.en}`)
         : f(`un stage ou une alternance${at.fr}`, `an internship or apprenticeship${at.en}`);
     case "internships": {
-      const ats = c.at === "highBar" ? f(" chez des employeurs à forte barre d'embauche", " at high-bar employers") : c.at === "product" ? f(" dans des équipes produit exigeantes", " in demanding product teams") : f("", "");
+      const ats = c.at === "highBar" ? f(" chez des employeurs très sélectifs à l'embauche", " at employers with a high hiring bar") : c.at === "product" ? f(" dans des équipes produit exigeantes", " in demanding product teams") : f("", "");
       return c.count
         ? f(`${c.count} stages ou alternances${ats.fr}`, `${c.count} internships or apprenticeships${ats.en}`)
         : f(`${m} mois de stage ou d'alternance cumulés${ats.fr}`, `${m} months of internships or apprenticeships in total${ats.en}`);
@@ -703,7 +710,7 @@ export function empDeclared(d: DeclaredInput, seniority: GridSeniority | undefin
       const list = c.at ? interns.filter((r) => keys.has(r.role.company || r.role.title)) : interns;
       const total = unionMonths(list);
       if (c.count ? list.length < c.count : !list.length || total < need) return null;
-      const where = c.at === "highBar" ? f(" chez des employeurs à forte barre d'embauche", " at high-bar employers") : c.at === "product" ? f(" dans des équipes produit exigeantes", " in demanding product teams") : f("", "");
+      const where = c.at === "highBar" ? f(" chez des employeurs très sélectifs à l'embauche", " at employers with a high hiring bar") : c.at === "product" ? f(" dans des équipes produit exigeantes", " in demanding product teams") : f("", "");
       return c.count
         ? f(`${list.length} stages ou alternances${where.fr}.`, `${list.length} internships or apprenticeships${where.en}.`)
         : f(`${total} mois de stage ou d'alternance cumulés${where.fr}.`, `${total} months of internships or apprenticeships in total${where.en}.`);
@@ -713,7 +720,7 @@ export function empDeclared(d: DeclaredInput, seniority: GridSeniority | undefin
       if (!e || e.months < need) return null;
       const what = e.months ? f(`Un stage ou une alternance de ${e.months} mois`, `An internship or apprenticeship of ${months(e.months).en}`) : f("Un stage ou une alternance", "An internship or apprenticeship");
       return c.at === "highBar"
-        ? f(`${what.fr} chez ${e.name}, employeur à forte barre d'embauche.`, `${what.en} at ${e.name}, a high-bar employer.`)
+        ? f(`${what.fr} chez ${e.name}, employeur très sélectif à l'embauche.`, `${what.en} at ${e.name}, an employer with a high hiring bar.`)
         : c.at === "product"
           ? f(`${what.fr} dans une équipe produit exigeante : ${e.name}.`, `${what.en} in a demanding product team: ${e.name}.`)
           : f(`${what.fr} : ${e.name}.`, `${what.en}: ${e.name}.`);
@@ -732,8 +739,8 @@ export function empDeclared(d: DeclaredInput, seniority: GridSeniority | undefin
       return h ? f(`${e.name} fondée et tenue ${h.fr}${path.fr}.`, `${e.name} founded and run for ${h.en}${path.en}.`) : f(`Une entreprise fondée : ${e.name}.`, `A company founded: ${e.name}.`);
     if (c.at === "highBar")
       return h
-        ? f(`${h.fr} chez ${e.name}, employeur à forte barre d'embauche${path.fr}.`, `${h.en} at ${e.name}, a high-bar employer${path.en}.`)
-        : f(`Un poste chez ${e.name}, employeur à forte barre d'embauche${path.fr}.`, `A role at ${e.name}, a high-bar employer${path.en}.`);
+        ? f(`${h.fr} chez ${e.name}, employeur très sélectif à l'embauche${path.fr}.`, `${h.en} at ${e.name}, an employer with a high hiring bar${path.en}.`)
+        : f(`Un poste chez ${e.name}, employeur très sélectif à l'embauche${path.fr}.`, `A role at ${e.name}, an employer with a high hiring bar${path.en}.`);
     if (c.at === "product")
       return h
         ? f(`${h.fr} dans une équipe produit exigeante : ${e.name}${path.fr}.`, `${h.en} in a demanding product team: ${e.name}${path.en}.`)
@@ -838,8 +845,35 @@ export function familiesOf(facts: GithubFacts): Family[] {
     .sort((a, b) => b.commits - a.commits || b.repos.length - a.repos.length || a.family.localeCompare(b.family));
 }
 
-export function stkGithub(g: GithubInput): Draft {
+/** Une ligne de la table de la stack, en clair. */
+function stkRowText(l: StkRow): Fact {
+  if (l.commits <= 1) return f("Du code public, sous ces seuils.", "Public code, under these thresholds.");
+  const fr = [`${nf(l.commits, "fr")} commits dans le langage principal`];
+  const en = [`${nf(l.commits, "en")} commits in the main language`];
+  if (l.years) {
+    fr.push(`pratiqué depuis ${l.years} an${l.years > 1 ? "s" : ""}`);
+    en.push(`practiced for ${l.years} year${l.years > 1 ? "s" : ""}`);
+  }
+  if (l.otherFamilies) {
+    fr.push(l.otherFamilies === 1 ? "une autre famille de langages" : `${l.otherFamilies} autres familles de langages`);
+    en.push(l.otherFamilies === 1 ? "another language family" : `${l.otherFamilies} other language families`);
+  }
+  if (l.freshMonths !== null) {
+    fr.push(`du code poussé depuis moins de ${l.freshMonths} mois`);
+    en.push(`code pushed within ${l.freshMonths} months`);
+  }
+  return f(`${fr.join(", ")}.`, `${en.join(", ")}.`);
+}
+/** La table de la stack pour ce niveau d'expérience (celle des niveaux confirmé et plus, sans table propre). */
+const stkLevels = (code: SeniorityCode): StkRow[] => GRID.STK.byLevel?.[code] ?? GRID.STK.levels;
+export const stkTable = (code: SeniorityCode): { score: number; text: Fact }[] => stkLevels(code).map((l) => ({ score: l.score, text: capFirst(stkRowText(l)) }));
+
+/** La stack prouvée, lue dans la table du niveau d'expérience (0.5.0) : sans niveau donné, celui que GitHub estime. */
+export function stkGithub(g: GithubInput, seniority: GridSeniority | undefined = githubSeniority(g)): Draft {
   const { facts, m } = g;
+  const level = tableOf(seniority);
+  const LEVELS = stkLevels(level);
+  const table = stkTable(level);
   const fams = familiesOf(facts);
   const main = fams[0];
   const flags: Fact[] = [];
@@ -847,15 +881,15 @@ export function stkGithub(g: GithubInput): Draft {
   const agent = facts.trees.find((t) => facts.activeRepos.includes(t.repo) && (t.agentFiles?.length ?? 0) > 0);
   if (agent) flags.push(f(`IA dans l'atelier : des fichiers d'agent dans ${agent.repo}.`, `AI in the workshop: agent files in ${agent.repo}.`));
   if (!main || main.commits <= 0)
-    return unproven("STK", "github", f("Aucun repo public avec du code à compter.", "No public repo with code to count."), flags);
+    return { ...unproven("STK", "github", f("Aucun repo public avec du code à compter.", "No public repo with code to count."), flags), table };
+  if (thinGithub(m)) return { ...unproven("STK", "github", TOO_THIN(), flags), table };
   const now = m.now;
   const yrs = (now - main.firstCreated) / YEAR;
   const fresh = (now - main.lastPushed) / MONTH;
   const others = fams.filter((x) => x !== main && x.repos.some((r) => (r.commitCount ?? 0) >= GRID.STK.familyRepoCommits));
-  const holds = (l: (typeof GRID.STK.levels)[number]) =>
-    main.commits >= l.commits && yrs >= l.years && others.length >= l.otherFamilies && (l.freshMonths === null || fresh < l.freshMonths);
-  const lvl = GRID.STK.levels.find(holds)!;
-  const nextLvl = [...GRID.STK.levels].reverse().find((l) => l.score > lvl.score);
+  const holds = (l: StkRow) => main.commits >= l.commits && yrs >= l.years && others.length >= l.otherFamilies && (l.freshMonths === null || fresh < l.freshMonths);
+  const lvl = LEVELS.find(holds) ?? LEVELS[LEVELS.length - 1];
+  const nextLvl = [...LEVELS].reverse().find((l) => l.score > lvl.score);
   const lang = main.lead;
   const n = main.repos.length;
 
@@ -890,7 +924,7 @@ export function stkGithub(g: GithubInput): Draft {
     source: "github" as const,
     proof: repoUrl(main.lastRepo),
   };
-  return crit("STK", { score: lvl.score, state: "scored", source: "github", reached, ...(next ? { next } : {}), flags, evidence });
+  return crit("STK", { score: lvl.score, state: "scored", source: "github", reached, ...(next ? { next } : {}), flags, evidence, table });
 }
 
 const uniqNames = (xs: string[]) => {
@@ -1020,6 +1054,7 @@ export function codeGithub(g: GithubInput): Draft {
   const { facts, m, ai } = g;
   const readings = ai?.readings ?? [];
   if (!readings.length) return unproven("CODE", "github", f("Aucun repo lu : lecture du code indisponible.", "No repo read: code reading unavailable."));
+  if (thinGithub(m)) return unproven("CODE", "github", TOO_THIN());
   const C = GRID.CODE;
   const weight = (repo: string) => Math.max(1, facts.repos.find((r) => r.name === repo)?.activity ?? 1);
   let sw = 0;
@@ -1122,11 +1157,58 @@ export function actGithub(g: GithubInput): Draft {
 
 // --- OWN : ownership et production ------------------------------------------------------
 
-export function ownGithub(g: GithubInput): Draft {
+/** Une ligne de la table de l'ownership, en clair. `deployable` : le dépôt qui en donne la preuve, pour la ligne obtenue. */
+function ownRowText(l: OwnRow, deployable?: string | null): Fact {
+  if (l.anyRepo) return f("des repos, aucun porté dans la durée", "repos, none kept alive over time");
+  const long = (m: number): Fact => (m % 12 ? f(`${m} mois ou plus`, `${m} months or more`) : m === 12 ? f("un an ou plus", "a year or more") : f(`${m / 12} ans ou plus`, `${m / 12} years or more`));
+  const fr: string[] = [];
+  const en: string[] = [];
+  if (l.months && l.commits) {
+    fr.push(`un projet porté ${long(l.months).fr} (${l.commits} commits)`);
+    en.push(`a project kept alive for ${long(l.months).en} (${l.commits} commits)`);
+  } else if (l.commits) {
+    fr.push(`un projet de ${l.commits} commits`);
+    en.push(`a ${l.commits}-commit project`);
+  } else {
+    fr.push("un projet");
+    en.push("a project");
+  }
+  if (l.published) {
+    fr.push("publié");
+    en.push("released");
+  }
+  if (l.stars !== undefined || l.external !== undefined) {
+    const s = l.stars ?? 0;
+    const e = l.external ?? 0;
+    fr.push(`utilisé par d'autres (${nf(s, "fr")} stars GitHub ou ${e} compte${e > 1 ? "s" : ""} externe${e > 1 ? "s" : ""} qui contribue${e > 1 ? "nt" : ""})`);
+    en.push(`used by others (${nf(s, "en")} GitHub stars or ${e} outside contributor${e === 1 ? "" : "s"})`);
+  }
+  if (l.releasesInYear) {
+    fr.push(`${l.releasesInYear} releases dans l'année`);
+    en.push(`${l.releasesInYear} releases this year`);
+  }
+  let out = f(fr.join(", "), en.join(", "));
+  if (l.deployable)
+    out = deployable
+      ? f(`${out.fr}, et de quoi mettre en production (${deployable})`, `${out.en}, and what it takes to ship (${deployable})`)
+      : f(`${out.fr}, et de quoi mettre en production : Dockerfile, CI ou release`, `${out.en}, and what it takes to ship: Dockerfile, CI or release`);
+  return out;
+}
+/** La table de l'ownership pour ce niveau d'expérience (celle des niveaux confirmé et plus, sans table propre). */
+const ownLevels = (code: SeniorityCode): OwnRow[] => GRID.OWN.byLevel?.[code] ?? GRID.OWN.levels;
+export const ownTable = (code: SeniorityCode): { score: number; text: Fact }[] =>
+  ownLevels(code).map((l) => {
+    const t = capFirst(ownRowText(l));
+    return { score: l.score, text: f(`${t.fr}.`, `${t.en}.`) };
+  });
+
+/** L'ownership prouvé, lu dans la table du niveau d'expérience (0.5.0) : sans niveau donné, celui que GitHub estime. */
+export function ownGithub(g: GithubInput, seniority: GridSeniority | undefined = githubSeniority(g)): Draft {
   const { facts, m } = g;
-  if (thinGithub(m) || !facts.repos.length) return unproven("OWN", "github", f("GitHub trop mince pour juger.", "GitHub too thin to judge."));
-  const L = GRID.OWN.levels;
-  const lv = (s: number) => L.find((x) => x.score === s)!;
+  const level = tableOf(seniority);
+  const L = ownLevels(level);
+  const table = ownTable(level);
+  if (thinGithub(m) || !facts.repos.length) return { ...unproven("OWN", "github", f("GitHub trop mince pour juger.", "GitHub too thin to judge.")), table };
   const now = m.now;
   const inYear = (r: GithubRepo) => (r.releaseDates ?? []).filter((d) => now - Date.parse(d) <= 365 * DAY).length;
   const span = (r: GithubRepo) => Math.max(0, (Date.parse(r.pushedAt) - Date.parse(r.createdAt)) / MONTH);
@@ -1135,7 +1217,6 @@ export function ownGithub(g: GithubInput): Draft {
   // Publié : une release, ou un site en ligne (`GithubRepo.homepage`).
   const published = (r: GithubRepo) => (r.releaseDates ?? []).length > 0 || !!r.homepage?.trim();
   const repos = facts.repos.filter(countedRepo);
-  const carried = (s: number) => repos.filter((r) => span(r) >= lv(s).months! && commits(r) >= lv(s).commits!);
 
   // De quoi mettre en production dans un dépôt actif : Dockerfile, CI ou release.
   const deployTree = facts.trees.find((t) => t.available && facts.activeRepos.includes(t.repo) && (t.hasCi || t.markers.includes("dockerfile")));
@@ -1143,42 +1224,43 @@ export function ownGithub(g: GithubInput): Draft {
   const deployable = deployTree?.repo ?? releasedActive?.name ?? null;
 
   const best = (xs: GithubRepo[], by: (r: GithubRepo) => number) => xs.reduce<GithubRepo | null>((b, r) => (!b || by(r) > by(b) ? r : b), null);
-  let score: number;
-  let repo: GithubRepo | null;
-  const t10 = repos.filter((r) => (r.stars >= lv(10).stars! || ext(r) >= lv(10).external!) && inYear(r) >= lv(10).releasesInYear!);
-  const t8 = carried(8).filter((r) => published(r) && (r.stars >= lv(8).stars! || ext(r) >= lv(8).external!));
-  const t6 = deployable ? carried(6) : [];
-  const t4 = carried(4);
-  if (t10.length) [score, repo] = [10, best(t10, (r) => r.stars)];
-  else if (t8.length) [score, repo] = [8, best(t8, (r) => r.stars)];
-  else if (t6.length) [score, repo] = [6, best(t6, commits)];
-  else if (t4.length) [score, repo] = [4, best(t4, commits)];
-  else [score, repo] = [2, best(repos.length ? repos : facts.repos, commits)];
+  const used = (l: OwnRow) => l.stars !== undefined || l.external !== undefined;
+  /** Les dépôts qui remplissent la ligne ; aucun si elle demande de quoi mettre en production et que rien ne le prouve. */
+  const holding = (l: OwnRow): GithubRepo[] =>
+    l.anyRepo || (l.deployable && !deployable)
+      ? []
+      : repos.filter(
+          (r) =>
+            (l.months === undefined || span(r) >= l.months) &&
+            (l.commits === undefined || commits(r) >= l.commits) &&
+            (!l.published || published(r)) &&
+            (!used(l) || r.stars >= (l.stars ?? Infinity) || ext(r) >= (l.external ?? Infinity)) &&
+            (l.releasesInYear === undefined || inYear(r) >= l.releasesInYear),
+        );
+  let index = L.length - 1;
+  let repo: GithubRepo | null = null;
+  for (let i = 0; i < L.length; i++) {
+    const hit = holding(L[i]);
+    if (hit.length) {
+      index = i;
+      repo = best(hit, used(L[i]) ? (r) => r.stars : commits);
+      break;
+    }
+  }
+  const row = L[index];
+  const score = row.score;
+  if (!repo) repo = best(repos.length ? repos : facts.repos, commits);
 
   const shown = repo ?? facts.repos[0];
   const desc = (r: GithubRepo): Fact => {
     const mo = Math.round(span(r));
     return f(`${r.name} : ${nf(commits(r), "fr")} commits sur ${mo} mois`, `${r.name}: ${nf(commits(r), "en")} commits over ${mo} month${mo === 1 ? "" : "s"}`);
   };
-  const reachedText: Record<number, Fact> = {
-    10: f("Un projet dont beaucoup se servent, avec trois releases dans l'année.", "A project many people use, with three releases this year."),
-    8: f("Un projet porté plus d'un an, publié, et utilisé par d'autres.", "A project kept alive for over a year, released, and used by others."),
-    6: f(`Un projet porté 6 mois ou plus, et de quoi mettre en production (${deployable}).`, `A project kept alive for 6 months or more, and what it takes to ship (${deployable}).`),
-    4: f("Un projet porté 6 mois ou plus.", "A project kept alive for 6 months or more."),
-    2: f("Des repos, aucun porté dans la durée.", "Repos, none kept alive over time."),
-  };
-  const nextText: Record<number, Fact> = {
-    2: f(`Pour 4 : un projet porté 6 mois avec ${lv(4).commits} commits. Le plus gros : ${desc(shown).fr}.`, `For 4: a project kept alive for 6 months with ${lv(4).commits} commits. The biggest: ${desc(shown).en}.`),
-    4: f("Pour 6 : de quoi mettre en production dans un repo actif (Dockerfile, CI ou release).", "For 6: what it takes to ship in an active repo (Dockerfile, CI or release)."),
-    6: f(
-      `Pour 8 : un projet de plus d'un an et ${lv(8).commits} commits, publié, utilisé par d'autres (${lv(8).stars} stars GitHub ou ${lv(8).external} comptes externes qui contribuent).`,
-      `For 8: a project over a year old with ${lv(8).commits} commits, released, used by others (${lv(8).stars} GitHub stars or ${lv(8).external} outside contributors).`,
-    ),
-    8: f(
-      `Pour 10 : ${nf(lv(10).stars!, "fr")} stars GitHub ou ${lv(10).external} comptes externes qui contribuent, et ${lv(10).releasesInYear} releases dans l'année.`,
-      `For 10: ${nf(lv(10).stars!, "en")} GitHub stars or ${lv(10).external} outside contributors, and ${lv(10).releasesInYear} releases this year.`,
-    ),
-  };
+  const got = capFirst(ownRowText(row, deployable));
+  const reached = f(`${got.fr}.`, `${got.en}.`);
+  const above = index > 0 ? L[index - 1] : undefined;
+  const biggest = row.anyRepo ? f(` Le plus gros : ${desc(shown).fr}.`, ` The biggest: ${desc(shown).en}.`) : f("", "");
+  const next = above ? f(`Pour ${above.score} : ${ownRowText(above).fr}.${biggest.fr}`, `For ${above.score}: ${ownRowText(above).en}.${biggest.en}`) : undefined;
   const deployRepo = deployable ? facts.repos.find((r) => r.name === deployable) : undefined;
   const deployTreeOf = deployable ? facts.trees.find((t) => t.repo === deployable) : undefined;
   const deployBits: string[] = [];
@@ -1193,9 +1275,10 @@ export function ownGithub(g: GithubInput): Draft {
     score,
     state: "scored",
     source: "github",
-    reached: reachedText[score],
-    ...(nextText[score] ? { next: nextText[score] } : {}),
+    reached,
+    ...(next ? { next } : {}),
     evidence: { text: f(`${desc(shown).fr}.${extra.fr}`, `${desc(shown).en}.${extra.en}`), source: "github", proof: repoUrl(shown) },
+    table,
   });
 }
 
@@ -1567,12 +1650,27 @@ export function githubGrid(g: GithubInput, seniority: GridSeniority | undefined 
     eduGithub(g),
     xpGithub(g),
     missing("EMP", "github", f("Le parcours se lit sur LinkedIn ou le CV\u00a0: pas encore au dossier.", "Career path is read on LinkedIn or the résumé: not on file yet.")),
-    stkGithub(g),
+    stkGithub(g, seniority),
     codeGithub(g),
     actGithub(g),
-    ownGithub(g),
+    ownGithub(g, seniority),
     ossGithub(g),
     ],
+    seniority,
+  );
+}
+
+/**
+ * La grille GitHub relue au niveau du dossier : la stack et l'ownership dans la table
+ * du niveau que donnent les postes datés, pas dans celle que GitHub estime ; les autres
+ * critères tels quels (le code lu par l'IA n'est pas relu). Sert à la note du dossier,
+ * y compris quand la pièce GitHub sort du cache.
+ */
+export function githubGridAt(grid: Grid, facts: GithubFacts, seniority: GridSeniority): Grid {
+  const g: GithubInput = { facts, m: deriveGithub(facts), ai: null };
+  const strip = ({ counted: _c, ...rest }: GridCriterion): Draft => rest;
+  return finalize(
+    grid.criteria.map((c) => (c.code === "STK" ? stkGithub(g, seniority) : c.code === "OWN" ? ownGithub(g, seniority) : strip(c))),
     seniority,
   );
 }

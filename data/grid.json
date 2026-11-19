@@ -27,9 +27,10 @@
   },
 
   "thinGithub": {
-    "_doc": "GitHub trop mince pour juger : moins de minRepos dépôts publics et aucun de repoCommits commits.",
+    "_doc": "GitHub trop mince pour juger, ni en bien ni en mal : moins de minRepos dépôts publics et aucun de repoCommits commits ; ou (0.5.0) moins de minCommits commits en tout dans les dépôts publics, quand tous sont comptés. Ses critères sont alors non prouvés, stack et code compris : quelques commits de cours ne font pas baisser un dossier.",
     "minRepos": 3,
-    "repoCommits": 10
+    "repoCommits": 10,
+    "minCommits": 50
   },
 
   "EDU": {
@@ -135,6 +136,23 @@
       { "score": 4, "commits": 50, "years": 0, "otherFamilies": 0, "freshMonths": 24 },
       { "score": 2, "commits": 1, "years": 0, "otherFamilies": 0, "freshMonths": null }
     ],
+    "_byLevelDoc": "0.5.0 : la table d'un début de carrière et celle d'un junior, lues à la place de `levels` (qui reste celle des niveaux confirmé, senior et expert : leur code est souvent privé, on ne leur demande pas plus). Un an de pratique et 400 commits sont le haut de la table de quelqu'un qui débute.",
+    "byLevel": {
+      "student": [
+        { "score": 10, "commits": 400, "years": 1, "otherFamilies": 1, "freshMonths": 6 },
+        { "score": 8, "commits": 200, "years": 1, "otherFamilies": 0, "freshMonths": 6 },
+        { "score": 6, "commits": 100, "years": 0, "otherFamilies": 0, "freshMonths": 12 },
+        { "score": 4, "commits": 25, "years": 0, "otherFamilies": 0, "freshMonths": 24 },
+        { "score": 2, "commits": 1, "years": 0, "otherFamilies": 0, "freshMonths": null }
+      ],
+      "junior": [
+        { "score": 10, "commits": 600, "years": 2, "otherFamilies": 1, "freshMonths": 6 },
+        { "score": 8, "commits": 300, "years": 1, "otherFamilies": 1, "freshMonths": 6 },
+        { "score": 6, "commits": 150, "years": 1, "otherFamilies": 0, "freshMonths": 12 },
+        { "score": 4, "commits": 50, "years": 0, "otherFamilies": 0, "freshMonths": 24 },
+        { "score": 2, "commits": 1, "years": 0, "otherFamilies": 0, "freshMonths": null }
+      ]
+    },
     "familyRepoCommits": 10,
     "dumped": { "maxCommits": 5, "minSizeKb": 1024 },
     "declared": [
@@ -193,6 +211,23 @@
       { "score": 4, "months": 6, "commits": 50 },
       { "score": 2, "anyRepo": true }
     ],
+    "_byLevelDoc": "0.5.0 : la table d'un début de carrière et celle d'un junior, lues à la place de `levels`. Une ligne : un projet porté months mois avec commits commits, publié (published), utilisé (stars étoiles ou external comptes externes), releasesInYear releases dans l'année, et de quoi mettre en production dans un dépôt actif (deployable).",
+    "byLevel": {
+      "student": [
+        { "score": 10, "months": 6, "commits": 50, "published": true, "stars": 10, "external": 1 },
+        { "score": 8, "months": 6, "commits": 50, "deployable": true },
+        { "score": 6, "months": 3, "commits": 30 },
+        { "score": 4, "commits": 10 },
+        { "score": 2, "anyRepo": true }
+      ],
+      "junior": [
+        { "score": 10, "months": 12, "commits": 100, "published": true, "stars": 25, "external": 2 },
+        { "score": 8, "months": 6, "commits": 50, "deployable": true },
+        { "score": 6, "months": 6, "commits": 50 },
+        { "score": 4, "months": 3, "commits": 30 },
+        { "score": 2, "anyRepo": true }
+      ]
+    },
     "declared": [
       { "score": 6, "outcomes": 3 },
       { "score": 4, "outcomes": 1, "founded": true }

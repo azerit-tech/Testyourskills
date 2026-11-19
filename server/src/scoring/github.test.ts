@@ -29,8 +29,8 @@ describe("barème GitHub sur un profil synthétique", () => {
     // La note globale est celle de la grille ; sans lecture IA, le code n'est pas prouvé (plafond 85).
     expect(card.overall).toBe(card.grid?.overall);
     expect(card.grid?.rule).toBe("capped_unproven");
-    // L'expérience estimée (4) ne pèse plus (barème 0.5.0) : 58 sous 0.4.0, 65.
-    expect(card.overall).toBe(65);
+    // L'expérience estimée (4) ne pèse plus, et la stack et l'ownership se lisent au niveau « Junior » (barème 0.5.0) : 58 sous 0.4.0, 73.
+    expect(card.overall).toBe(73);
     expect(card.tier).toBe("silver");
   });
 

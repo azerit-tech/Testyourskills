@@ -71,7 +71,8 @@ export interface Deps {
     counts: CvTextCounts,
     opts: { lang: Lang; judgedInSeconds: number; github?: unknown; linkedin?: unknown; now?: string; highBar?: HighBarList },
   ): CardBody;
-  compareCards(cv: CardData, github: CardData, label?: "LinkedIn" | "CV"): Omit<ComparisonData, "id" | "createdAt">;
+  /** `githubFacts` : les faits de la pièce GitHub, pour lire sa stack et son ownership au niveau d'expérience du dossier. */
+  compareCards(cv: CardData, github: CardData, label?: "LinkedIn" | "CV", githubFacts?: unknown): Omit<ComparisonData, "id" | "createdAt">;
   renderImage(input: RenderInput): Promise<Uint8Array>;
 }
 
@@ -783,7 +784,7 @@ export class Pipeline {
     };
     const ghCard = githubCard(newId());
     // La pièce déclarative porte le nom que lui donne la grille (declaredInput : un profil LinkedIn rangé, sinon le CV).
-    const raw = deps.compareCards(cvCard, ghCard, declared.linkedin ? "LinkedIn" : "CV");
+    const raw = deps.compareCards(cvCard, ghCard, declared.linkedin ? "LinkedIn" : "CV", gh.facts);
     const cmp = linkedinUrl ? asLinkedinComparison(raw) : raw;
     const comparison: ComparisonData = {
       ...cmp,

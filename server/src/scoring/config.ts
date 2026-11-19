@@ -176,6 +176,26 @@ export interface EmpRow {
   score: number;
   any: EmpCondition[];
 }
+/** Une ligne de la table de la stack : commits du langage principal, années de pratique, autres familles, fraîcheur. */
+export interface StkRow {
+  score: number;
+  commits: number;
+  years: number;
+  otherFamilies: number;
+  freshMonths: number | null;
+}
+/** Une ligne de la table de l'ownership : un projet porté, publié, utilisé ; de quoi mettre en production. */
+export interface OwnRow {
+  score: number;
+  stars?: number;
+  external?: number;
+  releasesInYear?: number;
+  months?: number;
+  commits?: number;
+  published?: boolean;
+  deployable?: boolean;
+  anyRepo?: boolean;
+}
 
 /** Barème de recrutement (data/grid.json) : tables de niveaux, coefficients, familles, traces. */
 export interface GridConfig {
@@ -183,7 +203,7 @@ export interface GridConfig {
   /** Le niveau d'expérience auquel le dossier est lu : seuils en mois comptés, du plus haut au plus bas. */
   seniority: { levels: { code: SeniorityCode; months: number }[]; default: SeniorityCode };
   final: { neverLower: CriterionCode[]; declaredNeverLower: boolean; capUnproven: number; emptyBelowShare: number; emptyScore: number; bounds: { min: number; max: number } };
-  thinGithub: { minRepos: number; repoCommits: number };
+  thinGithub: { minRepos: number; repoCommits: number; minCommits: number };
   EDU: { tiers: Record<Exclude<SchoolTier, "none">, number>; selection: Record<SelectionKind, number>; githubPattern: string; githubScore: number };
   XP: {
     share: Record<GridRoleKind, number>;
@@ -211,7 +231,9 @@ export interface GridConfig {
     defaultRank: number;
   };
   STK: {
-    levels: { score: number; commits: number; years: number; otherFamilies: number; freshMonths: number | null }[];
+    levels: StkRow[];
+    /** La table d'un niveau d'expérience, à la place de `levels` (0.5.0). */
+    byLevel?: Partial<Record<SeniorityCode, StkRow[]>>;
     familyRepoCommits: number;
     dumped: { maxCommits: number; minSizeKb: number };
     declared: { score: number; described: number; recent: number; recentMonths: number }[];
@@ -222,7 +244,9 @@ export interface GridConfig {
   CODE: { multiplier: number; testsFrom: number; testsShare: number; capWithoutTests: number; commitsFrom: number; repoCommits: number; capWithoutCommits: number };
   ACT: { levels: { score: number; weeks: number }[]; codeFrom: number; codeRepoCommits: number; capWithoutCode: number };
   OWN: {
-    levels: { score: number; stars?: number; external?: number; releasesInYear?: number; months?: number; commits?: number; published?: boolean; deployable?: boolean; anyRepo?: boolean }[];
+    levels: OwnRow[];
+    /** La table d'un niveau d'expérience, à la place de `levels` (0.5.0). */
+    byLevel?: Partial<Record<SeniorityCode, OwnRow[]>>;
     declared: { score: number; outcomes: number; founded?: boolean }[];
   };
   OSS: {
