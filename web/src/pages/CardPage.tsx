@@ -30,7 +30,7 @@ import { Spin } from "../components/Spin";
 import type { WalkoutControl } from "../components/Walkout3D";
 import { Waiting } from "../components/Waiting";
 import { pick, useT } from "../i18n";
-import { api, ApiError, tokens, type CaseInfo } from "../lib/api";
+import { api, ApiError, isMine, tokens, type CaseInfo } from "../lib/api";
 import { isClosed, isInputError } from "../lib/errors";
 import { useHold, type SceneState } from "../lib/hold";
 import { gaveUp, nextPatience, type Patience } from "../lib/patience";
@@ -563,7 +563,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
   // Revendiquée par la personne connectée (§18.1) : sa fiche, même sans le jeton de cet appareil.
   const cardLogin = main.login;
   const claimed = !!me && !!cardLogin && me.login === cardLogin.toLowerCase();
-  const visitor = !owner && !claimed;
+  // Sa fiche par le compte (§18.85) : le serveur la dit `mine`, sans jeton sur cet appareil.
+  const visitor = !owner && !claimed && !isMine(id);
 
   // Dénonciation (§18.6) et page partagée (§18.7).
   // La configuration est déjà dans la page (ou en mémoire) : « C'est moi » est là dès la première image, rien ne pousse le bloc.

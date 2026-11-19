@@ -249,17 +249,102 @@ function startLinkedInPhoto(id: string, token: string | null) {
 
 let mockMe: Me | null = null;
 
+/** Ce que /api/me rend : la revendication (login, hidden) et le compte léger (§18.85). */
+interface MeBody {
+  login?: unknown;
+  hidden?: unknown;
+  cardId?: unknown;
+  sources?: unknown;
+  avatarUrl?: unknown;
+  initial?: unknown;
+}
+let meFlight: Promise<MeBody | null> | null = null;
+/** Une seule demande à la fois : la barre, l'entrée et l'après-fiche la partagent. */
+function fetchMe(): Promise<MeBody | null> {
+  meFlight ??= fetch("/api/me", { headers: { Accept: "application/json" } })
+    .then(async (res) => (res.ok ? ((await res.json()) as MeBody | null) : null))
+    .catch(() => null)
+    .finally(() => setTimeout(() => (meFlight = null), 0));
+  return meFlight;
+}
+
 /** Qui est connecté par GitHub, ou null. Jamais d'erreur : null au moindre doute. */
 async function getMe(): Promise<Me | null> {
   if (isMock()) return mockMe;
-  try {
-    const res = await fetch("/api/me", { headers: { Accept: "application/json" } });
-    if (!res.ok) return null;
-    const me = (await res.json()) as Me | null;
-    return me && typeof me.login === "string" ? { login: me.login, hidden: me.hidden === true } : null;
-  } catch {
-    return null;
+  const me = await fetchMe();
+  return me && typeof me.login === "string" ? { login: me.login, hidden: me.hidden === true } : null;
+}
+
+// --- Le compte léger (§18.85) ------------------------------------------------
+// Se connecter par LinkedIn ou GitHub crée le compte ; le cookie est httpOnly, le
+// front demande /api/me. En démo, le compte vit dans sessionStorage (une connexion
+// de démo recharge la page) ; ?compte=li ou ?compte=gh en pose un avec sa fiche.
+
+export type AccountSource = "linkedin" | "github";
+export interface Account {
+  /** « Ma fiche », ou null : jamais faite, expirée, supprimée. */
+  cardId: string | null;
+  sources: AccountSource[];
+  avatarUrl: string | null;
+  initial: string | null;
+}
+
+const MOCK_ACCOUNT_KEY = "tys_mock_acct";
+let mockAccountMem: Account | null = null;
+let mockAccountUrlRead = false;
+const MOCK_ACCOUNTS: Record<string, Account> = {
+  li: { cardId: "m-licmp-compte01", sources: ["linkedin"], avatarUrl: "/mock-linkedin.svg", initial: "L" },
+  gh: { cardId: "m-gold-compte01", sources: ["github"], avatarUrl: null, initial: "L" },
+};
+
+function parseAccount(raw: unknown): Account | null {
+  if (!raw || typeof raw !== "object") return null;
+  const b = raw as MeBody;
+  const sources = Array.isArray(b.sources) ? b.sources.filter((s): s is AccountSource => s === "linkedin" || s === "github") : [];
+  if (!sources.length) return null;
+  return {
+    cardId: typeof b.cardId === "string" ? b.cardId : null,
+    sources,
+    avatarUrl: typeof b.avatarUrl === "string" && b.avatarUrl ? b.avatarUrl : null,
+    initial: typeof b.initial === "string" && b.initial ? b.initial : null,
+  };
+}
+
+/** Le compte de démo. */
+export function mockAccount(): Account | null {
+  if (!mockAccountUrlRead) {
+    mockAccountUrlRead = true;
+    try {
+      const q = new URLSearchParams(window.location.search).get("compte");
+      if (q && q in MOCK_ACCOUNTS) setMockAccount(MOCK_ACCOUNTS[q]!);
+      else if (q === "0") setMockAccount(null);
+    } catch {
+      /* hors navigateur */
+    }
   }
+  try {
+    const raw = sessionStorage.getItem(MOCK_ACCOUNT_KEY);
+    if (raw) return parseAccount(JSON.parse(raw));
+  } catch {
+    /* stockage bloqué : la RAM */
+  }
+  return mockAccountMem;
+}
+
+export function setMockAccount(a: Account | null) {
+  mockAccountMem = a;
+  try {
+    if (a) sessionStorage.setItem(MOCK_ACCOUNT_KEY, JSON.stringify(a));
+    else sessionStorage.removeItem(MOCK_ACCOUNT_KEY);
+  } catch {
+    /* stockage bloqué : la RAM */
+  }
+}
+
+/** Le compte de ce navigateur, ou null (pas connecté, ou pas de compte sur ce serveur). Jamais d'erreur. */
+async function getAccount(): Promise<Account | null> {
+  if (isMock()) return mockAccount();
+  return parseAccount(await fetchMe());
 }
 
 /**
@@ -294,10 +379,12 @@ async function setHidden(hidden: boolean): Promise<Me> {
   return { login: body.login, hidden: body.hidden };
 }
 
+/** Se déconnecter : la revendication et le compte (§18.85), les deux cookies. */
 async function logout(): Promise<void> {
   mine.clear();
   if (isMock()) {
     mockMe = null;
+    setMockAccount(null);
     return;
   }
   const res = await fetch("/auth/logout", { method: "POST" });
@@ -392,7 +479,7 @@ async function getJob(id: string): Promise<JobState> {
     const week = isMock() ? mockWeekRank(main) : job.week;
     if (week) weeks.set(id, week);
     else weeks.delete(id);
-    const owned = isMock() ? !!mockMe && mockMe.login === main.login?.toLowerCase() : job.mine === true;
+    const owned = isMock() ? (!!mockMe && mockMe.login === main.login?.toLowerCase()) || mockAccount()?.cardId === id : job.mine === true;
     if (owned) mine.add(id);
     else mine.delete(id);
     if (main.login) withGithub.add(id);
@@ -481,9 +568,17 @@ async function requestRemoval(cardId: string, email: string): Promise<"sent" | "
   throw await readError(res);
 }
 
-/** `token` null : la session du propriétaire revendiqué (cookie) fait foi. */
+/** Supprimer sa fiche : par son jeton, ou par sa session (`token` null) ; par le compte, le compte part avec (§18.85). */
 async function deleteCard(id: string, token: string | null): Promise<void> {
-  if (isMock()) return (await demoApi()).deleteCard(id, token ?? "");
+  if (isMock()) {
+    await (await demoApi()).deleteCard(id, token ?? "");
+    if (!token && mockAccount()?.cardId === id) {
+      mine.clear();
+      mockMe = null;
+      setMockAccount(null);
+    }
+    return;
+  }
   const qs = token ? `?token=${encodeURIComponent(token)}` : "";
   const res = await fetch(`/api/card/${encodeURIComponent(id)}${qs}`, { method: "DELETE" });
   if (!res.ok) throw await readError(res);
@@ -554,7 +649,7 @@ async function fetchTop(): Promise<WeekTop | null> {
   }
 }
 
-export const api = { createCard, getJob, getCase, vote, sendEmail, requestRemoval, deleteCard, track, getConfig, knownConfig, startLinkedInPhoto, getShowcase, getTop, getMe, startClaim, setHidden, logout };
+export const api = { createCard, getJob, getCase, vote, sendEmail, requestRemoval, deleteCard, track, getConfig, knownConfig, startLinkedInPhoto, getShowcase, getTop, getMe, getAccount, startClaim, setHidden, logout };
 
 /** URLs des images rendues par le serveur (§7). `?v=` : le dessin en cours, servi avec un cache d'un an (shared/images.ts). */
 export const images = {

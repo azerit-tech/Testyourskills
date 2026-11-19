@@ -4,6 +4,7 @@
 // champ reste celui où un lien ou un pseudo se tape.
 import type { GithubSuggestion, LinkedinSuggestion } from "../../../shared/entry";
 import { isMock } from "./api";
+import { mockSignIn } from "./account";
 
 /** Ce que la connexion LinkedIn a retrouvé : le profil sûr, sinon les homonymes à proposer. */
 export interface LinkedinReturn {
@@ -68,26 +69,40 @@ function here(): string {
   return u.pathname + u.search;
 }
 
-/** Part chez LinkedIn ; le serveur revient sur cette page avec ?li=1. */
-export function startLinkedinLogin(): void {
-  if (isMock()) {
-    const u = new URL(here(), window.location.origin);
-    u.searchParams.set("li", "1");
-    window.location.assign(u.pathname + u.search);
-    return;
-  }
-  window.location.assign(`/auth/linkedin/enter?return=${encodeURIComponent(here())}`);
+/** `redo` : « Refaire ma fiche », le parcours d'aujourd'hui même avec une fiche au compte (§18.85). */
+export interface LoginOpts {
+  redo?: boolean;
 }
 
-/** Part chez GitHub ; le serveur revient sur cette page avec ?gh=1. */
-export function startGithubLogin(): void {
-  if (isMock()) {
-    const u = new URL(here(), window.location.origin);
-    u.searchParams.set("gh", "1");
-    window.location.assign(u.pathname + u.search);
-    return;
+/** Démo : la connexion crée le compte ; avec une fiche, droit dessus, comme le serveur. */
+function mockLogin(source: "linkedin" | "github", flag: "li" | "gh", o: LoginOpts) {
+  const card = mockSignIn(source);
+  if (card && !o.redo) return window.location.assign(`/c/${card}`);
+  const u = new URL(here(), window.location.origin);
+  u.searchParams.set(flag, "1");
+  window.location.assign(u.pathname + u.search);
+}
+
+/** Part chez LinkedIn ; le serveur revient sur cette page avec ?li=1, ou sur la fiche du compte. */
+export function startLinkedinLogin(o: LoginOpts = {}): void {
+  if (isMock()) return mockLogin("linkedin", "li", o);
+  window.location.assign(`/auth/linkedin/enter?return=${encodeURIComponent(here())}${o.redo ? "&redo=1" : ""}`);
+}
+
+/** Part chez GitHub ; le serveur revient sur cette page avec ?gh=1, ou sur la fiche du compte. */
+export function startGithubLogin(o: LoginOpts = {}): void {
+  if (isMock()) return mockLogin("github", "gh", o);
+  window.location.assign(`/auth/github/enter?return=${encodeURIComponent(here())}${o.redo ? "&redo=1" : ""}`);
+}
+
+/** Un retour de connexion attend dans l'adresse (?li= ou ?gh=) : l'entrée le prend, rien d'autre ne s'affiche. */
+export function returnPending(): boolean {
+  try {
+    const q = new URL(window.location.href).searchParams;
+    return q.has("li") || q.has("gh");
+  } catch {
+    return false;
   }
-  window.location.assign(`/auth/github/enter?return=${encodeURIComponent(here())}`);
 }
 
 let linkedinReturn: Promise<LinkedinReturn | null> | null = null;

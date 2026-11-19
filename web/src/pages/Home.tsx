@@ -29,7 +29,8 @@ import { useT } from "../i18n";
 import { ApiError, api, type Showcase } from "../lib/api";
 import { onLinkClick } from "../lib/router";
 import { homeHook, useAppConfig } from "../lib/season";
-import { clearPending, dropPrefill, filmOwed, myCard, peekPrefill, pendingFile, type MyCard } from "../lib/session";
+import { clearPending, dropPrefill, filmOwed, myCard, peekPrefill, pendingFile, rememberMine, type MyCard } from "../lib/session";
+import { useAccount } from "../lib/account";
 
 /** Dénoncer depuis l'accueil (/<pseudo> d'un autre) : le bloc de la fiche, chargé seulement ce jour-là. */
 const Denounce = lazy(() => import("../components/Denounce").then((m) => ({ default: m.Denounce })));
@@ -90,8 +91,28 @@ interface Memory {
  * vérifiée auprès du serveur. Un dossier sorti entre-temps devient « Ta fiche », un
  * dossier échoué ou une fiche retirée disparaît.
  */
-function useMemory(): Memory {
+function useMemory(accountCard: string | null): Memory {
   const [mem, setMem] = useState<Memory>(() => ({ mine: myCard(), pending: pendingFile() }));
+
+  // Connecté (§18.85) : la fiche du compte devient « Ta fiche », même faite sur un autre appareil.
+  useEffect(() => {
+    if (!accountCard || accountCard === mem.mine?.id) return;
+    let alive = true;
+    void api
+      .getJob(accountCard)
+      .then((job) => {
+        if (!alive || job.state !== "done") return;
+        const main = job.kind === "card" ? job.card : fileOf(job.comparison);
+        const mine = { id: accountCard, login: main.login ?? null, overall: main.overall };
+        rememberMine(mine);
+        setMem((m) => ({ ...m, mine }));
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountCard]);
 
   useEffect(() => {
     let alive = true;
@@ -274,7 +295,9 @@ export function Home() {
   const inputRef = useRef<HTMLInputElement>(null);
   const showcase = useShowcase();
   const topKnown = useTopKnown();
-  const mem = useMemory();
+  // Connecté avec une fiche au compte (§18.85) : la ligne de sa fiche, puis l'entrée connectée (« Voir ma fiche »).
+  const acct = useAccount();
+  const mem = useMemory(acct?.cardId ?? null);
   // La ligne sous le titre (lib/season.ts) : l'entretien seulement si une prime est ouverte.
   const hook = homeHook(h, useAppConfig());
   // Revenu en plein film : la fiche existe, sa note attend la poursuite.
@@ -344,7 +367,7 @@ export function Home() {
                 </Suspense>
               </div>
             </>
-          ) : returning && !open && mem.mine ? (
+          ) : returning && !open && mem.mine && !acct?.cardId ? (
             <ReturnCall mine={mem.mine} onAnother={openForm} />
           ) : (
             <>
