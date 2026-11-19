@@ -657,7 +657,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
           <ReturnCall mine={self} onAnother={() => setAnother(true)} onSignOut={acct ? () => void signOut() : undefined} />
         </section>
       )}
-      <Denounce cardId={self.id} selfLogin={self.login ?? undefined} toast={toast.show} />
+      <Denounce cardId={self.id} selfLogin={self.login ?? undefined} mine={self.overall} toast={toast.show} />
     </>
   ) : (
     <section className="you" id="you" aria-labelledby="you-title">
@@ -800,7 +800,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
         {/* Sous trois étoiles : « Ajoute ton LinkedIn » (ou ton GitHub) tout de suite, avant le partage. */}
         {low && missing}
         {/* Dénonce un complice (§18.6), le premier bloc sous le verdict (§18.83) : au bureau, dans le premier écran avec le partage. */}
-        {!visitor && <Denounce cardId={id} selfLogin={cardLogin} toast={toast.show} />}
+        {!visitor && <Denounce cardId={id} selfLogin={cardLogin} mine={main.sealed ? null : main.overall} toast={toast.show} />}
         {/* Fiche masquée : /og/* et /c/:id répondent 404 / 410 à tous, l'image ne se télécharge pas et le lien ne montre rien. */}
         {fromRival && <Duel mine={own} card={fromRival} duel={fromDuel} from />}
         {!visitor && !(claimed && me?.hidden) && <ShareBar item={item} toast={toast.show} second={!!addFirst} />}

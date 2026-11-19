@@ -23,6 +23,7 @@ import { deleteCookie } from "hono/cookie";
 import { mountAuth, ownerFromRequest, sameOrigin, SESSION_COOKIE, type GithubAuthConfig } from "./auth";
 import { createAccounts, mountAccount } from "./account";
 import { DENOUNCE_LIMITED, DENOUNCE_PER_DAY, mountDenounce, parseDenunciation } from "./denounce";
+import { DUEL_FILE_RE, duelMeta, duelOf, duelPath, removeDuels } from "./duel";
 import { mountJury } from "./jury";
 import { autoJoinBands, mountBands, rootOf } from "./bands";
 import { mountBandPages } from "./bandPages";
@@ -213,13 +214,15 @@ const TOTW_TAG = "-totw";
 const THIRD_PARTY_TAG = "-tp";
 
 export async function removeImages(ogDir: string, ids: string[]) {
-  await Promise.all(
-    ids.flatMap((id) =>
+  await Promise.all([
+    // Les duels où paraît l'une de ces fiches (§18.94, duel.ts).
+    removeDuels(ogDir, ids),
+    ...ids.flatMap((id) =>
       OG_SUFFIXES.flatMap((s) =>
         ["", TOTW_TAG].flatMap((tag) => ["", THIRD_PARTY_TAG].map((tp) => rm(join(ogDir, `${id}${tag}${tp}${s}.png`), { force: true }))),
       ),
     ),
-  );
+  ]);
 }
 
 /**
@@ -344,6 +347,7 @@ export function createApp(opts: AppOptions) {
     limiter,
     fetchImpl,
     removeImages: (ids) => removeImages(ogDir, ids),
+    removeDuels: (ids) => removeDuels(ogDir, ids),
     account,
     // Le repli de `tys_who` (§18.90), créé plus bas : lu à la demande.
     known: (c) => linkedinEnter?.knownOf(c) ?? null,
@@ -921,6 +925,8 @@ export function createApp(opts: AppOptions) {
   app.get("/og/:file", async (c) => {
     if (`/og/${c.req.param("file")}` === HOME_IMAGE_PATH) return serveHomeImage(c, "fr");
     if (`/og/${c.req.param("file")}` === HOME_IMAGE_PATH_EN) return serveHomeImage(c, "en");
+    const vs = DUEL_FILE_RE.exec(c.req.param("file"));
+    if (vs) return serveDuelImage(c, vs[1]!, vs[2]!);
     const m = OG_FILE_RE.exec(c.req.param("file"));
     if (!m) return c.notFound();
     const id = m[1]!;
@@ -978,6 +984,39 @@ export function createApp(opts: AppOptions) {
     });
   });
 
+  /**
+   * Le duel d'une dénonciation (§18.94, duel.ts) : `/og/{fiche}-vs-{dénonciateur}.png`. Rien
+   * (404) si `r` n'est pas le dénonciateur de la fiche, ou si l'une des deux est masquée.
+   * Rendu une fois par état des deux fiches (la clé du fichier), cache court : une
+   * revendication change l'image.
+   */
+  const serveDuelImage = async (c: Context, id: string, r: string) => {
+    const row = store.fileRow(id);
+    const duel = row && row.id === id ? duelOf(store, row, r, thirdParty) : null;
+    if (!duel) return c.notFound();
+    const path = duelPath(ogDir, id, r, duel.key);
+    let png: Uint8Array | null = await readFile(path).catch(() => null);
+    if (!png) {
+      const key = `vs:${id}:${r}:${duel.key}`;
+      let p = rendering.get(key);
+      if (!p) {
+        p = (async () => {
+          const inline = (card: CardData) => inlineAvatar(card, baseUrl, avatarDir);
+          const [by, target] = await Promise.all([inline(duel.by), inline(duel.target)]);
+          const buf = await deps.renderImage({ format: "duel", duel: { by, target }, lang: duel.target.lang ?? "fr" });
+          await mkdir(dirname(path), { recursive: true });
+          const tmp = `${path}.${process.pid}.tmp`;
+          await writeFile(tmp, buf);
+          await rename(tmp, path);
+          return buf;
+        })().finally(() => rendering.delete(key));
+        rendering.set(key, p);
+      }
+      png = await p;
+    }
+    return c.body(new Uint8Array(png), 200, { "Content-Type": "image/png", "X-Robots-Tag": NOINDEX, "Cache-Control": "public, max-age=300" });
+  };
+
   // GET /c/:id : page avec balises OG, qui charge le front.
   app.get("/c/:id", async (c) => {
     const id = c.req.param("id");
@@ -1003,7 +1042,9 @@ export function createApp(opts: AppOptions) {
     }
     // L'aperçu est lu par tout le monde : la version publique (shared/publicView.ts).
     const found = row ? metaFor(publicView(withWeekSpecial(store.db, row.data).data, { thirdParty: thirdParty(row) }), baseUrl) : genericMeta(baseUrl, `/c/${id}`, requestLang(c.req.query("lang"), c.req.header("Accept-Language")));
-    const meta = { ...found, noindex: true };
+    // Le lien envoyé par le dénonciateur (?r= sa fiche) : l'aperçu est le duel (§18.94) ; tout autre r, l'aperçu habituel.
+    const duel = row ? duelOf(store, row, c.req.query("r"), thirdParty) : null;
+    const meta = { ...(duel ? duelMeta(duel, found, baseUrl) : found), noindex: true };
     const html = template ? injectMeta(template, meta) : standalonePage(meta);
     c.header("Cache-Control", "public, max-age=300");
     return c.html(html, row ? 200 : 404);

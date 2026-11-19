@@ -681,3 +681,19 @@ describe("masquer", () => {
     expect((await ctx.app.request("/api/card/CardAAAA01")).status).toBe(200);
   });
 });
+
+describe("revendication et duels (§18.94)", () => {
+  it("revendiquer efface les duels en cache des fiches du login, pas ceux des autres", async () => {
+    const ctx = setup();
+    insertCard(ctx.store);
+    const dir = join(ctx.ogDir, "vs");
+    mkdirSync(dir, { recursive: true });
+    const mine = join(dir, "CardAAAA01-vs-OtherCard1-0123456789ab.png");
+    const theirs = join(dir, "OtherCard2-vs-OtherCard1-0123456789ab.png");
+    writeFileSync(mine, "x");
+    writeFileSync(theirs, "x");
+    await claim(ctx);
+    expect(existsSync(mine)).toBe(false);
+    expect(existsSync(theirs)).toBe(true);
+  });
+});
