@@ -10,6 +10,7 @@ import { SCORING } from "../scoring/config";
 import { isSourceCandidate } from "./detect";
 import type { GithubFacts } from "./facts";
 import { makeCtx, rawFile, rest, soft, type GithubAuth } from "./http";
+import { phase } from "../timing";
 
 const PICK = {
   filesPerRepo: 10,
@@ -43,7 +44,11 @@ export function truncateTo(text: string, max: number): string {
   return cut + marker;
 }
 
-export async function pickFilesForReading(facts: GithubFacts, opts: { token: GithubAuth; signal?: AbortSignal }): Promise<RepoFiles[]> {
+export async function pickFilesForReading(
+  /** Les faits entiers, ou la part que la collecte donne en avance (`onReadable`, collect.ts) : le choix est le même. */
+  facts: Pick<GithubFacts, "repos" | "activeRepos" | "trees" | "commits">,
+  opts: { token: GithubAuth; signal?: AbortSignal },
+): Promise<RepoFiles[]> {
   const ctx = makeCtx(opts.token, opts.signal);
   const byName = new Map(facts.repos.map((r) => [r.name, r]));
   const chosen = facts.activeRepos
@@ -52,7 +57,7 @@ export async function pickFilesForReading(facts: GithubFacts, opts: { token: Git
     .slice(0, SCORING.github.readRepos);
 
   // Classement des fichiers de chaque repo : touchés par les derniers commits, puis taille.
-  const ranked = await Promise.all(
+  const ranked = await phase("lu.commits", () => Promise.all(
     chosen.map(async ({ repo, tree }) => {
       const oids = facts.commits
         .filter((c) => c.repo === repo!.name)
@@ -72,16 +77,20 @@ export async function pickFilesForReading(facts: GithubFacts, opts: { token: Git
       const files = [...code.slice(0, PICK.filesPerRepo - tests.length), ...tests];
       return { repo: repo!, files };
     }),
-  );
+  ));
 
-  // Contenus, répartis sur le budget total.
+  // Contenus : les fichiers de tous les repos se téléchargent ensemble (ils ne
+  // dépendent pas les uns des autres), puis se répartissent sur le budget total.
+  const downloaded = await phase("lu.contenus", () => Promise.all(
+    ranked.map(({ repo, files }) => Promise.all(files.map((f) => soft(ctx, () => rawFile(ctx, repo.fullName, repo.defaultBranch, f.path, 150_000))))),
+  ));
   let remaining = PICK.totalBytes;
   let wanted = 0;
   let fetched = 0;
   const out: RepoFiles[] = [];
   for (let i = 0; i < ranked.length; i++) {
     const { repo, files } = ranked[i];
-    const contents = await Promise.all(files.map((f) => soft(ctx, () => rawFile(ctx, repo.fullName, repo.defaultBranch, f.path, 150_000))));
+    const contents = downloaded[i];
     wanted += files.length;
     fetched += contents.filter((c) => c !== null).length;
     const valid = files.map((f, j) => ({ path: f.path, content: contents[j] })).filter((f) => f.content && !f.content.includes("\u0000"));

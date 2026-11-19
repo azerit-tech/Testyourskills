@@ -5,12 +5,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import Database from "better-sqlite3";
 import { afterEach, describe, expect, it } from "vitest";
-import type { BandBoard, BandPage, BandRef, MyBands } from "../../shared/bands";
+import type { BandBoard, BandPage, BandRef, BandsTop, MyBands } from "../../shared/bands";
 import { FIXTURES } from "../../shared/fixtures";
 import type { CardData } from "../../shared/types";
 import { createApp, purge } from "./app";
 import { SESSION_COOKIE, signSession } from "./auth";
-import { bandBoard, bandsTop, bandStanding, FORMING_SIZE, joinBand } from "./bands";
+import { bandBoard, bandsTop, bandStanding, forgetBands, FORMING_SIZE, joinBand } from "./bands";
 import { migrate, RETENTION_MS, Store } from "./db";
 import type { Deps } from "./pipeline";
 
@@ -287,9 +287,50 @@ describe("le score d'une bande", () => {
     // Sa propre bande, plus bas ou en formation, vient en plus.
     expect(bandBoard(ctx.store.db, "ecole", "esiea").extra).toMatchObject({ id: "esiea", missing: 1 });
     expect(bandBoard(ctx.store.db, "ecole", "epita").extra).toBeNull();
-    // L'accueil : les cinq premières de chaque ligue.
-    expect(bandsTop(ctx.store.db).ecole.map((e) => e.id)).toEqual(["epitech", "epita", "efrei"]);
+    // L'accueil : le tableau d'abord, puis la bande en formation pour une place qui reste.
+    expect(bandsTop(ctx.store.db).ecole.map((e) => [e.id, e.rank])).toEqual([
+      ["epitech", 1],
+      ["epita", 2],
+      ["efrei", 3],
+      ["esiea", null],
+    ]);
     expect(bandsTop(ctx.store.db).boite).toEqual([]);
+  });
+
+  it("l'accueil (§18.92) : cinq lignes par ligue, le tableau puis les bandes en formation, les plus étoilées d'abord ; la sienne en plus si elle est plus bas", () => {
+    const ctx = setup();
+    const t = 1_800_000_000_000;
+    const add = (ref: BandRef, stars: (1 | 2 | 3 | 4 | 5 | 6)[], at: number) => stars.forEach((s, i) => put(ctx.store, insert(ctx.store, { stars: s }), ref, at + i));
+    add(school("epitech"), [2, 2, 2], t); // au tableau, 6 étoiles : devant toute bande en formation, même plus étoilée
+    add(school("centralesupelec"), [3], t + 100); // 1 dossier, 3 étoiles
+    add(school("esiea"), [1, 1], t + 200); // 2 dossiers, 2 étoiles
+    add(school("epita"), [6, 4], t + 300); // 2 dossiers, 10 étoiles
+    add(school("efrei"), [3], t + 400); // 1 dossier, 3 étoiles, plus récente que CentraleSupélec
+    add(school("utc"), [2], t + 500); // 1 dossier, 2 étoiles
+    add(school("ensimag"), [1], t + 600);
+    const top = bandsTop(ctx.store.db);
+    // les étoiles d'abord (pas les dossiers, l'ordre de /bandes) ; à égalité, le plus de dossiers, puis la plus ancienne
+    expect(top.ecole.map((e) => [e.id, e.rank, e.score])).toEqual([
+      ["epitech", 1, 6],
+      ["epita", null, 10],
+      ["centralesupelec", null, 3],
+      ["efrei", null, 3],
+      ["esiea", null, 2],
+    ]);
+    expect(top.mine).toBeUndefined();
+    // sa bande, plus bas que les cinq lignes : en plus, avec sa place dans le même ordre
+    expect(bandsTop(ctx.store.db, Date.now(), { ecole: "ensimag" }).mine).toMatchObject({ ecole: { place: 7, band: { id: "ensimag", rank: null, members: 1 } } });
+    // déjà dans la liste, ou inconnue : rien de plus
+    expect(bandsTop(ctx.store.db, Date.now(), { ecole: "epita", boite: "inconnue" }).mine).toBeUndefined();
+
+    // une boîte de la table d'alias se voit en formation ; une boîte au nom libre reste cachée avant trois dossiers
+    add({ type: "boite", id: "azerit", label: "Azerit" }, [4], t);
+    add({ type: "boite", id: "petite-boite", label: "Petite Boîte" }, [6, 6], t);
+    forgetBands(ctx.store.db);
+    expect(bandsTop(ctx.store.db).boite.map((e) => e.id)).toEqual(["azerit"]);
+    expect(bandsTop(ctx.store.db, Date.now(), { boite: "petite-boite" }).mine).toBeUndefined();
+    // /bandes ne change pas : ses bandes en formation, les plus avancées d'abord
+    expect(bandBoard(ctx.store.db, "ecole").forming.map((e) => e.id).slice(0, 2)).toEqual(["epita", "esiea"]);
   });
 
   it("les bandes en formation suivent le tableau : les plus avancées d'abord, sans la sienne, dix au plus", () => {
@@ -444,7 +485,13 @@ describe("pages publiques", () => {
     const board = await call<BandBoard>(ctx, "/api/bands?type=boite");
     expect(board.json.entries).toMatchObject([{ id: "doctolib", rank: 1, score: 12, members: 3 }]);
     expect((await call(ctx, "/api/bands?type=ville")).status).toBe(400);
-    expect((await call<{ ecole: unknown[]; boite: unknown[] }>(ctx, "/api/bands/top")).json.boite).toHaveLength(1);
+    expect((await call<BandsTop>(ctx, "/api/bands/top")).json.boite).toHaveLength(1);
+    // sa propre bande, plus bas que les cinq lignes, par l'adresse ; un identifiant mal formé est ignoré
+    for (const [i, id] of ["meta", "google", "ubisoft", "mistral-ai", "blablacar"].entries()) for (let k = 0; k < 2; k++) put(ctx.store, insert(ctx.store, { stars: (6 - i) as 2 | 3 | 4 | 5 | 6 }), { type: "boite", id, label: id });
+    forgetBands(ctx.store.db);
+    const mine = await call<BandsTop>(ctx, "/api/bands/top?boite=blablacar&ecole=%3Cx%3E");
+    expect(mine.json.boite.map((b) => b.id)).toEqual(["doctolib", "meta", "google", "ubisoft", "mistral-ai"]);
+    expect(mine.json.mine).toMatchObject({ boite: { place: 6, band: { id: "blablacar", members: 2 } } });
   });
 
   it("la vue publique d'une fiche ne porte pas son école ; la personne fichée la lit", async () => {

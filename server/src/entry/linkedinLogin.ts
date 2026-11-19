@@ -86,6 +86,8 @@ interface Session {
   exp: number;
   resolving: Promise<Resolution>;
   resolved?: Resolution;
+  /** Le compte de la personne connectée (§18.91) : la fiche qu'elle lance y sera liée. */
+  accountId?: string;
 }
 
 /** Ce que `tys_who` retient : le nom, puis le profil sûr et la fiche. */
@@ -111,6 +113,8 @@ export interface EntryIdentity {
   sureProfile: boolean;
   /** Comment ce profil est le sien : l'email, la photo, le seul au nom et à l'employeur, ou choisi par elle dans « C'est toi ? ». */
   profileHow: "email" | "photo" | "employer" | "picked";
+  /** Le compte de la personne connectée (§18.91), sinon absent. */
+  accountId?: string;
 }
 
 export interface LinkedinEnterOptions {
@@ -128,7 +132,7 @@ export interface LinkedinEnterOptions {
   peek?: (url: string, opts: { spend: () => boolean; signal?: AbortSignal }) => Promise<ProfilePeek | null>;
   /** « Même photo ? » ; les tests en donnent un faux. */
   samePhoto?: (a: string, b: string) => Promise<boolean>;
-  /** La photo que l'App Azerit garde d'un profil (§18.91) ; absent : aucune. */
+  /** La photo que l'App Azerit garde d'un profil (§18.95) ; absent : aucune. */
   storedPhoto?: (url: string) => Promise<StoredPhoto | null>;
   /** « Même photo ? » entre la photo rendue par LinkedIn et une photo gardée ; les tests en donnent un faux. */
   samePhotoBytes?: (picture: string, photo: StoredPhoto) => Promise<boolean>;
@@ -160,7 +164,7 @@ export function photoMatcher(fetchImpl: typeof fetch): (a: string, b: string) =>
   };
 }
 
-/** Une photo déjà en main (celle que l'App Azerit garde d'un profil, §18.91). */
+/** Une photo déjà en main (celle que l'App Azerit garde d'un profil, §18.95). */
 export interface StoredPhoto {
   bytes: Uint8Array;
   ext: "jpg" | "png";
@@ -252,7 +256,7 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
       if (found.status === "off") out.off = true;
       const all = found.status === "ok" ? found.results : [];
       let same = all.filter((c) => samePublicFullName(who.name, c.name));
-      // La photo que l'App Azerit garde déjà d'un de ces profils (§18.91) : la sienne,
+      // La photo que l'App Azerit garde déjà d'un de ces profils (§18.95) : la sienne,
       // et elle seule, le désigne tout de suite, sans lire aucun profil (quatre secondes et
       // une lecture payée de moins). Sinon, rien ne change.
       const storedPhoto = o.storedPhoto;
@@ -313,7 +317,7 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
 
   const hook: LinkedinEnterHook = {
     allow: (c) => o.limiter.take("li-enter", clientIp(c), ENTER_STARTS_PER_DAY),
-    finish(c, returnPath, profile) {
+    finish(c, returnPath, profile, accountId) {
       sweep();
       const id = randomBytes(18).toString("base64url");
       const who = { ...profile, name: profile.name ?? "" };
@@ -324,6 +328,7 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
         exp: now() + ENTER_TTL_MS,
         // La recherche part tout de suite : elle tourne pendant que la page se recharge.
         resolving: Promise.race([resolve(who, clientIp(c)), new Promise<Resolution>((res) => setTimeout(() => res(failed()), RESOLVE_MAX_MS).unref?.())]).catch(failed),
+        ...(accountId ? { accountId } : {}),
       };
       void session.resolving.then((r) => (session.resolved = r));
       sessions.set(id, session);
@@ -387,6 +392,7 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
       // Le profil au seul nom et employeur fait partir la fiche, sans valoir la preuve d'un email ou d'une photo.
       sureProfile: sure && r.how !== "employer",
       profileHow: sure && r.how ? r.how : "picked",
+      ...(found.session.accountId ? { accountId: found.session.accountId } : {}),
       used() {
         sessions.delete(found.id);
         deleteCookie(c, ENTER_COOKIE, cookieBase);
@@ -415,5 +421,20 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
     deleteCookie(c, KNOWN_COOKIE, { ...cookieBase, httpOnly: false });
   };
 
-  return { hook, identityFor, rememberCard, forgetCard };
+  /** La fiche que `tys_who` désigne (« Voir ma fiche », §18.90), sans droit ; null s'il ne désigne rien. */
+  const knownOf = (c: Context): KnownCard | null => {
+    const w = whoOf(c);
+    return w && (w.url || w.cardId) ? (o.knownCard?.(w) ?? null) : null;
+  };
+
+  /** Se déconnecter, ou sa fiche supprimée par son compte (§18.91) : ce navigateur oublie tout de l'entrée. */
+  const forgetAll = (c: Context) => {
+    const found = sessionOf(c);
+    if (found) sessions.delete(found.id);
+    deleteCookie(c, ENTER_COOKIE, cookieBase);
+    deleteCookie(c, WHO_COOKIE, cookieBase);
+    deleteCookie(c, KNOWN_COOKIE, { ...cookieBase, httpOnly: false });
+  };
+
+  return { hook, identityFor, rememberCard, forgetCard, knownOf, forgetAll };
 }

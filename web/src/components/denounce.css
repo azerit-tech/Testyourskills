@@ -113,6 +113,41 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* ce qui part (§18.94) : l'image du duel, telle que la messagerie la montrera ; le ratio est réservé */
+.denounce-preview {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1200 / 630;
+  border-radius: var(--r-item);
+  background: var(--c-line);
+}
+/* les canaux : WhatsApp et SMS sous le gros bouton (téléphone), la rangée entière au bureau */
+.denounce-via-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+/* 360 px : « WhatsApp » tient en entier dans sa moitié de rangée */
+.denounce-via-row .denounce-via {
+  min-width: 0;
+  gap: 6px;
+  padding: 0 10px;
+}
+.denounce-via span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.denounce-via-row.is-desk {
+  display: flex;
+  flex-wrap: wrap;
+}
+.denounce-via-row.is-desk .denounce-via {
+  flex: 1 1 auto;
+}
+.denounce-via-row.is-desk .pill-big {
+  flex: 1 1 100%;
+}
 .denounce-links {
   display: flex;
   flex-wrap: wrap;
@@ -133,7 +168,7 @@
   .denounce-form .pill {
     width: auto;
   }
-  .denounce-actions {
+  .denounce-actions:not(.denounce-via-row) {
     justify-items: start;
   }
 }

@@ -19,8 +19,11 @@ import { genericMeta, HOME_IMAGE_PATH, HOME_IMAGE_PATH_EN, injectConfig, injectH
 import { ID_RE, MAX_PDF_BYTES, MESSAGES, Pipeline, type Deps, type RenderInput } from "./pipeline";
 import { CARDS_PER_BROWSER, CARDS_PER_DAY, RateLimiter, browserId, clientIp } from "./ratelimit";
 import { inlineAvatar, mountLinkedin, removeAvatars, type LinkedinConfig } from "./linkedin";
-import { mountAuth, ownerFromRequest, sameOrigin, type GithubAuthConfig } from "./auth";
+import { deleteCookie } from "hono/cookie";
+import { mountAuth, ownerFromRequest, sameOrigin, SESSION_COOKIE, type GithubAuthConfig } from "./auth";
+import { createAccounts, mountAccount } from "./account";
 import { DENOUNCE_LIMITED, DENOUNCE_PER_DAY, mountDenounce, parseDenunciation } from "./denounce";
+import { DUEL_FILE_RE, duelMeta, duelOf, duelPath, removeDuels } from "./duel";
 import { mountJury } from "./jury";
 import { autoJoinBands, mountBands, rootOf } from "./bands";
 import { mountBandPages } from "./bandPages";
@@ -86,6 +89,8 @@ export interface AppOptions {
   githubLogin?: GithubLoginConfig;
   /** Cookies de session en Secure. Défaut : si baseUrl est en https. */
   secureCookies?: boolean;
+  /** Le compte léger (§18.91) : SESSION_SECRET. Défaut : celui de « C'est moi » ; absent des deux : pas de compte. */
+  accountSecret?: string;
   /** Photos LinkedIn sur disque. Défaut : à côté de ogDir, dans avatars/. */
   avatarDir?: string;
   /** Pseudo GitHub de la carte d'exemple de l'accueil (§6.1). Absent : pas de vitrine. */
@@ -103,7 +108,7 @@ export interface AppOptions {
   linkedinProfiles?: LinkedinFinder;
   /** La recherche d'un profil LinkedIn par nom (§18.80). Absent : le champ « Ton nom » reste un champ où l'on colle un lien. */
   linkedinPeople?: LinkedinPeople;
-  /** Le registre GitHub ↔ LinkedIn de l'App Azerit (§18.91). Absent : rien n'est lu ni écrit chez elle. */
+  /** Le registre GitHub ↔ LinkedIn de l'App Azerit (§18.95). Absent : rien n'est lu ni écrit chez elle. */
   registry?: RegistryPort;
   /** La recherche de comptes GitHub des suggestions (§18.80). Absent : la vraie (github/searchUsers.ts). */
   githubUserSearch?: GithubSearchRoutesOptions["search"];
@@ -214,13 +219,15 @@ const TOTW_TAG = "-totw";
 const THIRD_PARTY_TAG = "-tp";
 
 export async function removeImages(ogDir: string, ids: string[]) {
-  await Promise.all(
-    ids.flatMap((id) =>
+  await Promise.all([
+    // Les duels où paraît l'une de ces fiches (§18.94, duel.ts).
+    removeDuels(ogDir, ids),
+    ...ids.flatMap((id) =>
       OG_SUFFIXES.flatMap((s) =>
         ["", TOTW_TAG].flatMap((tag) => ["", THIRD_PARTY_TAG].map((tp) => rm(join(ogDir, `${id}${tag}${tp}${s}.png`), { force: true }))),
       ),
     ),
-  );
+  ]);
 }
 
 /**
@@ -318,12 +325,17 @@ export function createApp(opts: AppOptions) {
     return c.json(errorBody("internal", MESSAGES.internal), 500);
   });
 
+  // Le compte léger (§18.91), en tête : toutes les routes lisent le compte du navigateur.
+  const account = createAccounts({ store, secret: opts.accountSecret ?? opts.githubAuth?.sessionSecret, secure: opts.secureCookies ?? baseUrl.startsWith("https://") });
+  mountAccount(app, account);
+
   // « Se connecter avec GitHub » (§18.80), avant la revendication : les deux partagent
   // /auth/github/callback, et l'entrée ne prend que ses propres retours.
   mountGithubEnter(app, {
     store,
     config: opts.githubLogin,
     claim: opts.githubAuth,
+    account,
     baseUrl,
     secure: opts.secureCookies ?? baseUrl.startsWith("https://"),
     limiter,
@@ -340,11 +352,16 @@ export function createApp(opts: AppOptions) {
     limiter,
     fetchImpl,
     removeImages: (ids) => removeImages(ogDir, ids),
-    // « C'est moi » sur une fiche qui porte un LinkedIn : la personne prouve son GitHub et désigne ce profil (§18.91).
+    // « C'est moi » sur une fiche qui porte un LinkedIn : la personne prouve son GitHub et désigne ce profil (§18.95).
     onClaimed: (row, login) => {
       const url = ((store.fileRow(row.id) ?? row).facts as { linkedinUrl?: unknown } | null | undefined)?.linkedinUrl;
       if (typeof url === "string") opts.registry?.recordLink({ login, url, ...CLAIM_SIGNAL });
     },
+    removeDuels: (ids) => removeDuels(ogDir, ids),
+    account,
+    // Le repli de `tys_who` (§18.90), créé plus bas : lu à la demande.
+    known: (c) => linkedinEnter?.knownOf(c) ?? null,
+    forget: (c) => linkedinEnter?.forgetAll(c),
   });
 
   // « Se connecter avec LinkedIn » (§18.80) : il faut la connexion, la lecture des profils et leur recherche par nom.
@@ -404,12 +421,14 @@ export function createApp(opts: AppOptions) {
 
   /**
    * La personne connectée est propriétaire revendiquée du login de cette fiche
-   * (§18.1). Pour agir sur la fiche, la requête doit aussi venir du site.
+   * (§18.1), ou son compte a cette fiche pour « Ma fiche » (§18.91) : sa session
+   * vaut alors le jeton. Pour agir sur la fiche, la requête doit aussi venir du site.
    */
   const ownedBy = (c: Context, row: CardRow): boolean => {
     const login = store.loginOf(row);
     const owner = login ? ownerFromRequest(c) : null;
-    return !!owner && owner.login === login!.toLowerCase() && sameOrigin(c, baseUrl);
+    const byOwner = !!owner && owner.login === login!.toLowerCase();
+    return (byOwner || !!account?.owns(c, row)) && sameOrigin(c, baseUrl);
   };
 
   /**
@@ -674,17 +693,21 @@ export function createApp(opts: AppOptions) {
       // connectée (le profil sûr, ou l'un des homonymes proposés). Sa fiche reçoit le
       // GitHub retrouvé d'après son identité, et son email vérifié comme contact.
       const who = linkedinUrl && !login && !pdf && !denounce ? (linkedinEnter?.identityFor(c, linkedinUrl) ?? null) : null;
-      // Le registre de l'App (§18.91) : le lien que la connexion LinkedIn établit.
+      // Le registre de l'App (§18.95) : le lien que la connexion LinkedIn établit.
       if (who?.github && linkedinUrl) opts.registry?.recordLink({ login: who.github.login, url: linkedinUrl, ...signInSignal(who.profileHow, who.github.how) });
       /** L'email de la personne connectée, posé sur sa fiche dès qu'elle existe ; jamais sur une fiche qui en porte déjà un. */
       const lead = (id: string) => {
         if (!denounce) linkedinEnter?.rememberCard(c, id, linkedinUrl, !!who);
         who?.used();
         const email = who?.email;
-        if (!email) return;
+        // La fiche de l'entrée connectée va à son compte (§18.91).
+        const accountId = who?.accountId;
+        if (!email && !accountId) return;
         const tie = () => {
           const row = store.getCard(id);
-          if (!row || row.email) return;
+          if (!row) return;
+          if (accountId) account?.link(accountId, id);
+          if (!email || row.email) return;
           store.setEmail(id, email);
           store.recordEvent("card_email", id, { via: "linkedin" });
           void sendLead(opts.leadsEndpoint, buildLead(email, id, baseUrl), fetchImpl);
@@ -705,12 +728,24 @@ export function createApp(opts: AppOptions) {
         }
       }
 
+      // « Se connecter avec GitHub » : le pseudo échangé par /api/entry/github, lancé par ce compte (§18.91).
+      // Jamais pour un pseudo tapé, un lien collé ou une dénonciation : la fiche peut être celle d'un autre.
+      const ghAccount = account && login && !pdf && !linkedinUrl && !denounce ? account.fromRequest(c) : null;
+      const ghLinked = !!ghAccount && account!.takeGithub(ghAccount.id, login!);
+      const linkGithub = (id: string) => {
+        if (!ghLinked) return;
+        const tie = () => store.getCard(id) && account!.link(ghAccount!.id, id);
+        if (store.getCard(id)) tie();
+        else void pipeline.wait(id).then(tie);
+      };
+
       // Cache 24 h et déduplication des jobs en cours, pour GitHub seul (§4.7, §12).
       if (login && !pdf && !linkedinUrl) {
         // Une comparaison LinkedIn contre GitHub récente passe devant la fiche GitHub seule (§18.24).
         const compared = opts.linkedinProfiles ? recentLinkedinCard(store.db, { login }) : null;
         if (compared) {
           denounced(compared);
+          linkGithub(compared);
           return c.json({ id: compared, cached: true }, 200);
         }
         const recent = store.findRecentGithub(login);
@@ -718,11 +753,13 @@ export function createApp(opts: AppOptions) {
         const cached = recent ? (store.fileRow(recent.id) ?? recent) : null;
         if (cached) {
           denounced(cached.id);
+          linkGithub(cached.id);
           return c.json({ id: cached.id, cached: true }, 200);
         }
         const running = pipeline.inflightFor(login);
         if (running) {
           denounced(running);
+          linkGithub(running);
           return c.json({ id: running, cached: true }, 200);
         }
       }
@@ -762,7 +799,7 @@ export function createApp(opts: AppOptions) {
       });
       denounced(id, true);
       lead(id);
-      // Les comptes d'une fiche sortie vont au registre de l'App (§18.91) : jamais un pseudo qui n'existe pas.
+      // Les comptes d'une fiche sortie vont au registre de l'App (§18.95) : jamais un pseudo qui n'existe pas.
       const registry = opts.registry;
       if (registry && !pdf) {
         void pipeline.wait(id).then(() => {
@@ -771,6 +808,7 @@ export function createApp(opts: AppOptions) {
           if (row) registry.recordAccounts({ github: store.loginOf(row), linkedin: typeof url === "string" ? url : null });
         });
       }
+      linkGithub(id);
       // L'entrée d'office dans les bandes (§18.82), dès que la fiche est posée : seulement pour une
       // fiche que sa personne fait elle-même (elle reçoit le jeton), jamais pour une dénonciation,
       // et sans rien prendre à la limite par IP des entrées à la main.
@@ -829,7 +867,16 @@ export function createApp(opts: AppOptions) {
     if (!ID_RE.test(id)) return { status: 404 };
     const row = store.getCard(id);
     if (!row) return { status: 404 };
-    if (!tokenMatches(c.req.query("token"), row.deleteToken) && !(bySession && ownedBy(c, row))) return { status: 403 };
+    const bySessionOk = bySession && ownedBy(c, row);
+    if (!tokenMatches(c.req.query("token"), row.deleteToken) && !bySessionOk) return { status: 403 };
+    // Supprimée par sa personne connectée : son compte part avec, et elle sort ; tous les cookies (§18.91).
+    const leaving = bySessionOk ? account?.fromRequest(c) : null;
+    if (leaving) {
+      account!.accounts.remove(leaving.id);
+      account!.clear(c);
+      deleteCookie(c, SESSION_COOKIE, { httpOnly: true, secure: opts.secureCookies ?? baseUrl.startsWith("https://"), sameSite: "Lax", path: "/" });
+      linkedinEnter?.forgetAll(c);
+    }
     // Fiche LinkedIn supprimée : le profil en cache part avec elle (§18.24).
     const facts = (row.parentId ? store.getCard(row.parentId) : row)?.facts;
     forgetLinkedinOfCard(store.db, facts);
@@ -901,6 +948,8 @@ export function createApp(opts: AppOptions) {
   app.get("/og/:file", async (c) => {
     if (`/og/${c.req.param("file")}` === HOME_IMAGE_PATH) return serveHomeImage(c, "fr");
     if (`/og/${c.req.param("file")}` === HOME_IMAGE_PATH_EN) return serveHomeImage(c, "en");
+    const vs = DUEL_FILE_RE.exec(c.req.param("file"));
+    if (vs) return serveDuelImage(c, vs[1]!, vs[2]!);
     const m = OG_FILE_RE.exec(c.req.param("file"));
     if (!m) return c.notFound();
     const id = m[1]!;
@@ -958,6 +1007,39 @@ export function createApp(opts: AppOptions) {
     });
   });
 
+  /**
+   * Le duel d'une dénonciation (§18.94, duel.ts) : `/og/{fiche}-vs-{dénonciateur}.png`. Rien
+   * (404) si `r` n'est pas le dénonciateur de la fiche, ou si l'une des deux est masquée.
+   * Rendu une fois par état des deux fiches (la clé du fichier), cache court : une
+   * revendication change l'image.
+   */
+  const serveDuelImage = async (c: Context, id: string, r: string) => {
+    const row = store.fileRow(id);
+    const duel = row && row.id === id ? duelOf(store, row, r, thirdParty) : null;
+    if (!duel) return c.notFound();
+    const path = duelPath(ogDir, id, r, duel.key);
+    let png: Uint8Array | null = await readFile(path).catch(() => null);
+    if (!png) {
+      const key = `vs:${id}:${r}:${duel.key}`;
+      let p = rendering.get(key);
+      if (!p) {
+        p = (async () => {
+          const inline = (card: CardData) => inlineAvatar(card, baseUrl, avatarDir);
+          const [by, target] = await Promise.all([inline(duel.by), inline(duel.target)]);
+          const buf = await deps.renderImage({ format: "duel", duel: { by, target }, lang: duel.target.lang ?? "fr" });
+          await mkdir(dirname(path), { recursive: true });
+          const tmp = `${path}.${process.pid}.tmp`;
+          await writeFile(tmp, buf);
+          await rename(tmp, path);
+          return buf;
+        })().finally(() => rendering.delete(key));
+        rendering.set(key, p);
+      }
+      png = await p;
+    }
+    return c.body(new Uint8Array(png), 200, { "Content-Type": "image/png", "X-Robots-Tag": NOINDEX, "Cache-Control": "public, max-age=300" });
+  };
+
   // GET /c/:id : page avec balises OG, qui charge le front.
   app.get("/c/:id", async (c) => {
     const id = c.req.param("id");
@@ -983,7 +1065,9 @@ export function createApp(opts: AppOptions) {
     }
     // L'aperçu est lu par tout le monde : la version publique (shared/publicView.ts).
     const found = row ? metaFor(publicView(withWeekSpecial(store.db, row.data).data, { thirdParty: thirdParty(row) }), baseUrl) : genericMeta(baseUrl, `/c/${id}`, requestLang(c.req.query("lang"), c.req.header("Accept-Language")));
-    const meta = { ...found, noindex: true };
+    // Le lien envoyé par le dénonciateur (?r= sa fiche) : l'aperçu est le duel (§18.94) ; tout autre r, l'aperçu habituel.
+    const duel = row ? duelOf(store, row, c.req.query("r"), thirdParty) : null;
+    const meta = { ...(duel ? duelMeta(duel, found, baseUrl) : found), noindex: true };
     const html = template ? injectMeta(template, meta) : standalonePage(meta);
     c.header("Cache-Control", "public, max-age=300");
     return c.html(html, row ? 200 : 404);
@@ -1034,6 +1118,7 @@ export function createApp(opts: AppOptions) {
     secure: opts.secureCookies ?? baseUrl.startsWith("https://"),
     stateSecret: opts.githubAuth?.sessionSecret,
     enter: linkedinEnter?.hook,
+    account,
   });
 
   // Pages à venir (/primes, /vs, /u…, §18.27) : jamais un pseudo, retour à l'accueil, query gardée (?mock=1).

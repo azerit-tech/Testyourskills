@@ -116,8 +116,6 @@ const fr = frTypoDeep({
     next: "Voir la suite",
     /** Le dernier formulaire de l'accueil, avant le pied de page (§18.48). */
     lastTitle: "À toi.",
-    /** Au-dessus du tableau des bandes : pourquoi une bande. */
-    bandsLead: "Fais ta fiche. Fais gagner ta bande.",
     /** L'accueil se souvient (§18.48) : la fiche déjà faite, ou le dossier encore en cours. */
     back: {
       mine: "Ta fiche\u00a0:",
@@ -130,6 +128,12 @@ const fr = frTypoDeep({
       /** Qui a déjà sa fiche (§18.52) : le bouton principal y ramène, le formulaire se replie dessous. */
       see: "Voir ma fiche",
       another: "Faire une autre fiche",
+    },
+    /** Connecté avec une fiche au compte (§18.91) : le rose y mène, la petite ligne dessous. */
+    account: {
+      see: "Voir ma fiche",
+      redo: "Refaire ma fiche",
+      out: "Se déconnecter",
     },
     /* Mur des 13 profils (§18.28) */
     wall: {
@@ -325,9 +329,9 @@ const fr = frTypoDeep({
     leadDenounced: (who: string, by: string | null) => (by ? `@${by} a dénoncé ${who}.` : `Quelqu'un a dénoncé ${who}.`),
     /** Sans bloc des critères au-dessus (fiche dénoncée sans grille) : la même question, sans « ces huit critères ». */
     yourTurnBare: "Et toi, tu vaux combien d'étoiles\u00a0? Ton LinkedIn ou ton GitHub suffit.",
-    /** Sous la fiche d'un dossier à deux sources (§18.36) : d'où vient la preuve, une seule note. */
+    /** Sous la fiche d'un dossier à deux sources (§18.36, §18.93) : une fiche, une note, lue « d'après LinkedIn et GitHub ». */
     pieces: {
-      line: (labels: string) => `Sources au dossier\u00a0: ${labels}`,
+      line: (labels: string) => `D'après ${labels.replace(/^CV\b/, "le CV")}`,
       /* « LinkedIn et GitHub » : une phrase, pas un point médian. */
       pair: (a: string, b: string) => `${a} et ${b}`,
       unproven: "Code à prouver",
@@ -787,7 +791,26 @@ const fr = frTypoDeep({
     charge: (status: string) => `Chef d'accusation : ${status}`,
     /* le seul bouton : à la personne elle-même, pour qu'elle la reprenne (parcours 2 et 25) */
     send: (who: string) => `Envoyer à ${who}`,
-    sendText: (who: string, stars: string, tag: string) => `${who}, Azerit a dressé ta fiche de dev : ${stars ? `${stars}, ` : ""}${tag}. C'est toi ? Reprends-la :`,
+    /* le message envoyé (§18.94) : on l'a dénoncé, le duel en chiffres, puis le lien. `them` nul : dossier scellé ; `me` nul : sa note inconnue */
+    sendText: (who: string, me: number | null, them: number | null, lead: string) =>
+      me === null
+        ? `${who}, je viens de te dénoncer sur Azerit. À toi de jouer :`
+        : them === null
+          ? `${who}, je viens de te dénoncer sur Azerit. Ta fiche t'attend : fais mieux que mes ${me} ?`
+          : `${who}, je viens de te dénoncer sur Azerit : ${me} contre ${them}, ${lead}. À toi de jouer :`,
+    /** L'écart vu par qui envoie : « j'ai une étoile d'avance », « tu as 3 points d'avance ». */
+    iLead: (gap: string) => `j'ai ${gap}`,
+    youLead: (gap: string) => `tu as ${gap}`,
+    sendTie: "égalité parfaite",
+    mailSubject: "Je viens de te dénoncer sur Azerit",
+    /** Les canaux de l'envoi : téléphone (raccourcis sous le bouton) et ordinateur (la rangée). */
+    viaWhatsapp: "WhatsApp",
+    viaSms: "SMS",
+    viaEmail: "E-mail",
+    viaLinkedin: "LinkedIn",
+    viaCopy: "Copier",
+    linkedinCopied: "Message copié : colle-le dans LinkedIn.",
+    previewAlt: (who: string) => `Le face-à-face envoyé à ${who}`,
     sendCopied: (who: string) => `Message copié : envoie-le à ${who}.`,
     see: "Voir sa fiche",
     copyLink: "Copier le lien",
@@ -965,7 +988,6 @@ const en: Dict = {
     exampleFrom: (labels) => `based on ${labels}`,
     next: "See more",
     lastTitle: "Your turn.",
-    bandsLead: "Get your rap sheet. Make your crew win.",
     back: {
       mine: "Your sheet:",
       mineGo: "See it again",
@@ -975,6 +997,11 @@ const en: Dict = {
       owedGo: "Watch it",
       see: "See my sheet",
       another: "Make another sheet",
+    },
+    account: {
+      see: "See my sheet",
+      redo: "Redo my sheet",
+      out: "Sign out",
     },
     wall: {
       title: "Which profile are you?",
@@ -1136,7 +1163,7 @@ const en: Dict = {
     leadDenounced: (who, by) => (by ? `@${by} turned in ${who}.` : `Someone turned in ${who}.`),
     yourTurnBare: "What about you, how many stars? Your LinkedIn or your GitHub is all it takes.",
     pieces: {
-      line: (labels) => `Sources on file: ${labels}`,
+      line: (labels) => `Based on ${labels.replace(/^Résumé\b/, "the résumé")}`,
       pair: (a, b) => `${a} and ${b}`,
       unproven: "Code still unproven",
       link: "Link between the two sources: to be confirmed",
@@ -1526,7 +1553,23 @@ const en: Dict = {
     inSights: "is in the crosshairs",
     charge: (status) => `Charge: ${status}`,
     send: (who) => `Send to ${who}`,
-    sendText: (who, stars, tag) => `${who}, Azerit drew up your dev rap sheet: ${stars ? `${stars}, ` : ""}${tag}. That's you? Take it back:`,
+    sendText: (who, me, them, lead) =>
+      me === null
+        ? `${who}, I just turned you in on Azerit. Your move:`
+        : them === null
+          ? `${who}, I just turned you in on Azerit. Your sheet is waiting: can you beat my ${me}?`
+          : `${who}, I just turned you in on Azerit: ${me} vs ${them}, ${lead}. Your move:`,
+    iLead: (gap) => `I'm ${gap}`,
+    youLead: (gap) => `you're ${gap}`,
+    sendTie: "a dead heat",
+    mailSubject: "I just turned you in on Azerit",
+    viaWhatsapp: "WhatsApp",
+    viaSms: "Text",
+    viaEmail: "Email",
+    viaLinkedin: "LinkedIn",
+    viaCopy: "Copy",
+    linkedinCopied: "Message copied: paste it into LinkedIn.",
+    previewAlt: (who) => `The face-off sent to ${who}`,
     sendCopied: (who) => `Message copied: send it to ${who}.`,
     see: "See their sheet",
     copyLink: "Copy link",

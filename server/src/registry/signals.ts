@@ -1,4 +1,4 @@
-// Ce que vaut chaque signal du jeu, dans l'échelle de l'App (SPEC §18.91) :
+// Ce que vaut chaque signal du jeu, dans l'échelle de l'App (SPEC §18.95) :
 // 2 quand la personne le déclare elle-même ou que son identité est vérifiée,
 // 1 quand une recherche ou un nom seul l'a trouvé. Le nom du signal devient
 // l'étape (`step`) du lien écrit.

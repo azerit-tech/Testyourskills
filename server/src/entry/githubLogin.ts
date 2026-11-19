@@ -17,6 +17,7 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import type { Hono } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
+import { accountFromRequest, type AccountKit } from "../account";
 import { GH_AUTHORIZE_URL, SESSION_COOKIE, SESSION_TTL_MS, fetchGithubUser, safeReturnPath, sign, signSession, unsign, type GithubAuthConfig } from "../auth";
 import type { Store } from "../db";
 import { clientIp, type RateLimiter } from "../ratelimit";
@@ -48,6 +49,8 @@ export interface GithubEnterOptions {
   config?: GithubLoginConfig;
   /** La revendication (§18.1), si elle est configurée : la connexion vaut « C'est moi ». */
   claim?: GithubAuthConfig;
+  /** Le compte léger (§18.91) : la connexion le trouve ou le crée. Absent : pas de compte. */
+  account?: AccountKit | null;
   baseUrl: string;
   secure: boolean;
   limiter: RateLimiter;
@@ -74,6 +77,9 @@ export function mountGithubEnter(app: Hono, o: GithubEnterOptions): void {
     const p = unsign(secret, "gh-login", getCookie(c, GH_ENTER_COOKIE));
     if (getCookie(c, GH_ENTER_COOKIE)) clearLogin(c);
     if (!p || typeof p.l !== "string" || typeof p.e !== "number" || p.e < Date.now()) return c.json({ signedIn: false });
+    // La fiche que le front lance pour ce pseudo est celle de l'entrée connectée : elle ira au compte (§18.91).
+    const account = accountFromRequest(c);
+    if (account) o.account?.expectGithub(account.id, p.l);
     return c.json({ signedIn: true, login: p.l });
   });
 
@@ -91,7 +97,9 @@ export function mountGithubEnter(app: Hono, o: GithubEnterOptions): void {
     const returnPath = safeReturnPath(c.req.query("return")) ?? "/";
     if (!o.limiter.take("gh-enter", clientIp(c), GH_ENTER_STARTS_PER_DAY)) return c.redirect(back(returnPath, "error"), 302);
     const state = randomBytes(24).toString("base64url");
-    setCookie(c, GH_ENTER_STATE_COOKIE, sign(secret, "gh-enter", { s: state, r: returnPath, e: Date.now() + STATE_TTL_MS }), {
+    // `d` : « Refaire ma fiche » (§18.91), le retour ne mène pas droit à la fiche du compte.
+    const redo = c.req.query("redo") === "1";
+    setCookie(c, GH_ENTER_STATE_COOKIE, sign(secret, "gh-enter", { s: state, r: returnPath, e: Date.now() + STATE_TTL_MS, ...(redo ? { d: 1 } : {}) }), {
       ...cookieBase,
       path: STATE_PATH,
       maxAge: STATE_TTL_MS / 1000,
@@ -124,6 +132,10 @@ export function mountGithubEnter(app: Hono, o: GithubEnterOptions): void {
         const owner = o.store.claimOwner(user.login, user.githubId);
         setCookie(c, SESSION_COOKIE, signSession(o.claim.sessionSecret, owner), { ...cookieBase, path: "/", maxAge: SESSION_TTL_MS / 1000 });
       }
+      // Connexion = compte (§18.91). Sa fiche est en ligne : droit dessus, sans nouveau calcul.
+      const account = o.account?.signIn(c, { githubId: user.githubId }) ?? null;
+      const mine = account && st.d !== 1 ? o.account!.cardOf(account) : null;
+      if (mine) return c.redirect(`${o.baseUrl}/c/${mine.id}`, 302);
       setCookie(c, GH_ENTER_COOKIE, sign(secret, "gh-login", { l: user.login, e: Date.now() + LOGIN_TTL_MS }), { ...cookieBase, path: "/", maxAge: LOGIN_TTL_MS / 1000 });
       return c.redirect(back(returnPath, "1"), 302);
     } catch (err) {

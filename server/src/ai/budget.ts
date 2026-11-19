@@ -18,6 +18,10 @@ export interface UsageLike {
     /** Tokens écrits en cache (inclus dans prompt_tokens). */
     cache_write_tokens?: number | null;
   } | null;
+  completion_tokens_details?: {
+    /** Tokens de raisonnement (inclus dans completion_tokens) : du temps passé avant la réponse. */
+    reasoning_tokens?: number | null;
+  } | null;
 }
 
 /** Prix en dollars par million de tokens. */

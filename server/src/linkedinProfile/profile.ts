@@ -64,7 +64,7 @@ export interface ProviderResult {
   githubLogin: string | null;
   /** false : le fournisseur n'a pas regardé (Crustdata sans les plateformes dev). */
   githubChecked: boolean;
-  /** La sortie brute de l'acteur Apify, pour le registre de l'App (§18.91). Jamais gardée ici. */
+  /** La sortie brute de l'acteur Apify, pour le registre de l'App (§18.95). Jamais gardée ici. */
   raw?: unknown;
 }
 

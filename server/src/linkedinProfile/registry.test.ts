@@ -1,4 +1,4 @@
-// Le registre de l'App Azerit branché sur la lecture des profils (§18.91) : lu
+// Le registre de l'App Azerit branché sur la lecture des profils (§18.95) : lu
 // avant tout appel payant, enrichi de ce qui est lu. Base de l'App en mémoire,
 // fournisseur factice, noms inventés.
 

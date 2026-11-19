@@ -32,9 +32,13 @@
 // - Une route POST qui agit pour le propriétaire vérifie aussi l'origine
 //   (`sameOrigin`) : SameSite=Lax couvre déjà les navigateurs récents.
 
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import type { Context, Hono } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
+import { fileOf } from "../../shared/caseFile";
+import type { CardData, ComparisonData } from "../../shared/types";
+import { accountFromRequest, type AccountKit } from "./account";
+import { sameString, sign, unsign } from "./signing";
 import { autoJoinBands } from "./bands";
 import type { CardRow, Store } from "./db";
 import { ID_RE } from "./pipeline";
@@ -73,38 +77,10 @@ export function githubAuthFromEnv(env: NodeJS.ProcessEnv): GithubAuthConfig | un
   return clientId && clientSecret && sessionSecret ? { clientId, clientSecret, sessionSecret } : undefined;
 }
 
-// --- Signature HMAC ---------------------------------------------------------
+// --- Signature HMAC (signing.ts) ---------------------------------------------
 
-function mac(secret: string, purpose: string, body: string): string {
-  return createHmac("sha256", secret).update(`${purpose}.${body}`).digest("base64url");
-}
-
-function sameString(a: string, b: string): boolean {
-  const x = Buffer.from(a);
-  const y = Buffer.from(b);
-  return x.length === y.length && timingSafeEqual(x, y);
-}
-
-/** Valeur signée `{charge}.{signature}` ; `purpose` empêche qu'une valeur passe pour une autre (aussi pour linkedin.ts). */
-export function sign(secret: string, purpose: string, payload: object): string {
-  const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  return `${body}.${mac(secret, purpose, body)}`;
-}
-
-/** Charge d'une valeur signée, ou null si la signature ne correspond pas. Comparaison en temps constant. */
-export function unsign(secret: string, purpose: string, value: string | undefined): Record<string, unknown> | null {
-  if (!value || value.length > 2048) return null;
-  const dot = value.indexOf(".");
-  if (dot <= 0) return null;
-  const body = value.slice(0, dot);
-  if (!sameString(value.slice(dot + 1), mac(secret, purpose, body))) return null;
-  try {
-    const v: unknown = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
-    return v && typeof v === "object" ? (v as Record<string, unknown>) : null;
-  } catch {
-    return null;
-  }
-}
+/** Aussi pour linkedin.ts et les entrées : chaque valeur signée a son préfixe d'usage. */
+export { sign, unsign };
 
 export function signSession(secret: string, owner: Owner, now = Date.now()): string {
   return sign(secret, "session", { l: owner.login.toLowerCase(), i: owner.githubId, e: now + SESSION_TTL_MS });
@@ -176,14 +152,19 @@ declare module "hono" {
   }
 }
 
-/** Propriétaire connecté (voir l'en-tête du module), sinon null. */
+/**
+ * Propriétaire connecté (voir l'en-tête du module), sinon null. Le compte léger
+ * (§18.91) dont le GitHub est prouvé le reste au-delà des 30 jours de `tys_owner`.
+ */
 export function ownerFromRequest(c: Context): Owner | null {
   const auth = c.get("ownerAuth");
   if (!auth) return null;
   const s = verifySession(auth.secret, getCookie(c, SESSION_COOKIE));
-  if (!s) return null;
-  const row = auth.store.getOwnerById(s.githubId);
-  return row ? { login: row.login, githubId: row.githubId } : null;
+  const row = s ? auth.store.getOwnerById(s.githubId) : null;
+  if (row) return { login: row.login, githubId: row.githubId };
+  const githubId = accountFromRequest(c)?.githubId ?? null;
+  const proven = githubId !== null ? auth.store.getOwnerById(githubId) : null;
+  return proven ? { login: proven.login, githubId: proven.githubId } : null;
 }
 
 /** Une requête qui annonce une origine doit venir du site lui-même. */
@@ -252,8 +233,24 @@ export interface AuthRoutesOptions {
   fetchImpl: typeof fetch;
   /** Invalide les PNG en cache des ids donnés (fiches masquées). */
   removeImages(ids: string[]): Promise<void>;
-  /** Une fiche vient d'être revendiquée par le GitHub `login` (registre de l'App, §18.91). */
+  /** Une fiche vient d'être revendiquée par le GitHub `login` (registre de l'App, §18.95). */
   onClaimed?(row: CardRow, login: string): void;
+  /** Efface les duels en cache de ces fiches (§18.94) : revendiquée, une fiche n'est plus scellée. */
+  removeDuels?(ids: string[]): Promise<void>;
+  /** Le compte léger (§18.91). Absent : /api/me ne parle que de la revendication. */
+  account?: AccountKit | null;
+  /** Le repli sans droit (`tys_who`, §18.90) : la fiche de qui s'est connecté, lue seulement sans compte valide. */
+  known?: (c: Context) => { id: string; login: string | null; overall: number } | null;
+  /** Efface les cookies de l'entrée LinkedIn (`tys_who`, `tys_known`, `tys_enter`). */
+  forget?: (c: Context) => void;
+}
+
+/** Ce que /api/me dit de la fiche : son id, son pseudo et sa note (« Ma fiche »), et de quoi la montrer dans la barre du haut (photo ou initiale). */
+function accountCard(row: CardRow | null): { cardId: string | null; cardLogin: string | null; overall: number | null; avatarUrl: string | null; initial: string | null } {
+  if (!row) return { cardId: null, cardLogin: null, overall: null, avatarUrl: null, initial: null };
+  const main = row.kind === "comparison" ? fileOf(row.data as ComparisonData) : (row.data as CardData);
+  const initial = (main.name || main.login || "").trim().charAt(0).toLocaleUpperCase("fr") || null;
+  return { cardId: row.id, cardLogin: main.login ? main.login.toLowerCase() : null, overall: main.overall, avatarUrl: main.avatarUrl || null, initial };
 }
 
 type ClaimResult = "ok" | "mismatch" | "error" | "limited";
@@ -273,18 +270,40 @@ export function mountAuth(app: Hono, o: AuthRoutesOptions) {
   }
 
   // Toujours là : le front ne sait pas encore si l'OAuth est configuré quand il demande.
+  // Se déconnecter efface tout : la revendication, le compte (§18.91) et ce que l'entrée LinkedIn retient (§18.90).
   app.post("/auth/logout", (c) => {
     c.header("Cache-Control", "no-store");
     if (!sameOrigin(c, o.baseUrl)) return c.json({ ok: false }, 403);
     clearSession(c);
+    o.account?.clear(c);
+    o.forget?.(c);
     return c.json({ ok: true });
   });
 
+  // Qui est là, en un seul appel : le propriétaire revendiqué (login, hidden, comme avant), le
+  // compte (§18.91) : sa fiche et ses sources, non nul dès qu'un compte est valide, LinkedIn seul
+  // compris. Sans l'un ni l'autre, le repli sans droit de `tys_who` (§18.90) : sa fiche, `known`.
   app.get("/api/me", (c) => {
     c.header("Cache-Control", "no-store");
     const owner = ownerFromRequest(c);
-    if (!owner) return c.json(null);
-    return c.json({ login: owner.login, hidden: o.store.isHidden(owner.login) });
+    const kit = o.account ?? null;
+    const account = kit?.fromRequest(c) ?? null;
+    if (!owner && !account) {
+      const k = o.known?.(c) ?? null;
+      const row = k ? o.store.getCard(k.id) : null;
+      return c.json(row && k ? { login: null, hidden: false, ...accountCard(row), cardLogin: k.login, overall: k.overall, sources: [], known: true } : null);
+    }
+    if (account) kit!.accounts.touch(account);
+    const sources: ("linkedin" | "github")[] = [];
+    if (account?.linkedinKey) sources.push("linkedin");
+    if (owner || (account && account.githubId !== null)) sources.push("github");
+    const card = account ? kit!.cardOf(account) : owner && kit ? kit.cardOfLogin(owner.login) : null;
+    return c.json({
+      login: owner?.login ?? null,
+      hidden: owner ? o.store.isHidden(owner.login) : false,
+      ...accountCard(card),
+      sources,
+    });
   });
 
   if (!cfg) return;
@@ -353,9 +372,14 @@ export function mountAuth(app: Hono, o: AuthRoutesOptions) {
       return c.redirect(back(st.r, "error"), 302);
     }
 
+    // Connexion = compte (§18.91) : le GitHub vient d'être prouvé, quelle que soit la fiche.
+    o.account?.signIn(c, { githubId: user.githubId });
+
     if (user.login !== cardLogin.toLowerCase()) return c.redirect(back(st.r, "mismatch", user.login), 302);
 
     const owner = o.store.claimOwner(user.login, user.githubId);
+    // Ses duels d'avant (scellés, faits par un tiers) ne servent plus : l'état a changé (§18.94).
+    await o.removeDuels?.(o.store.idsForLogin(user.login));
     // La cible d'une dénonciation a appelé son avocat (§18.6).
     if (row?.denouncedBy) o.store.recordEvent("denounce_claimed", row.id);
     // La fiche revendiquée entre d'office dans la bande de son école et de sa boîte (§18.82) : une

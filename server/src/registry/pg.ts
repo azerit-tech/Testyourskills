@@ -1,4 +1,4 @@
-// La base de l'App en Postgres (SPEC §18.91) : trois connexions au plus, sous
+// La base de l'App en Postgres (SPEC §18.95) : trois connexions au plus, sous
 // le rôle `testyourskills`, qui se déclare (`azerit.writer`) pour que les
 // déclencheurs de l'App (`*_sql_writer`, azerit/db/_sql_writers.py) donnent un
 // `uid` et un `rev` à chaque ligne écrite. Que des SELECT et des INSERT ; une

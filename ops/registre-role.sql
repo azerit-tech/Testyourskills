@@ -1,4 +1,4 @@
--- Le rôle Postgres de Testyourskills dans la base de l'App Azerit (SPEC §18.91).
+-- Le rôle Postgres de Testyourskills dans la base de l'App Azerit (SPEC §18.95).
 --
 -- À appliquer UNE fois, à la main, sur le VPS (ops/DEPLOY.md, « Le registre de
 -- l'App Azerit ») :

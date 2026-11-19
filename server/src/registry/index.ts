@@ -1,4 +1,4 @@
-// Le registre GitHub ↔ LinkedIn de l'App Azerit (SPEC §18.91) : la base
+// Le registre GitHub ↔ LinkedIn de l'App Azerit (SPEC §18.95) : la base
 // Postgres du VPS (`azerit`, conteneur `azerit-postgres`), lue avant toute
 // recherche payante et enrichie de ce que le jeu établit.
 //

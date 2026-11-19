@@ -114,7 +114,7 @@ pas saine, les 80 dernières lignes de `docker logs testyourskills` sont affich�
 
 ## Le registre de l'App Azerit
 
-Le jeu lit et enrichit la base de l'App (SPEC §18.91) : `azerit-postgres`, base
+Le jeu lit et enrichit la base de l'App (SPEC §18.95) : `azerit-postgres`, base
 `azerit`, sur le même réseau docker `ruby_default`. Il y entre sous un rôle à
 lui, `testyourskills`, jamais le superutilisateur : lecture de `accounts`,
 `account_links`, `cvs`, `photos`, `photo_profiles` ; ajout seul dans `accounts`,

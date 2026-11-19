@@ -539,7 +539,7 @@ describe("qui s'est connecté : le navigateur s'en souvient (SPEC §18.90)", () 
   });
 });
 
-describe("le registre de l'App Azerit (§18.91)", () => {
+describe("le registre de l'App Azerit (§18.95)", () => {
   /** Un registre factice : les liens et les comptes qu'on lui verse, une photo gardée par profil. */
   function fakeRegistry(photos: Record<string, Uint8Array> = {}) {
     const links: { login: string; url: string; strength: number; step: string }[] = [];

@@ -110,7 +110,7 @@ useBudgetDb(store.db);
 startCreditsWatch();
 // LinkedIn contre GitHub (§18.24) : sans jeton du fournisseur (APIFY_TOKEN, ou
 // CRUSTDATA_API_KEY avec LINKEDIN_PROVIDER=crustdata), la fonctionnalité est absente.
-// Le registre GitHub ↔ LinkedIn de l'App Azerit (§18.91) : AZERIT_DB_URL, sinon rien ne change.
+// Le registre GitHub ↔ LinkedIn de l'App Azerit (§18.95) : AZERIT_DB_URL, sinon rien ne change.
 const registry = registryFromEnv(process.env) ?? undefined;
 if (registry) console.log("Registre de l'App Azerit : branché (lu avant toute recherche payante, enrichi en ajout seul).");
 const linkedinProfiles = linkedinProfilesFromEnv(process.env, store.db, undefined, registry) ?? undefined;
@@ -145,6 +145,8 @@ const { app, pipeline, refreshShowcase } = createApp({
   linkedin,
   githubAuth,
   githubLogin,
+  // Le compte léger (§18.91) : sans SESSION_SECRET, pas de compte, tout marche comme avant.
+  accountSecret: process.env.SESSION_SECRET?.trim() || undefined,
   secureCookies: prod,
   avatarDir,
   filmTraceFile,

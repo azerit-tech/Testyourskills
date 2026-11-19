@@ -1,4 +1,4 @@
-// Les formats de la base de l'App Azerit (SPEC §18.91), lus et écrits à
+// Les formats de la base de l'App Azerit (SPEC §18.95), lus et écrits à
 // l'identique de son code Python :
 //
 // - `accounts.handle_key` (`azerit/db/_accounts.handle_key`) : un login GitHub
