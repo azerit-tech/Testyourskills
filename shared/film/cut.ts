@@ -127,6 +127,27 @@ export const GAUGE_EASE = 1.5;
 export const SCORE_RISE = 12;
 export const SCORE_FINAL = 18;
 /**
+ * Le détail de la note (SPEC §18.95) : les critères de la grille tombent un par
+ * un pendant la route, dans les creux entre les étoiles, et s'empilent à gauche
+ * sous le score. Le premier pas avant DETAIL_OPEN ; aucun dans les DETAIL_PRE
+ * images avant le coup d'une étoile ni avant qu'elle soit posée depuis
+ * DETAIL_POST images (STAR_LAND + DETAIL_POST après le coup) ; le dernier au
+ * plus tard DETAIL_TAIL images avant le gel. Chaque critère entre en DETAIL_IN
+ * images, sa note claque (de DETAIL_SLAP_FROM à 1 en DETAIL_SLAP images) et
+ * compte de 0 à sa valeur en DETAIL_COUNT images ; son étiquette s'inverse
+ * DETAIL_HIT images. Deux critères sont au moins DETAIL_GAP images l'un de l'autre.
+ */
+export const DETAIL_OPEN = 12;
+export const DETAIL_PRE = 10;
+export const DETAIL_POST = 5;
+export const DETAIL_TAIL = 10;
+export const DETAIL_IN = 3;
+export const DETAIL_SLAP = 4;
+export const DETAIL_SLAP_FROM = 1.45;
+export const DETAIL_COUNT = 8;
+export const DETAIL_HIT = 8;
+export const DETAIL_GAP = 6;
+/**
  * L'étoile refusée (une à cinq étoiles) : sa jauge monte jusqu'à la part vraie
  * de la note entre deux seuils, bornée pour se lire (ni vide, ni presque pleine),
  * se fige avec l'image, puis se vide entre ces deux images comptées depuis la

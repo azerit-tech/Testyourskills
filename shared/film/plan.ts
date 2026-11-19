@@ -10,6 +10,7 @@ import { LEVEL_LABELS, STAR_THRESHOLDS, starsFor } from "../types";
 import { SCENE_LIGHT, sceneOf, type Light } from "../scenes";
 import { plateSub } from "../card/mug";
 import { radioLines, type FilmLine, type RadioCard } from "./radio";
+import { filmDetail, type FilmDetailBeat } from "./detail";
 import { CHASE_FRAMES, DENIED_DRAIN, DENIED_MAX, DENIED_MIN, FLICKER_ON, FPS, INTERCEPT_LEAD, SCORE_FINAL, SCORE_RISE, STAR_FRAMES, TITLE_POP, holdOf, playEnd } from "./cut";
 
 /**
@@ -180,9 +181,14 @@ export interface FilmPlan {
    * (radio.ts) ; demain les pièces du parcours, dans le même format.
    */
   lines: Record<Lang, FilmLine[]>;
+  /**
+   * Le détail de la note (SPEC §18.95) : les critères de la grille, un par un, chacun à son image, dans les creux
+   * entre les étoiles, tous tombés avant le gel. Vide sans grille (une fiche d'avant) : le film d'avant.
+   */
+  detail: FilmDetailBeat[];
 }
 
-export type FilmCard = Pick<CardData, "id" | "login" | "name" | "createdAt"> & RadioCard;
+export type FilmCard = Pick<CardData, "id" | "login" | "name" | "createdAt" | "grid"> & RadioCard;
 
 /**
  * Deux plans qui jouent le même film : même contenu, quel que soit l'objet. Le
@@ -233,5 +239,6 @@ export function filmPlan(card: FilmCard): FilmPlan {
     plateSub: { fr: plateSub(card.id, card.createdAt, "fr"), en: plateSub(card.id, card.createdAt, "en") },
     title: LEVEL_LABELS[level],
     lines: { fr: radioLines(card, "fr"), en: radioLines(card, "en") },
+    detail: filmDetail(card.grid, STAR_FRAMES.slice(0, level), freeze),
   };
 }
