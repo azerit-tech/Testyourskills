@@ -2,6 +2,7 @@
 // réel : faux GitHub, fausse IA, faux chercheur de LinkedIn, base en mémoire.
 
 import { mkdtempSync } from "node:fs";
+import { fakeDossier } from "../__fixtures__/fakeDossier";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -97,9 +98,9 @@ function setup(finder: FinderImpl | null, over: Partial<Deps> = {}, appOver: Par
     scoreCv(_r, _c, { lang, judgedInSeconds }) {
       return { ...body(FIXTURES.cv), lang, judgedInSeconds };
     },
-    // Comme le moteur (scoring/compare.ts) : les deux pièces, sans écart ni titre.
-    compareCards(cv, github) {
-      return { cv, github };
+    // Comme le moteur (scoring/compare.ts) : les deux pièces et la seule note du dossier.
+    scoreDossier(declared, github, o) {
+      return fakeDossier(this, declared, github, o);
     },
     async renderImage() {
       return new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
@@ -440,13 +441,15 @@ describe("entrée LinkedIn (le champ unique)", () => {
     expect(s).toMatchObject({ state: "done", kind: "comparison", comparison: { declaredSource: "linkedin" } });
   });
 
-  it("pas de GitHub : une fiche LinkedIn seule, hors top, en cache 24 h par adresse", async () => {
+  it("pas de GitHub : une fiche LinkedIn seule, classée sur sa note sans nom ni lien, en cache 24 h par adresse", async () => {
     const ctx = setup({ forUrl: async () => ({ status: "found", profile: PROFILE, githubLogin: null }) });
     const { json } = await post(ctx, { linkedin: "linkedin.com/in/camille-ardent" });
     const s = await state(ctx, json.id);
     expect(s).toMatchObject({ state: "done", kind: "card", card: { source: "cv", declaredSource: "linkedin", linkedinUrl: URL_ } });
     expect(ctx.store.getCard(json.id)).toMatchObject({ source: "linkedin", login: null, facts: { linkedinUrl: URL_ } });
-    expect(weekRank(ctx.store.db, json.id)).toBeNull();
+    // Le top classe des personnes (SPEC §18.82) : la fiche LinkedIn seule y entre, sans rien qui la nomme.
+    expect(weekRank(ctx.store.db, json.id)).toMatchObject({ rank: 1, total: 1 });
+    expect(JSON.stringify(weekTop(ctx.store.db).entries)).not.toMatch(new RegExp(`${json.id}|Camille|camille`));
     expect(ctx.calls.collect).toHaveLength(0);
     expect(s.state === "done" && s.kind === "card" && s.card.findings?.[0]?.text.fr).toBe("LinkedIn retrouvé : « Senior Full-Stack Engineer ».");
     const again = await post(ctx, { linkedin: "https://fr.linkedin.com/in/camille-ardent?trk=abc" });

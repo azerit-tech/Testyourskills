@@ -217,7 +217,7 @@ export function RecruiterGrid({ item, shared }: Props) {
   const code = item.kind === "comparison" || item.card.source === "github";
   // La note du dossier face à un GitHub « dossier vide » : le code n'est pas prouvé (§18.37).
   const unproven =
-    item.kind === "comparison" && item.comparison.github.grid?.rule === "empty_file" ? { src: declared === "cv" ? g.source.cv : g.source.linkedin, shared } : undefined;
+    item.kind === "comparison" && (item.comparison.github.unjudged || item.comparison.github.grid?.rule === "empty_file") ? { src: declared === "cv" ? g.source.cv : g.source.linkedin, shared } : undefined;
   const redacted = shared && grid.criteria.some((c) => rowText(c, { g, pick: (f) => pick(f, lang), declared, shared }).redacted);
   const detail = (
     <>

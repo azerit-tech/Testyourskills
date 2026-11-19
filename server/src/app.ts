@@ -684,7 +684,9 @@ export function createApp(opts: AppOptions) {
           denounced(compared);
           return c.json({ id: compared, cached: true }, 200);
         }
-        const cached = store.findRecentGithub(login);
+        const recent = store.findRecentGithub(login);
+        // Remplacée par un dossier plus complet de la même personne : c'est lui qui se montre.
+        const cached = recent ? (store.fileRow(recent.id) ?? recent) : null;
         if (cached) {
           denounced(cached.id);
           return c.json({ id: cached.id, cached: true }, 200);
@@ -759,7 +761,8 @@ export function createApp(opts: AppOptions) {
     c.header("Cache-Control", "no-store");
     const id = c.req.param("id");
     if (!ID_RE.test(id)) return c.json(errorBody("internal", MESSAGES.not_found), 404);
-    const row = store.getCard(id);
+    // Une personne, une note (SPEC §18.82) : l'adresse d'une pièce, ou d'une fiche remplacée, sert le dossier.
+    const row = store.fileRow(id);
     if (row && hiddenFrom(c, store.loginOf(row))) return c.json(errorBody("gone", MESSAGES.withdrawn), 410);
     const live = pipeline.jobState(id);
     if (live) return c.json(live);
@@ -860,7 +863,8 @@ export function createApp(opts: AppOptions) {
     const id = m[1]!;
     // Un dossier à deux pièces : les images de sa fiche (render/index.ts).
     const format: RenderInput["format"] = OG_FORMATS[m[2] ?? ""] ?? "og";
-    const row = store.getCard(id);
+    // L'image d'une pièce, ou d'une fiche remplacée, est celle du dossier : une seule note (SPEC §18.82).
+    const row = store.fileRow(id);
     // Fiche masquée : aucune image, pour personne (les robots n'ont pas de session).
     if (!row || store.isHidden(store.loginOf(row))) return c.notFound();
 
@@ -914,7 +918,7 @@ export function createApp(opts: AppOptions) {
   // GET /c/:id : page avec balises OG, qui charge le front.
   app.get("/c/:id", async (c) => {
     const id = c.req.param("id");
-    const row = ID_RE.test(id) ? store.getCard(id) : null;
+    const row = ID_RE.test(id) ? store.fileRow(id) : null;
     const template = opts.indexHtml ? await opts.indexHtml().catch(() => null) : null;
     const login = row ? store.loginOf(row) : null;
     // Une fiche porte un nom : jamais dans un index de recherche (balise et en-tête, seo.ts).
@@ -927,6 +931,12 @@ export function createApp(opts: AppOptions) {
       const page = template ?? messagePage("withdrawn", langOfRequest(c.req.header("accept-language")));
       c.header("Cache-Control", "private, no-store");
       return c.html(injectMeta(page, generic), mine ? 200 : 410);
+    }
+    // L'adresse d'une pièce, ou d'une fiche remplacée, mène à celle du dossier : une seule note (SPEC §18.82).
+    if (row && row.id !== id) {
+      const query = new URL(c.req.url).search;
+      c.header("Cache-Control", "no-store");
+      return c.redirect(`/c/${row.id}${query}`, 302);
     }
     // L'aperçu est lu par tout le monde : la version publique (shared/publicView.ts).
     const found = row ? metaFor(publicView(withWeekSpecial(store.db, row.data).data, { thirdParty: thirdParty(row) }), baseUrl) : genericMeta(baseUrl, `/c/${id}`, requestLang(c.req.query("lang"), c.req.header("Accept-Language")));

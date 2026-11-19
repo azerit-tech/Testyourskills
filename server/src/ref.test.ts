@@ -2,6 +2,7 @@
 // migration de la colonne ref_card_id. Mêmes doubles que app.test.ts, base en mémoire.
 
 import Database from "better-sqlite3";
+import { fakeDossier } from "./__fixtures__/fakeDossier";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -71,9 +72,9 @@ function setup() {
     scoreCv(_r, _c, { lang, judgedInSeconds }) {
       return { ...body(FIXTURES.cv), lang, judgedInSeconds };
     },
-    // Comme le moteur (scoring/compare.ts) : les deux pièces, sans écart ni titre.
-    compareCards(cv, github) {
-      return { cv, github };
+    // Comme le moteur (scoring/compare.ts) : les deux pièces et la seule note du dossier.
+    scoreDossier(declared, github, o) {
+      return fakeDossier(this, declared, github, o);
     },
     async renderImage() {
       return new Uint8Array([0x89, 0x50, 0x4e, 0x47]);

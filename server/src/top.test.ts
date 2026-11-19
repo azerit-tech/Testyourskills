@@ -46,6 +46,33 @@ function gh(login: string, overall: number, createdAt: number, over: Partial<New
   };
 }
 
+/**
+ * Un dossier à deux pièces : la ligne du dossier, qui porte la seule note, et ses deux pièces.
+ * `pieceNote` : la note qu'une pièce GitHub portait à elle, dans les lignes d'avant 0.5.0.
+ */
+function dossier(id: string, login: string, overall: number, createdAt: number, o: { source?: "linkedin" | "both"; facts?: unknown; pieceNote?: number } = {}): NewCardRow[] {
+  const source = o.source ?? "linkedin";
+  const at = new Date(createdAt).toISOString();
+  const github = gh(login, o.pieceNote ?? overall, createdAt, { parentId: id });
+  const cvId = `cv${github.id}`;
+  const cv = { ...FIXTURES.cv, id: cvId, createdAt: at, overall: o.pieceNote ?? overall } as CardData;
+  const data = { id, createdAt: at, declaredSource: source === "linkedin" ? "linkedin" : "cv", cv, github: github.data as CardData, grid: { criteria: [], overall } } as ComparisonData;
+  const facts = o.facts ?? (source === "linkedin" ? { linkedinUrl: `https://www.linkedin.com/in/${login}`, linkedinProven: true } : undefined);
+  return [
+    { id, createdAt, source, login, kind: "comparison", data, ...(facts ? { facts } : {}), deleteToken: "t" },
+    { id: cvId, parentId: id, createdAt, source: source === "linkedin" ? "linkedin" : "cv", login: null, kind: "card", data: cv, deleteToken: "t" },
+    github,
+  ];
+}
+
+/** Une fiche LinkedIn seule. */
+function li(slug: string, overall: number, createdAt: number): NewCardRow {
+  const id = `lnkd${String(++seq).padStart(4, "0")}`;
+  const linkedinUrl = `https://www.linkedin.com/in/${slug}`;
+  const data = { ...FIXTURES.cv, id, createdAt: new Date(createdAt).toISOString(), overall, declaredSource: "linkedin", linkedinUrl } as CardData;
+  return { id, createdAt, source: "linkedin", login: null, kind: "card", data, facts: { linkedinUrl }, deleteToken: "t" };
+}
+
 describe("weekTop", () => {
   it("une ligne par login, sa meilleure note ; total = logins classés", () => {
     const store = newStore();
@@ -104,43 +131,75 @@ describe("weekTop", () => {
     expect(weekTop(store.db, { now: NOW }).entries[0]!.login).toBe("old");
   });
 
-  it("la carte GitHub d'une comparaison entre au classement, pas la comparaison ni la carte CV", () => {
+  it("un dossier à deux pièces entre sur sa note, la seule ; ses pièces n'entrent jamais (SPEC §18.82)", () => {
     const store = newStore();
-    const cmpId = "cmp00001";
-    const child = gh("both", 77, W46 + H, { parentId: cmpId });
-    store.insertCards([
-      { id: cmpId, createdAt: W46 + H, source: "both", login: "both", kind: "comparison", data: { ...FIXTURES.gold, id: cmpId } as never, deleteToken: "t" },
-      { ...gh("both", 99, W46 + H, { parentId: cmpId }), source: "cv", login: null },
-      child,
-    ]);
+    // Lignes d'avant 0.5.0 : la pièce GitHub portait 99 à elle. Le classement lit la note du dossier, 70.
+    const rows = dossier("cmp00001", "duo", 70, W46 + H, { pieceNote: 99 });
+    store.insertCards(rows);
     const top = weekTop(store.db, { now: NOW });
-    expect(top.entries.map((e) => [e.login, e.cardId])).toEqual([["both", child.id]]);
+    expect(top.entries.map((e) => [e.login, e.cardId, e.overall])).toEqual([["duo", "cmp00001", 70]]);
+    // Relu de la base, le dossier d'avant ne rend plus que sa note, pièces comprises.
+    const read = store.getCard("cmp00001")!.data as ComparisonData;
+    expect([read.cv.overall, read.github.overall, read.grid!.overall]).toEqual([70, 70, 70]);
+    // Le rang d'une pièce est celui de son dossier.
+    for (const r of rows) expect(weekRank(store.db, r.id, NOW)).toMatchObject({ rank: 1, total: 1 });
   });
 
-  it("comparaison LinkedIn : sa carte GitHub n'entre que si le lien est prouvé (§18.24)", () => {
+  it("une personne, une ligne : son dossier passe devant sa fiche GitHub seule, même mieux notée", () => {
     const store = newStore();
-    const cmp = (id: string, login: string, facts: unknown, overall: number) => {
-      const child = gh(login, overall, W46 + H, { parentId: id });
-      store.insertCards([
-        { id, createdAt: W46 + H, source: "linkedin", login, kind: "comparison", data: { ...FIXTURES.gold, id } as never, facts, deleteToken: "t" },
-        child,
-      ]);
-      return child;
-    };
-    const proven = cmp("cmpProven1", "prouve", { linkedinUrl: "https://www.linkedin.com/in/a", linkedinProven: true }, 70);
-    const forged = cmp("cmpForged1", "victime", { linkedinUrl: "https://www.linkedin.com/in/b", linkedinProven: false }, 95);
-    // Une comparaison d'avant ce champ n'est pas prouvée.
-    const legacy = cmp("cmpLegacy1", "avant", { linkedinUrl: "https://www.linkedin.com/in/c" }, 90);
-    expect(weekTop(store.db, { now: NOW }).entries.map((e) => [e.login, e.cardId])).toEqual([["prouve", proven.id]]);
-    expect(weekRank(store.db, forged.id, NOW)).toBeNull();
-    expect(weekRank(store.db, legacy.id, NOW)).toBeNull();
+    const alone = gh("duo", 90, W46 + H);
+    store.insertCards([alone]);
+    expect(weekTop(store.db, { now: NOW }).entries.map((e) => [e.cardId, e.overall])).toEqual([[alone.id, 90]]);
+    store.insertCards(dossier("cmp00003", "duo", 72, W46 + 2 * H));
+    const top = weekTop(store.db, { now: NOW });
+    expect(top.total).toBe(1);
+    expect(top.entries.map((e) => [e.login, e.cardId, e.overall])).toEqual([["duo", "cmp00003", 72]]);
+    // La fiche seule est remplacée par le dossier : son adresse le sert, et son rang est le sien.
+    expect(store.getCard(alone.id)!.supersededBy).toBe("cmp00003");
+    expect(store.fileRow(alone.id)!.id).toBe("cmp00003");
+    expect(weekRank(store.db, alone.id, NOW)).toMatchObject({ rank: 1, total: 1 });
+  });
 
-    // La fiche GitHub du pseudo entre, elle ; la carte de la comparaison non prouvée ne prend pas son rang.
+  it("une fiche LinkedIn seule entre sur sa note, sans nom, sans portrait, sans lien", () => {
+    const store = newStore();
+    const solo = li("camille", 70, W46 + H);
+    store.insertCards([solo, gh("dev", 60, W46 + H)]);
+    const top = weekTop(store.db, { now: NOW });
+    expect(top.total).toBe(2);
+    expect(top.entries[0]).toEqual({ rank: 1, overall: 70, stars: 4, ...(top.entries[0]!.profile ? { profile: top.entries[0]!.profile } : {}) });
+    expect(JSON.stringify(top.entries[0])).not.toContain(solo.id);
+    expect(weekRank(store.db, solo.id, NOW)).toMatchObject({ rank: 1, total: 2 });
+    // Son dossier arrive (même adresse LinkedIn, lien prouvé) : une seule ligne, celle du dossier.
+    store.insertCards(dossier("cmp00004", "camille-dev", 65, W46 + 2 * H, { facts: { linkedinUrl: "https://www.linkedin.com/in/camille", linkedinProven: true } }));
+    const after = weekTop(store.db, { now: NOW });
+    expect(after.entries.map((e) => [e.login, e.overall])).toEqual([["camille-dev", 65], ["dev", 60]]);
+    expect(store.fileRow(solo.id)!.id).toBe("cmp00004");
+  });
+
+  it("un dossier dont le lien n'est pas prouvé ne classe personne et ne remplace rien (§18.24)", () => {
+    const store = newStore();
+    store.insertCards(dossier("cmpProven1", "prouve", 70, W46 + H));
+    const forged = dossier("cmpForged1", "victime", 95, W46 + H, { facts: { linkedinUrl: "https://www.linkedin.com/in/b", linkedinProven: false } });
+    // Un dossier d'avant ce champ n'est pas prouvé ; un CV déposé avec un pseudo non plus.
+    const legacy = dossier("cmpLegacy1", "avant", 90, W46 + H, { facts: { linkedinUrl: "https://www.linkedin.com/in/c" } });
+    const withCv = dossier("cmpAvecCv1", "both", 88, W46 + H, { source: "both" });
+    store.insertCards(forged);
+    store.insertCards(legacy);
+    store.insertCards(withCv);
+    expect(weekTop(store.db, { now: NOW }).entries.map((e) => [e.login, e.cardId])).toEqual([["prouve", "cmpProven1"]]);
+    for (const rows of [forged, legacy, withCv]) for (const r of rows) expect(weekRank(store.db, r.id, NOW)).toBeNull();
+
+    // La fiche GitHub du pseudo entre, elle ; le dossier non prouvé ne prend ni son rang ni son adresse.
     const own = gh("victime", 60, W46 + 2 * H);
     store.insertCards([own]);
-    expect(weekTop(store.db, { now: NOW }).entries.map((e) => e.cardId)).toEqual([proven.id, own.id]);
-    expect(weekRank(store.db, forged.id, NOW)).toBeNull();
-    expect(withWeekSpecial(store.db, forged.data as CardData, NOW).week).toBeNull();
+    expect(weekTop(store.db, { now: NOW }).entries.map((e) => e.cardId)).toEqual(["cmpProven1", own.id]);
+    expect(weekRank(store.db, "cmpForged1", NOW)).toBeNull();
+    expect(withWeekSpecial(store.db, forged[0]!.data as ComparisonData, NOW).week).toBeNull();
+    const before = gh("victime2", 60, W46);
+    store.insertCards([before]);
+    store.insertCards(dossier("cmpForged2", "victime2", 95, W46 + H, { facts: { linkedinUrl: "https://www.linkedin.com/in/d", linkedinProven: false } }));
+    expect(store.getCard(before.id)!.supersededBy).toBeNull();
+    expect(store.fileRow(before.id)!.id).toBe(before.id);
   });
 
   it("change de semaine le lundi 00:00 UTC", () => {
@@ -316,17 +375,12 @@ describe("withWeekSpecial", () => {
     expect(later.live).toBe(false);
   });
 
-  it("sur une comparaison, c'est sa carte GitHub qui la porte", () => {
+  it("sur un dossier, le rang est celui de sa note, et la spéciale se pose sur sa pièce GitHub", () => {
     const store = newStore();
-    const cmpId = "cmp00002";
-    const child = gh("pair", 80, W46 + H, { parentId: cmpId });
-    const cmp = { id: cmpId, createdAt: new Date(W46 + H).toISOString(), cv: { ...FIXTURES.cv, id: "cvchild1" }, github: child.data as CardData, deltas: {}, headline: { fr: "", en: "" } } as unknown as ComparisonData;
-    store.insertCards([
-      { id: cmpId, createdAt: W46 + H, source: "both", login: "pair", kind: "comparison", data: cmp, deleteToken: "t" },
-      child,
-      ...crowd("g", TOTW_MIN_ENTRIES - 1, W46 + H),
-    ]);
-    const out = withWeekSpecial(store.db, cmp, NOW);
+    const rows = dossier("cmp00002", "pair", 80, W46 + H);
+    store.insertCards([...rows, ...crowd("g", TOTW_MIN_ENTRIES - 1, W46 + H)]);
+    const out = withWeekSpecial(store.db, rows[0]!.data as ComparisonData, NOW);
+    expect(out.week).toMatchObject({ rank: 1 });
     expect(out.data.github.special).toBe("totw");
     expect(out.data.cv.special).toBeUndefined();
   });
@@ -380,20 +434,21 @@ describe("fiche née d'une dénonciation", () => {
     expect(weekRank(store.db, denounced.id, NOW)).toBeNull();
   });
 
-  it("comparaison dénoncée : sa carte GitHub attend aussi la revendication", () => {
+  it("dossier dénoncé : il attend aussi la revendication, et ne prend pas l'adresse de la fiche que la personne a faite", () => {
     const store = newStore();
-    const cmpId = "cmpDenon1";
-    const child = gh("duo", 88, W46 + H, { parentId: cmpId });
-    store.insertCards([
-      { id: cmpId, createdAt: W46 + H, source: "linkedin", login: "duo", kind: "comparison", data: { ...FIXTURES.gold, id: cmpId } as never, facts: { linkedinUrl: "https://www.linkedin.com/in/d", linkedinProven: true }, deleteToken: "t" },
-      child,
-    ]);
-    expect(weekRank(store.db, child.id, NOW)).toMatchObject({ rank: 1 });
-    store.markDenounced(cmpId, "someone01", null);
-    expect(weekTop(store.db, { now: NOW }).entries).toEqual([]);
-    expect(weekRank(store.db, child.id, NOW)).toBeNull();
+    const own = gh("duo", 60, W46);
+    store.insertCards([own]);
+    const rows = dossier("cmpDenon1", "duo", 88, W46 + H);
+    store.insertCards(rows);
+    expect(weekRank(store.db, rows[2]!.id, NOW)).toMatchObject({ rank: 1 });
+    store.markDenounced("cmpDenon1", "someone01", null);
+    // Le dossier fait par un tiers sort ; la fiche de la personne garde sa place et son adresse.
+    expect(weekTop(store.db, { now: NOW }).entries.map((e) => [e.cardId, e.overall])).toEqual([[own.id, 60]]);
+    expect(weekRank(store.db, "cmpDenon1", NOW)).toBeNull();
+    expect(store.fileRow(own.id)!.id).toBe(own.id);
     store.claimOwner("duo", 77);
-    expect(weekRank(store.db, child.id, NOW)).toMatchObject({ rank: 1 });
+    expect(weekRank(store.db, rows[2]!.id, NOW)).toMatchObject({ rank: 1 });
+    expect(weekTop(store.db, { now: NOW }).entries.map((e) => [e.cardId, e.overall])).toEqual([["cmpDenon1", 88]]);
   });
 });
 
@@ -459,7 +514,7 @@ describe("routes", () => {
     expect(renders).toEqual(["og:totw", "og:-"]);
     expect(readdirSync(ogDir).sort()).toEqual([`${mine.id}-totw.png`, `${mine.id}.png`].sort());
     // Page /c/:id : l'image de partage d'une fiche du top 5 a sa propre adresse.
-    const html = await (await app.request(`/c/${store.getCard(weekTop(store.db).entries[0]!.cardId)!.id}`)).text();
+    const html = await (await app.request(`/c/${store.getCard(weekTop(store.db).entries[0]!.cardId!)!.id}`)).text();
     expect(html).toContain("?v=10&amp;s=totw");
     expect(html).toContain("Top 5 de la semaine");
   });

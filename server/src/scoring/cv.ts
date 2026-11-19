@@ -5,7 +5,7 @@
 
 import { matchSchool } from "../../../shared/bands";
 import type { CvReading, CvTextCounts } from "../../../shared/readings";
-import type { CardData, Fact, Lang, Position, Stat, StatCode } from "../../../shared/types";
+import type { CardData, Fact, Grid, Lang, Position, Stat, StatCode } from "../../../shared/types";
 import { tierFor } from "../../../shared/types";
 import type { GithubFacts } from "../github/facts";
 import { df, fact, initialsOf, nf, orderStats, reliabilityOf, specialOf, valuesOf, xpStatOf } from "./common";
@@ -111,6 +111,8 @@ export function scoreCv(
     now?: string;
     /** Employeurs à forte barre d'embauche : la liste du serveur (employers.ts), passée par le pipeline. Absente : aucune. */
     highBar?: HighBarList;
+    /** La grille du dossier dont cette fiche est une pièce. La pièce n'a alors ni grille ni note à elle : elle porte la note du dossier. */
+    dossier?: Grid;
   },
 ): Omit<CardData, "id" | "createdAt"> {
   const r = reading;
@@ -120,7 +122,7 @@ export function scoreCv(
   const nowIso = opts.now ?? opts.github?.collectedAt;
   const now = nowIso && !Number.isNaN(Date.parse(nowIso)) ? Date.parse(nowIso) : Date.now();
   const gh = opts.github ? { facts: opts.github, m: deriveGithub(opts.github) } : undefined;
-  const grid = declaredGrid(declaredInput(r, { profile: opts.linkedin, now, ...(opts.highBar ? { highBar: opts.highBar } : {}) }), gh);
+  const grid = opts.dossier ?? declaredGrid(declaredInput(r, { profile: opts.linkedin, now, ...(opts.highBar ? { highBar: opts.highBar } : {}) }), gh);
 
   // TEC
   const seniorityBase = C.TEC.seniority[r.seniority_claimed] ?? C.TEC.seniority.mid;
@@ -239,6 +241,6 @@ export function scoreCv(
     reliability: reliabilityOf(stats),
     judgedInSeconds: opts.judgedInSeconds,
     lang: opts.lang,
-    grid,
+    ...(opts.dossier ? {} : { grid }),
   };
 }

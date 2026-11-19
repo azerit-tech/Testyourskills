@@ -1,6 +1,7 @@
 // Tests de l'API et du pipeline avec des dépendances fausses, base en mémoire.
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { fakeDossier } from "./__fixtures__/fakeDossier";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -101,9 +102,9 @@ function setup(over: Partial<Deps> = {}, appOver: Partial<AppOptions> = {}) {
       calls.scoreCvGithub.push(github);
       return { ...body(FIXTURES.cv), lang, judgedInSeconds };
     },
-    // Comme le moteur (scoring/compare.ts) : les deux pièces, sans écart ni titre.
-    compareCards(cv, github) {
-      return { cv, github };
+    // Comme le moteur (scoring/compare.ts) : les deux pièces et la seule note du dossier.
+    scoreDossier(declared, github, o) {
+      return fakeDossier(this, declared, github, o);
     },
     async renderImage(input) {
       calls.render.push(input.format + ":" + (input.card ? "card" : "comparison"));
@@ -822,9 +823,12 @@ describe("CV et comparaison", () => {
     expect(cmp.id).toBe(json.id);
     expect(new Set([cmp.id, cmp.cv.id, cmp.github.id]).size).toBe(3);
     expect(ctx.calls.scoreCvGithub[0]).toMatchObject({ login: "leamd" });
-    // Chaque carte de la comparaison a sa propre URL.
-    expect((await getState(ctx, cmp.cv.id)).state).toMatchObject({ state: "done", kind: "card", card: { source: "cv" } });
-    expect((await getState(ctx, cmp.github.id)).state).toMatchObject({ state: "done", kind: "card", card: { source: "github" } });
+    // Une personne, une note (SPEC §18.82) : l'adresse d'une pièce sert le dossier, jamais la pièce seule.
+    for (const piece of [cmp.cv.id, cmp.github.id]) {
+      expect((await getState(ctx, piece)).state).toMatchObject({ state: "done", kind: "comparison", comparison: { id: cmp.id } });
+      const page = await ctx.app.request(`/c/${piece}`);
+      expect([page.status, page.headers.get("location")]).toEqual([302, `/c/${cmp.id}`]);
+    }
     expect(ctx.store.listEvents("card_generated")).toHaveLength(1);
   });
 

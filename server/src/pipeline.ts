@@ -7,7 +7,8 @@
 // Les deux : branches en parallèle, puis scoreCv avec les faits GitHub, puis compareCards.
 
 import { randomBytes, randomInt } from "node:crypto";
-import type { CardData, ComparisonData, ErrorCode, Fact, Finding, JobState, Lang, ProgressEvent } from "../../shared/types";
+import type { CardData, ComparisonData, ErrorCode, Fact, Finding, Grid, JobState, Lang, ProgressEvent } from "../../shared/types";
+import { tierFor } from "../../shared/types";
 import type { BandStanding } from "../../shared/bands";
 import { frTypo, typoFacts } from "../../shared/typo";
 import { forReveal, githubFindings, strongest } from "./findings";
@@ -71,9 +72,34 @@ export interface Deps {
     counts: CvTextCounts,
     opts: { lang: Lang; judgedInSeconds: number; github?: unknown; linkedin?: unknown; now?: string; highBar?: HighBarList },
   ): CardBody;
-  /** `githubFacts` : les faits de la pièce GitHub, pour lire sa stack et son ownership au niveau d'expérience du dossier. */
-  compareCards(cv: CardData, github: CardData, label?: "LinkedIn" | "CV", githubFacts?: unknown): Omit<ComparisonData, "id" | "createdAt">;
+  /**
+   * Le dossier d'une personne dont on a les deux pièces (SPEC §18.82) : UNE grille et UNE
+   * note, calculées une fois sur les données brutes. Les deux pièces rendues n'ont ni
+   * grille ni note à elles (`overall` y est la note du dossier).
+   */
+  scoreDossier(
+    declared: { reading: CvReading; counts: CvTextCounts; linkedin?: unknown; now?: string; highBar?: HighBarList },
+    github: { facts: unknown; ai: CodeReadingResult | null },
+    opts: { lang: Lang; judgedInSeconds: number },
+  ): { cv: CardBody; github: CardBody; grid: Grid };
   renderImage(input: RenderInput): Promise<Uint8Array>;
+}
+
+/**
+ * Les deux pièces d'un dossier telles qu'on les range (SPEC §18.82) : ni grille ni rang à
+ * elles, et pour toute note celle du dossier. Posé ici, quel que soit le moteur branché :
+ * rien de ce qui est écrit en base ne peut donner deux chiffres pour la même personne.
+ */
+export function asPieces(
+  scored: { cv: CardBody; github: CardBody; grid: Grid },
+  own: { cv: Pick<CardData, "id" | "createdAt">; github: Pick<CardData, "id" | "createdAt"> & Partial<Pick<CardData, "findings">> },
+): Omit<ComparisonData, "id" | "createdAt"> {
+  const { grid } = scored;
+  const piece = (card: CardBody, extra: Pick<CardData, "id" | "createdAt"> & Partial<Pick<CardData, "findings">>): CardData => {
+    const { grid: _grid, rank: _rank, ...rest } = card as CardBody & Pick<CardData, "grid" | "rank">;
+    return { ...rest, ...extra, overall: grid.overall, tier: tierFor(grid.overall) };
+  };
+  return { cv: piece(scored.cv, own.cv), github: piece(scored.github, own.github), grid };
 }
 
 // --- Identifiants -----------------------------------------------------------
@@ -424,7 +450,7 @@ interface GithubResult {
    * configurée, panne, sortie invalide) : la fiche sort, hors cache 24 h (§12).
    */
   degraded: boolean;
-  /** Carte de moins de 24 h réutilisée telle quelle (comparaison). */
+  /** Fiche GitHub seule de moins de 24 h : resservie telle quelle si le pseudo est seul ; au dossier, seules ses données brutes servent. */
   cached?: CardData;
 }
 
@@ -704,10 +730,12 @@ export class Pipeline {
     const createdAt = new Date(now).toISOString();
     const judgedInSeconds = ctx.seconds();
 
+    // Les trois trouvailles les plus fortes, toutes sources : elles ne changent pas la note.
+    // Pièce sortie du cache de 24 h : celles de sa fiche.
+    const foundForGithub = (): Finding[] => (gh!.cached ? (gh!.cached.findings ?? []) : strongest(ctx.findings()));
     const githubCard = (cardId: string): CardData => {
       if (gh!.cached) return { ...gh!.cached, id: cardId, createdAt };
-      // Les trois trouvailles les plus fortes, toutes sources : elles ne changent pas la note.
-      const found = strongest(ctx.findings());
+      const found = foundForGithub();
       return { ...deps.scoreGithub(gh!.facts, gh!.ai, { lang, judgedInSeconds }), ...(found.length ? { findings: found } : {}), id: cardId, createdAt };
     };
     const githubRow = (card: CardData, parentId: string | null, degraded = gh!.degraded): NewCardRow => ({
@@ -718,8 +746,10 @@ export class Pipeline {
       login: login!,
       kind: "card",
       data: card,
-      // Aussi sur la carte GitHub d'une comparaison : le top de la semaine y lit les abonnés (§18.22).
+      // Les données brutes de la pièce, sans note : les faits (le top de la semaine y lit les
+      // abonnés, §18.22) et la lecture du code, pour recalculer le dossier quand une pièce arrive.
       facts: gh!.facts,
+      ai: gh!.ai,
       deleteToken,
       degraded,
     });
@@ -775,24 +805,14 @@ export class Pipeline {
     const vouchedLink = !!vouched && linkedinAsked === vouched.linkedinUrl;
     const linkedinProven = !!li && !!linkedinUrl && (li.proven || vouchedLink || identityProven || githubShowsLinkedin(gh.facts, linkedinUrl));
 
-    // Comparaison : trois lignes, la comparaison et ses deux cartes, chacune son id.
+    // Le dossier : un seul calcul sur les deux pièces, une grille, une note (SPEC §18.82).
+    // Trois lignes : le dossier, qui porte la note, et ses deux pièces, qui n'en ont pas à elles.
     ctx.emit("compare");
-    const cvCard: CardData = {
-      ...deps.scoreCv(reading, declared.counts, { lang, judgedInSeconds, github: gh.facts, ...declaredOpts }),
-      id: newId(),
-      createdAt,
-    };
-    const ghCard = githubCard(newId());
-    // La pièce déclarative porte le nom que lui donne la grille (declaredInput : un profil LinkedIn rangé, sinon le CV).
-    const raw = deps.compareCards(cvCard, ghCard, declared.linkedin ? "LinkedIn" : "CV", gh.facts);
-    const cmp = linkedinUrl ? asLinkedinComparison(raw) : raw;
-    const comparison: ComparisonData = {
-      ...cmp,
-      id,
-      createdAt,
-      cv: { ...cmp.cv, id: cvCard.id, createdAt },
-      github: { ...cmp.github, id: ghCard.id, createdAt },
-    };
+    const scored = deps.scoreDossier({ reading, counts: declared.counts, ...declaredOpts }, { facts: gh.facts, ai: gh.ai }, { lang, judgedInSeconds });
+    const found = foundForGithub();
+    const pieces = asPieces(scored, { cv: { id: newId(), createdAt }, github: { id: newId(), createdAt, ...(found.length ? { findings: found } : {}) } });
+    const cmp = linkedinUrl ? asLinkedinComparison(pieces) : pieces;
+    const comparison: ComparisonData = { ...cmp, id, createdAt };
     return [
       {
         id,
@@ -869,10 +889,12 @@ export class Pipeline {
     const { deps, store } = this.opts;
     if (allowCache) {
       // Comparaison sur un pseudo jugé il y a moins de 24 h : on ne refait pas les appels.
+      // Il faut ses données brutes, faits et lecture du code : le dossier se calcule dessus.
+      // Une fiche rangée avant qu'on garde la lecture se recollecte.
       const row = store.findRecentGithub(login);
-      if (row?.facts && row.kind === "card") {
+      if (row?.facts && row.aiStored && row.kind === "card") {
         onFacts?.(row.facts);
-        return { facts: row.facts, ai: null, degraded: false, cached: row.data as CardData };
+        return { facts: row.facts, ai: row.ai as CodeReadingResult | null, degraded: false, cached: row.data as CardData };
       }
     }
     const facts = await deps.collectGithub(login, {

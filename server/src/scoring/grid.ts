@@ -18,7 +18,7 @@ import type { ExternalMergedPR, GithubFacts, GithubRepo } from "../github/facts"
 import type { LinkedinRole } from "../linkedinProfile/profile";
 import { df, nf } from "./common";
 import { GRID, type EmpCondition, type GridRoleKind, type OwnRow, type StkRow } from "./config";
-import { deriveGithub, isTutorialRepo, type GithubMetrics } from "./derive";
+import { isTutorialRepo, type GithubMetrics } from "./derive";
 import { highBarEmployer, type HighBarList } from "./employers";
 import { normSchool, rankedSchools, schoolListNames, schoolTier, type RankedSchoolList } from "./school";
 import { EDU_NEXT, EDU_NEXT_GITHUB, SCHOOL_COUNTED, schoolCounted } from "../../../shared/schoolRank";
@@ -1641,12 +1641,11 @@ export function finalize(drafts: Draft[], seniority?: GridSeniority): Grid {
   return { criteria: ordered.map((d) => ({ ...d, counted: counted.has(d.code) })), overall, ...(rule ? { rule } : {}), ...meta };
 }
 
-// --- Les trois grilles (§4) ----------------------------------------------------------------
+// --- Un dossier, un calcul (§4, SPEC §18.82) -----------------------------------------------
 
-/** Fiche GitHub : la note prouvée. École et parcours non renseignés (sauf un hackathon dans un dépôt), expérience estimée. */
-export function githubGrid(g: GithubInput, seniority: GridSeniority | undefined = githubSeniority(g)): Grid {
-  return finalize(
-    [
+/** Ce que GitHub prouve, critère par critère, lu au niveau d'expérience du dossier. Aucune note. */
+function githubDrafts(g: GithubInput, seniority: GridSeniority | undefined): Draft[] {
+  return [
     eduGithub(g),
     xpGithub(g),
     missing("EMP", "github", f("Le parcours se lit sur LinkedIn ou le CV\u00a0: pas encore au dossier.", "Career path is read on LinkedIn or the résumé: not on file yet.")),
@@ -1655,49 +1654,63 @@ export function githubGrid(g: GithubInput, seniority: GridSeniority | undefined 
     actGithub(g),
     ownGithub(g, seniority),
     ossGithub(g),
-    ],
-    seniority,
-  );
+  ];
 }
 
 /**
- * La grille GitHub relue au niveau du dossier : la stack et l'ownership dans la table
- * du niveau que donnent les postes datés, pas dans celle que GitHub estime ; les autres
- * critères tels quels (le code lu par l'IA n'est pas relu). Sert à la note du dossier,
- * y compris quand la pièce GitHub sort du cache.
+ * Ce que LinkedIn ou le CV déclare, critère par critère. Code, activité et open source non
+ * prouvés. Avec les faits GitHub du dossier, les pièces sont recoupées (notes inchangées)
+ * et la stack porte ses chefs d'accusation de recoupement. Aucune note.
  */
-export function githubGridAt(grid: Grid, facts: GithubFacts, seniority: GridSeniority): Grid {
-  const g: GithubInput = { facts, m: deriveGithub(facts), ai: null };
-  const strip = ({ counted: _c, ...rest }: GridCriterion): Draft => rest;
-  return finalize(
-    grid.criteria.map((c) => (c.code === "STK" ? stkGithub(g, seniority) : c.code === "OWN" ? ownGithub(g, seniority) : strip(c))),
-    seniority,
-  );
-}
-
-/**
- * Fiche LinkedIn ou CV : la note déclarée. Code, activité et open source non
- * prouvés. Avec les faits GitHub d'une comparaison, la stack porte aussi ses
- * chefs d'accusation de recoupement ; sa note, elle, ne bouge pas.
- */
-export function declaredGrid(d: DeclaredInput, gh?: Pick<GithubInput, "facts" | "m">): Grid {
+function declaredDrafts(d: DeclaredInput, gh?: Pick<GithubInput, "facts" | "m">): Draft[] {
   const src = d.label;
-  // Avec les faits GitHub d'une comparaison, les pièces recoupées (notes inchangées).
   const check = (draft: Draft, fn: (x: Draft, d: DeclaredInput, gh: GithubSide) => Draft) => (gh ? fn(draft, d, gh) : draft);
-  const seniority = declaredSeniority(d);
-  return finalize(
-    [
+  return [
     eduDeclared(d),
     check(xpDeclared(d), xpCrossCheck),
-    check(empDeclared(d, seniority), empCrossCheck),
+    check(empDeclared(d, declaredSeniority(d)), empCrossCheck),
     check(stkDeclared(d, gh), stkCrossCheck),
     unproven("CODE", "linkedin", f(`Le code ne se prouve pas sur ${src}.`, `Code cannot be proven on ${src}.`)),
     unproven("ACT", "linkedin", f(`L'activité ne se lit pas sur ${src}.`, `Activity cannot be read on ${src}.`)),
     ownDeclared(d),
     unproven("OSS", "linkedin", f(`Une mention « open source » sur ${src} ne donne rien sans trace.`, `An "open source" mention on ${src} gives nothing without a trace.`)),
-    ],
-    seniority,
-  );
+  ];
+}
+
+/** Tout ce qu'on sait d'une personne : sa pièce déclarative (LinkedIn ou CV), sa pièce GitHub, ou les deux. */
+export interface DossierInput {
+  declared?: DeclaredInput;
+  github?: GithubInput;
+}
+
+/**
+ * La seule entrée du barème : une personne, un dossier, un calcul, une grille, une note.
+ * Le niveau d'expérience se lit une fois (les postes datés ; sans eux, l'estimation de
+ * GitHub), puis chaque critère est lu une fois, à ce niveau, sur sa source de preuve :
+ * LinkedIn pour l'école, l'expérience et le parcours (GitHub ne sert que si LinkedIn
+ * manque) ; GitHub pour la stack (le déclaré seulement sans preuve), le code, l'activité
+ * et l'open source ; la plus haute des deux pour l'ownership. Un GitHub trop mince ne
+ * tire pas le dossier vers le bas : ses critères sont non prouvés. Il n'existe pas de
+ * note par source : une fiche à une seule source est un dossier à une pièce, par ce
+ * même chemin. Chaque critère garde ce que dit chaque source (`declared`, `proven`).
+ */
+export function dossierGrid(input: DossierInput): Grid {
+  const { declared, github } = input;
+  if (!declared && !github) throw new Error("dossierGrid : un dossier a au moins une pièce");
+  const seniority = (declared && declaredSeniority(declared)) ?? (github && githubSeniority(github));
+  if (!declared) return finalize(githubDrafts(github!, seniority), seniority);
+  if (!github) return finalize(declaredDrafts(declared), seniority);
+  return finalize(mergeDrafts(declaredDrafts(declared, github), githubDrafts(github, seniority), declared.label), seniority);
+}
+
+/** Un dossier à une pièce, GitHub. `seniority` : pour lire les mêmes faits à un autre niveau (tests du barème). */
+export function githubGrid(g: GithubInput, seniority: GridSeniority | undefined = githubSeniority(g)): Grid {
+  return finalize(githubDrafts(g, seniority), seniority);
+}
+
+/** Un dossier à une pièce, LinkedIn ou CV. `gh` : les faits GitHub qui recoupent ses pièces, sans rien noter (tests du recoupement). */
+export function declaredGrid(d: DeclaredInput, gh?: Pick<GithubInput, "facts" | "m">): Grid {
+  return finalize(declaredDrafts(d, gh), declaredSeniority(d));
 }
 
 /** Les flags des deux côtés, sans doublon. */
@@ -1707,25 +1720,19 @@ const mergeFlags = (a: Fact[], b: Fact[]) => {
 };
 
 /**
- * La note du dossier : chaque critère pris sur sa source de preuve. LinkedIn
- * pour l'école, l'expérience et le parcours (GitHub ne sert que si LinkedIn
- * manque) ; GitHub pour la stack (le déclaré seulement sans preuve), le code,
- * l'activité et l'open source ; la plus haute des deux pour l'ownership.
- * Un GitHub trop mince ne tire pas le dossier vers le bas : ses critères sont
- * non prouvés. Chaque critère garde ses deux notes (`declared`, `proven`).
+ * Les deux lectures d'un dossier, critère par critère, avant la note : voir dossierGrid.
  * `label` : la pièce déclarative, « LinkedIn » ou « CV », pour sa pièce d'ownership.
  */
-export function caseGrid(declared: Grid, proven: Grid, label: "LinkedIn" | "CV" = "LinkedIn"): Grid {
+function mergeDrafts(declared: Draft[], proven: Draft[], label: "LinkedIn" | "CV"): Draft[] {
   const pick = (code: CriterionCode) => ({
-    d: declared.criteria.find((c) => c.code === code)!,
-    p: proven.criteria.find((c) => c.code === code)!,
+    d: declared.find((c) => c.code === code)!,
+    p: proven.find((c) => c.code === code)!,
   });
-  const strip = ({ counted: _c, ...rest }: GridCriterion): Draft => rest;
-  const drafts = CRITERION_CODES.map((code): Draft => {
+  return CRITERION_CODES.map((code): Draft => {
     const { d, p } = pick(code);
     const both = { declared: d.score, proven: p.score };
-    const has = (c: GridCriterion) => c.score !== null;
-    let chosen: GridCriterion;
+    const has = (c: Draft) => c.score !== null;
+    let chosen: Draft;
     let source: GridSource;
     switch (code) {
       case "EDU":
@@ -1748,11 +1755,9 @@ export function caseGrid(declared: Grid, proven: Grid, label: "LinkedIn" | "CV" 
     }
     const flags = mergeFlags(d.flags, p.flags);
     const evidence = caseEvidence(code, chosen === p, d, p, label);
-    const { evidence: _e, ...rest } = strip(chosen);
+    const { evidence: _e, ...rest } = chosen;
     return { ...rest, source, ...both, flags, ...(evidence ? { evidence } : {}) };
   });
-  // Le niveau du dossier : celui des postes datés ; sans eux, l'estimation de GitHub.
-  return finalize(drafts, declared.seniority ?? proven.seniority);
 }
 
 /** « Sur LinkedIn : une entreprise fondée. » : la pièce du côté déclaratif, après celle de GitHub. */
@@ -1769,7 +1774,7 @@ const declaredSide = (x: Fact, label: string): Fact => {
  * l'ownership noté des deux côtés, les deux pièces face à face. XP et EMP
  * gardent la pièce déclarative, déjà recoupée sur la fiche de la comparaison.
  */
-function caseEvidence(code: CriterionCode, tookProven: boolean, d: GridCriterion, p: GridCriterion, label: string): Evidence | undefined {
+function caseEvidence(code: CriterionCode, tookProven: boolean, d: Draft, p: Draft, label: string): Evidence | undefined {
   const de = d.evidence;
   const pe = p.evidence;
   const chosen = tookProven ? pe : de;

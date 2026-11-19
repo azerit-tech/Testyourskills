@@ -6,6 +6,7 @@ import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { withCatalogProfiles } from "../../shared/profileCatalog";
+import { oneNote } from "../../shared/caseFile";
 import { withoutSchoolRank } from "../../shared/schoolRank";
 import type { CardData, ComparisonData, Source } from "../../shared/types";
 import { ensureLinkedinTables, purgeLinkedin } from "./linkedinProfile/store";
@@ -31,6 +32,10 @@ export interface CardRow {
   kind: CardKind;
   data: CardData | ComparisonData;
   facts: unknown | null;
+  /** La lecture du code par l'IA (pièce GitHub) : donnée brute, sans note, pour recalculer le dossier. Null : rien à lire, ou ligne d'avant. */
+  ai: unknown | null;
+  /** La lecture a été rangée avec la ligne, même vide (rien à lire) : ses données brutes sont complètes. Faux : ligne d'avant. */
+  aiStored: boolean;
   email: string | null;
   deleteToken: string;
   expiresAt: number | null;
@@ -49,6 +54,8 @@ export interface CardRow {
   denounceBorn: boolean;
   /** Login du dénonciateur, posé seulement s'il était connecté comme propriétaire de sa fiche ; sinon anonyme. */
   denouncerLogin: string | null;
+  /** Le dossier plus complet de la même personne qui remplace cette fiche (SPEC §18.82), sinon null. */
+  supersededBy: string | null;
 }
 
 export type Verdict = "guilty" | "cleared";
@@ -98,6 +105,8 @@ export interface NewCardRow {
   kind: CardKind;
   data: CardData | ComparisonData;
   facts?: unknown;
+  /** La lecture du code par l'IA (pièce GitHub), rangée brute. */
+  ai?: unknown;
   deleteToken: string;
   refCardId?: string | null;
   /** Sortie sans lecture IA (panne de l'IA) : pas de cache 24 h. */
@@ -113,6 +122,7 @@ interface RawRow {
   kind: CardKind;
   json: string;
   facts_json: string | null;
+  ai_json?: string | null;
   email: string | null;
   delete_token: string;
   expires_at: number | null;
@@ -121,6 +131,7 @@ interface RawRow {
   denounced_by?: string | null;
   denouncer_login?: string | null;
   denounce_born?: number | null;
+  superseded_by?: string | null;
 }
 
 const SCHEMA = `
@@ -196,8 +207,11 @@ function toRow(r: RawRow): CardRow {
     kind: r.kind,
     // Le nom et la phrase du profil se relisent au catalogue (shared/profileCatalog.ts) ;
     // une grille rangée avant le §18.48 perd le rang de son école (shared/schoolRank.ts).
-    data: withoutSchoolRank(withCatalogProfiles(JSON.parse(r.json))),
+    // Un dossier rangé avant 0.5.0 : ses pièces ne rendent que la note du dossier (shared/caseFile.ts, oneNote).
+    data: oneNote(withoutSchoolRank(withCatalogProfiles(JSON.parse(r.json)))),
     facts: r.facts_json ? JSON.parse(r.facts_json) : null,
+    ai: r.ai_json ? JSON.parse(r.ai_json) : null,
+    aiStored: r.ai_json != null,
     email: r.email,
     deleteToken: r.delete_token,
     expiresAt: r.expires_at,
@@ -206,6 +220,7 @@ function toRow(r: RawRow): CardRow {
     denouncedBy: r.denounced_by ?? null,
     denouncerLogin: r.denouncer_login ?? null,
     denounceBorn: r.denounce_born === 1,
+    supersededBy: r.superseded_by ?? null,
   };
 }
 
@@ -226,6 +241,10 @@ export function stripToken<T extends CardData | ComparisonData>(data: T): T {
 export function migrate(db: Database.Database) {
   const cols = new Set((db.prepare(`PRAGMA table_info(cards)`).all() as { name: string }[]).map((c) => c.name));
   if (!cols.has("ref_card_id")) db.exec(`ALTER TABLE cards ADD COLUMN ref_card_id TEXT`);
+  // Une personne, un dossier, une note (SPEC §18.82) : la lecture du code rangée brute, et la
+  // fiche que remplace un dossier plus complet de la même personne. Deux colonnes ajoutées, rien de réécrit.
+  if (!cols.has("ai_json")) db.exec(`ALTER TABLE cards ADD COLUMN ai_json TEXT`);
+  if (!cols.has("superseded_by")) db.exec(`ALTER TABLE cards ADD COLUMN superseded_by TEXT`);
   if (!cols.has("degraded")) db.exec(`ALTER TABLE cards ADD COLUMN degraded INTEGER NOT NULL DEFAULT 0`);
   if (!cols.has("denounced_by")) db.exec(`ALTER TABLE cards ADD COLUMN denounced_by TEXT`);
   if (!cols.has("denouncer_login")) db.exec(`ALTER TABLE cards ADD COLUMN denouncer_login TEXT`);
@@ -293,8 +312,8 @@ export class Store {
   /** Insère une carte, ou une comparaison et ses deux cartes, en une transaction. */
   insertCards(rows: NewCardRow[]) {
     const stmt = this.db.prepare(
-      `INSERT INTO cards (id, parent_id, created_at, source, login, kind, json, facts_json, email, delete_token, expires_at, ref_card_id, degraded)
-       VALUES (@id, @parent_id, @created_at, @source, @login, @kind, @json, @facts_json, NULL, @delete_token, @expires_at, @ref_card_id, @degraded)`,
+      `INSERT INTO cards (id, parent_id, created_at, source, login, kind, json, facts_json, ai_json, email, delete_token, expires_at, ref_card_id, degraded)
+       VALUES (@id, @parent_id, @created_at, @source, @login, @kind, @json, @facts_json, @ai_json, NULL, @delete_token, @expires_at, @ref_card_id, @degraded)`,
     );
     const tx = this.db.transaction((list: NewCardRow[]) => {
       // Login revendiqué : ses nouvelles fiches sont à son propriétaire et n'expirent pas non plus (§18.1).
@@ -309,6 +328,8 @@ export class Store {
           kind: r.kind,
           json: JSON.stringify(stripToken(r.data)),
           facts_json: r.facts === undefined || r.facts === null ? null : JSON.stringify(r.facts),
+          // Une lecture vide (rien à lire) se range « null » : la ligne a ses données brutes.
+          ai_json: r.ai === undefined ? null : JSON.stringify(r.ai),
           delete_token: r.deleteToken,
           expires_at: kept ? null : r.createdAt + RETENTION_MS,
           // L'origine va sur la fiche racine seule, pas sur les cartes d'une comparaison.
@@ -319,6 +340,7 @@ export class Store {
     });
     tx(rows);
     for (const r of rows) this.pendingRefs.delete(r.id);
+    for (const r of rows) this.supersede(r);
     // Le classement de la semaine gardé en mémoire (top.ts) : la fiche née doit y lire son rang tout de suite.
     forgetWeekRanks(this.db);
   }
@@ -326,6 +348,48 @@ export class Store {
   getCard(id: string): CardRow | null {
     const r = this.db.prepare(`SELECT * FROM cards WHERE id = ?`).get(id) as RawRow | undefined;
     return r ? toRow(r) : null;
+  }
+
+  /**
+   * Une personne, un dossier, une note (SPEC §18.82) : un dossier à deux pièces dont le
+   * lien est prouvé remplace les fiches plus anciennes de la même personne, sa fiche
+   * GitHub seule, sa fiche LinkedIn seule et ses dossiers d'avant. Rien n'est réécrit
+   * ni supprimé : les anciennes lignes pointent le dossier (`superseded_by`), et leurs
+   * adresses le servent (`fileRow`). Un dossier non prouvé ne remplace rien : un tiers
+   * ne déplace pas la fiche d'un autre.
+   */
+  private supersede(r: NewCardRow) {
+    if (r.parentId || r.kind !== "comparison" || r.source !== "linkedin" || !r.login) return;
+    const facts = r.facts as { linkedinUrl?: unknown; linkedinProven?: unknown } | null | undefined;
+    if (facts?.linkedinProven !== true) return;
+    this.db
+      .prepare(
+        `UPDATE cards SET superseded_by = @id
+         WHERE parent_id IS NULL AND id <> @id AND created_at <= @at AND (
+           (login = @login AND (
+             (kind = 'card' AND source = 'github')
+             OR (kind = 'comparison' AND source = 'linkedin' AND json_extract(facts_json, '$.linkedinProven') = 1)))
+           OR (login IS NULL AND kind = 'card' AND source = 'linkedin' AND json_extract(facts_json, '$.linkedinUrl') = @url))`,
+      )
+      .run({ id: r.id, at: r.createdAt, login: r.login.toLowerCase(), url: typeof facts.linkedinUrl === "string" ? facts.linkedinUrl : null });
+  }
+
+  /**
+   * La fiche qui se montre à cette adresse : le dossier. L'id d'une pièce donne son
+   * dossier (une pièce n'a pas de note à elle, rien ne la montre seule) ; l'id d'une
+   * fiche remplacée donne le dossier qui l'a remplacée, tant qu'il est en ligne et
+   * n'est pas né d'une dénonciation (une fiche faite par un tiers ne prend pas l'adresse
+   * de celle que la personne a faite). Sans rien de tout cela, la fiche elle-même.
+   */
+  fileRow(id: string): CardRow | null {
+    let row = this.getCard(id);
+    for (let hops = 0; row && hops < 8; hops++) {
+      const next = row.parentId ?? row.supersededBy;
+      const target = next ? this.getCard(next) : null;
+      if (!target || (!row.parentId && target.denounceBorn)) break;
+      row = target;
+    }
+    return row;
   }
 
   /**

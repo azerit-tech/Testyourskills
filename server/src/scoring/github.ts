@@ -3,7 +3,7 @@
 // les six barres restent ses traits, et la barre XP lit le critère Expérience.
 
 import type { CodeReadingResult } from "../../../shared/readings";
-import type { CardData, Fact, Lang, Stat, StatCode } from "../../../shared/types";
+import type { CardData, Fact, Grid, Lang, Stat, StatCode } from "../../../shared/types";
 import { tierFor } from "../../../shared/types";
 import type { GithubFacts } from "../github/facts";
 import {
@@ -166,10 +166,11 @@ export function buzzStat(m: GithubMetrics): Stat {
 export function scoreGithub(
   facts: GithubFacts,
   ai: CodeReadingResult | null,
-  opts: { lang: Lang; judgedInSeconds: number },
+  /** `dossier` : la grille du dossier dont cette fiche est une pièce. La pièce n'a alors ni grille ni note à elle : elle porte la note du dossier. */
+  opts: { lang: Lang; judgedInSeconds: number; dossier?: Grid },
 ): Omit<CardData, "id" | "createdAt"> {
   const m = deriveGithub(facts);
-  const grid = githubGrid({ facts, m, ai });
+  const grid = opts.dossier ?? githubGrid({ facts, m, ai });
   const byCode: Record<StatCode, Stat> = {
     TEC: tecStat(facts, m, ai),
     SHIP: shipStat(m),
@@ -209,6 +210,6 @@ export function scoreGithub(
     reliability: reliabilityOf(stats),
     judgedInSeconds: opts.judgedInSeconds,
     lang: opts.lang,
-    grid,
+    ...(opts.dossier ? {} : { grid }),
   };
 }

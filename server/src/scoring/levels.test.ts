@@ -1,7 +1,7 @@
 // Barème 0.5.0 (SPEC §18.82) : la note dit « quel niveau pour cette expérience ».
 // Les dossiers de référence (__fixtures__/levels.ts), de bout en bout : la fiche
-// LinkedIn, la fiche GitHub, et la note du dossier telle que le pipeline la range
-// (compareCards, la pièce GitHub relue au niveau des postes datés).
+// LinkedIn seule, la fiche GitHub seule, et le dossier à deux pièces : un seul calcul
+// (dossierGrid), au niveau d'expérience des postes datés.
 //
 // Les notes « sous 0.4.0 » ont été mesurées en faisant tourner les mêmes dossiers sur
 // le moteur d'avant (commit 478ab52) ; note du dossier, avant → après :
@@ -9,15 +9,14 @@
 // Sous 0.4.0, (a) et (b) avaient la même note, et (c) passait devant par ses années.
 
 import { describe, expect, it } from "vitest";
-import { starsFor, type CardData, type CriterionCode, type Grid } from "../../../shared/types";
+import { starsFor, type CriterionCode, type Grid } from "../../../shared/types";
 import type { CodeReadingResult, CvReading } from "../../../shared/readings";
 import type { GithubFacts } from "../github/facts";
 import employersExample from "../../../data/employers.example.json";
-import { compareCards } from "./compare";
 import { GRID } from "./config";
 import { deriveGithub } from "./derive";
 import { parseEmployers, type HighBarList } from "./employers";
-import { caseGrid, declaredGrid, declaredInput, githubGrid, githubGridAt, ownTable, stkTable } from "./grid";
+import { declaredGrid, declaredInput, dossierGrid, githubGrid, ownTable, stkTable } from "./grid";
 import {
   COURSEWORK_AI,
   LEVELS_NOW,
@@ -44,12 +43,12 @@ const gh = (f: GithubFacts, ai: CodeReadingResult | null = null) => ({ facts: f,
 const scores = (g: Grid) => Object.fromEntries(g.criteria.map((c) => [c.code, c.score])) as Record<CriterionCode, number | null>;
 const crit = (g: Grid, code: CriterionCode) => g.criteria.find((c) => c.code === code)!;
 
-/** Un dossier à deux pièces, comme le pipeline le range : la pièce GitHub jugée seule, puis relue au niveau du dossier. */
+/** La personne avec une seule de ses pièces (un dossier à une pièce), et son dossier à deux pièces : un calcul, une note. */
 function file(reading: CvReading, profile: LevelProfile, facts: GithubFacts, ai: CodeReadingResult | null) {
-  const linkedin = declaredGrid(declaredInput(reading, { profile, now: NOW, highBar: HIGH_BAR }), gh(facts));
+  const declared = declaredInput(reading, { profile, now: NOW, highBar: HIGH_BAR });
+  const linkedin = declaredGrid(declared);
   const github = githubGrid(gh(facts, ai));
-  const card = (grid: Grid, source: "cv" | "github") => ({ grid, overall: grid.overall, source }) as unknown as CardData;
-  const dossier = compareCards(card(linkedin, "cv"), card(github, "github"), "LinkedIn", facts).grid!;
+  const dossier = dossierGrid({ declared, github: gh(facts, ai) });
   return { linkedin, github, dossier };
 }
 
@@ -91,13 +90,13 @@ describe("la note dit « quel niveau pour cette expérience » (barème 0.5.0)",
     // au dossier, au niveau des postes datés (« Début de carrière »).
     expect(a.github.seniority).toEqual({ code: "junior", months: 12, source: "github" });
     expect(scores(a.github)).toMatchObject({ STK: 6, OWN: 4 });
-    const relu = githubGridAt(a.github, studentFacts(), a.linkedin.seniority!);
+    const relu = githubGrid(gh(studentFacts(), STUDENT_AI), a.linkedin.seniority!);
     expect(scores(relu)).toMatchObject({ STK: 6, CODE: 6, ACT: 4, OWN: 6 });
     expect(crit(relu, "STK").table).toEqual(stkTable("student"));
     expect(crit(relu, "OWN").table).toEqual(ownTable("student"));
     expect(crit(a.dossier, "STK").table).toEqual(stkTable("student"));
     // Les mêmes faits lus dans la table d'un senior : 4 et 2.
-    const senior = githubGridAt(a.github, studentFacts(), { code: "senior", months: 90, source: "linkedin" });
+    const senior = githubGrid(gh(studentFacts(), STUDENT_AI), { code: "senior", months: 90, source: "linkedin" });
     expect(scores(senior)).toMatchObject({ STK: 4, OWN: 2 });
     // À partir du niveau confirmé, la table commune, inchangée.
     for (const code of ["mid", "senior", "expert"] as const) {
@@ -134,6 +133,6 @@ describe("le profil type : une école d'ingénieurs, deux stages, quelques commi
   it("deux stages que rien ne distingue : 60, la note suit ce que valent les stages", () => {
     expect(scores(plain.linkedin)).toMatchObject({ EMP: 6 });
     expect(plain.dossier.overall).toBe(60);
-    expect(caseGrid(plain.linkedin, plain.github).overall).toBe(60);
+    expect(plain.linkedin.overall).toBe(60);
   });
 });

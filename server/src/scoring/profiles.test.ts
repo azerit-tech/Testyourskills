@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { CardData, StatCode, StatusInstance } from "../../../shared/types";
+import type { StatCode, StatusInstance } from "../../../shared/types";
 import { cvCounts, cvReading, daysAgo, facts, repo } from "./__fixtures__/make";
 import { PROFILES, SENTENCES, STATUSES } from "./config";
 import { deriveGithub } from "./derive";
-import { compareCards, scoreCv, scoreGithub } from "./index";
+import { scoreCv, scoreDossier, scoreGithub } from "./index";
 import { PROFILE_RULES, pickProfile, sentenceFor, type ProfileCtx } from "./profiles";
 import { RULES } from "./rules";
 
@@ -188,17 +188,11 @@ describe("la fiche porte son profil et sa peine", () => {
     expect(card.sentence).toBeDefined();
   });
 
-  it("dossier à deux pièces : chaque pièce garde son profil, quel que soit l'écart (§18.36)", () => {
-    const gcard = { ...scoreGithub(nightFacts(), null, opts), id: "g", createdAt: "" } as CardData;
-    const ccard = { ...scoreCv(cvReading(), cvCounts(), opts), id: "c", createdAt: "" } as CardData;
-    for (const n of [14, 15, 40]) {
-      const cmp = compareCards({ ...ccard, overall: gcard.overall + n }, gcard);
-      expect(cmp.github.profile?.id).toBe("night_owl");
-      expect(cmp.cv.profile?.id).toBe(ccard.profile?.id);
-    }
-    // Le BUZZ du CV ne passe plus à la pièce GitHub.
-    const buzzy = { ...ccard, stats: ccard.stats.map((s) => (s.code === "BUZZ" ? { ...s, value: 95 } : s)) };
-    expect(compareCards(buzzy, gcard).github.profile?.id).toBe("night_owl");
+  it("dossier à deux pièces : chaque pièce garde son profil (§18.36)", () => {
+    const alone = scoreCv(cvReading(), cvCounts(), opts);
+    const cmp = scoreDossier({ reading: cvReading(), counts: cvCounts() }, { facts: nightFacts(), ai: null }, opts);
+    expect(cmp.github.profile?.id).toBe("night_owl");
+    expect(cmp.cv.profile?.id).toBe(alone.profile?.id);
   });
 });
 

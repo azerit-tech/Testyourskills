@@ -246,8 +246,14 @@ export interface CardData {
   /** « Plus recherché que `percent` % » des profils sourcés par Azerit, dans le groupe dit (§18.3). Absent sans table de référence. */
   /** `seniority` (0.5.0) : parmi les profils du même niveau d'expérience, quand la table de référence a ce groupe. */
   rank?: { percent: number; group: { kind: "language" | "position" | "all" | "seniority"; key?: string } };
-  /** Le barème de recrutement (0.4.0) : huit critères sur 10, dont `overall` est la moyenne. Absent des fiches d'avant. */
+  /**
+   * Le barème de recrutement : huit critères sur 10, dont `overall` est la moyenne. Absent des
+   * fiches d'avant 0.4.0, et (0.5.0) des pièces d'un dossier : une pièce n'a ni grille ni note
+   * à elle, `overall` et `tier` y sont ceux du dossier (`ComparisonData.grid`).
+   */
   grid?: Grid;
+  /** Pièce GitHub d'un dossier, trop mince pour juger (0.5.0) : ses critères sont non prouvés au dossier. */
+  unjudged?: boolean;
   /**
    * Vue publique (shared/publicView.ts) : un dossier vide fait par un tiers et pas encore
    * revendiqué. Sa note ne se dit pas dans l'aperçu de lien ni le texte de partage.
@@ -276,7 +282,10 @@ export interface ComparisonData {
   deltas?: Record<StatCode, number>;
   /** Titre de l'écart : rangé par les dossiers d'avant le 13 novembre 2026, plus produit ni lu (§18.36). */
   headline?: Fact;
-  /** La note du dossier : chaque critère pris sur sa source de preuve. Absente des comparaisons d'avant 0.4.0. */
+  /**
+   * La grille et la note du dossier, la seule de la personne (0.5.0 : calculée une fois sur les
+   * deux pièces, qui n'en portent aucune à elles). Absente des comparaisons d'avant 0.4.0.
+   */
   grid?: Grid;
   /**
    * La fiche du dossier, attachée par la vue publique (shared/publicView.ts) avant que la
@@ -305,8 +314,9 @@ export interface WeekRank {
 /** Une ligne du top de la semaine (GET /api/top). Rien de privé : ce qui est déjà sur la fiche publique. */
 export interface TopEntry {
   rank: number;
-  cardId: string;
-  login: string;
+  /** La fiche du dossier de la personne. Absente, comme `login` et le portrait, pour une fiche LinkedIn seule : ni nom ni lien au classement. */
+  cardId?: string;
+  login?: string;
   avatarUrl?: string;
   overall: number;
   stars: Stars;
@@ -321,7 +331,7 @@ export interface WeekTop {
   endsAt: number;
   /** Numéro de la semaine ISO. */
   week: number;
-  /** Nombre de logins classés cette semaine. */
+  /** Nombre de personnes classées cette semaine. */
   total: number;
   entries: TopEntry[];
 }

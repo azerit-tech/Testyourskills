@@ -7,7 +7,7 @@ import { scoreGithub as scoreGithubBare } from "./github";
 import { parsePercentileTable, withReference, type PercentileTable } from "./percentile";
 
 export { cvTextCounts, scoreCv } from "./cv";
-export { compareCards } from "./compare";
+export { scoreDossier, type DeclaredPiece, type GithubPiece } from "./compare";
 export { SCORING, STATUSES, BUZZWORDS, PROFILES, SENTENCES } from "./config";
 export { pickProfile, sentenceFor } from "./profiles";
 export { isLazyCommit } from "./derive";

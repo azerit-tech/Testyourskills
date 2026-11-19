@@ -16,7 +16,8 @@ import {
   lumineProfile,
   lumineReading,
 } from "../../../server/src/scoring/__fixtures__/founders";
-import { compareCards, scoreCv, scoreGithub } from "../../../server/src/scoring/index";
+import { scoreCv, scoreDossier, scoreGithub } from "../../../server/src/scoring/index";
+import { asPieces } from "../../../server/src/pipeline";
 import lectureUn from "../../../server/src/ai/__fixtures__/reading-exemple-un.json";
 import lectureDeux from "../../../server/src/ai/__fixtures__/reading-exemple-deux.json";
 import { validateCvOutput } from "../../../server/src/ai/readCv";
@@ -122,6 +123,10 @@ describe("la page partagée : aucun nom d'école ni d'ancien employeur, au mot p
   }
 });
 
+/** Un dossier LinkedIn et GitHub comme le pipeline le range : un calcul, une grille, deux pièces sans note à elles. */
+const dossier = (declared: Parameters<typeof scoreDossier>[0], github: Parameters<typeof scoreDossier>[1]) =>
+  asLinkedinComparison(asPieces(scoreDossier(declared, github, opts), { cv: { id: "li", createdAt: FOUNDERS_NOW }, github: { id: "gh", createdAt: FOUNDERS_NOW } }));
+
 /** Les lignes du bloc, par nom de critère. */
 function rowsOf(html: string): Map<string, string> {
   const rows = new Map<string, string>();
@@ -134,8 +139,7 @@ function rowsOf(html: string): Map<string, string> {
 
 describe("« recoupé » : de la sortie du moteur à l'étiquette affichée", () => {
   const github = asCard(scoreGithub(jacquesFacts(), JACQUES_AI, opts), "gh");
-  const linkedin = asCard(asLinkedinCard(scoreCv(jacquesReading(), cvCounts(), { ...opts, linkedin: jacquesProfile(), now: FOUNDERS_NOW, github: jacquesFacts() })), "li");
-  const comparison = { ...compareCards(linkedin, github), id: "cmp", createdAt: FOUNDERS_NOW, declaredSource: "linkedin" as const };
+  const comparison = { ...dossier({ reading: jacquesReading(), counts: cvCounts(), linkedin: jacquesProfile(), now: FOUNDERS_NOW }, { facts: jacquesFacts(), ai: JACQUES_AI }), id: "cmp", createdAt: FOUNDERS_NOW };
   const item: Shareable = { kind: "comparison", comparison };
 
   it("le moteur pose la source « both » sur la pièce de l'expérience, du parcours, de la stack et de l'ownership", () => {
@@ -217,8 +221,7 @@ describe("« recoupé » : de la sortie du moteur à l'étiquette affichée", ()
 describe("face à un GitHub vide : le code n'est pas prouvé, rien ne se compare", () => {
   // Lumine (§7) : LinkedIn 45, GitHub « dossier vide » 20, dossier 45.
   const github = asCard(scoreGithub(lumineFacts(), null, opts), "gh");
-  const linkedin = asCard(scoreCv(lumineReading(), cvCounts(), { ...opts, linkedin: lumineProfile(), now: FOUNDERS_NOW, github: lumineFacts() }), "li");
-  const comparison = { ...asLinkedinComparison(compareCards(linkedin, github)), id: "cmp", createdAt: FOUNDERS_NOW };
+  const comparison = { ...dossier({ reading: lumineReading(), counts: cvCounts(), linkedin: lumineProfile(), now: FOUNDERS_NOW }, { facts: lumineFacts(), ai: null }), id: "cmp", createdAt: FOUNDERS_NOW };
   const item: Shareable = { kind: "comparison", comparison };
   /** La dernière ligne du bloc de la note finale. */
   const lastFinalLine = (html: string) => {
@@ -229,7 +232,8 @@ describe("face à un GitHub vide : le code n'est pas prouvé, rien ne se compare
   const lastRule = (html: string) => [...html.matchAll(/<p class="rg-rule[^"]*">([^<]+)<\/p>/g)].map((m) => m[1].replace(/&#x27;/g, "'")).pop();
 
   it("le serveur : GitHub en dossier vide, ni titre ni écarts (§18.36)", () => {
-    expect(comparison.github.grid!.rule).toBe("empty_file");
+    expect(github.grid!.rule).toBe("empty_file");
+    expect(comparison.github.unjudged).toBe(true);
     expect(comparison).not.toHaveProperty("headline");
     expect(comparison).not.toHaveProperty("deltas");
   });
@@ -248,7 +252,7 @@ describe("face à un GitHub vide : le code n'est pas prouvé, rien ne se compare
   });
 
   it("une comparaison où le code est prouvé garde la ligne du plafond générique, s'il joue", () => {
-    const cmp = { ...comparison, github: { ...comparison.github, grid: { ...comparison.github.grid!, rule: undefined } } };
+    const cmp = { ...comparison, github: { ...comparison.github, unjudged: undefined } };
     expect(lastRule(render({ kind: "comparison", comparison: cmp }, false))).toBe(DICTS.fr.grid.final.capped);
   });
 
@@ -270,7 +274,7 @@ describe("une vraie grille du serveur, à travers le bloc : les deux profils d'e
     const linkedin = { roles: profile.roles, education: profile.education, skills: profile.skills, url: profile.url };
     const li = asCard(asLinkedinCard(scoreCv(v.value, cvCounts(), { ...opts, linkedin, now: FOUNDERS_NOW, github: facts })), "li");
     const gh = asCard(scoreGithub(facts, ai, opts), "gh");
-    const cmp = { ...asLinkedinComparison(compareCards(li, gh)), id: "cmp", createdAt: FOUNDERS_NOW };
+    const cmp = { ...dossier({ reading: v.value, counts: cvCounts(), linkedin, now: FOUNDERS_NOW }, { facts, ai }), id: "cmp", createdAt: FOUNDERS_NOW };
     const names = [...profile.roles.map((r) => r.company), ...profile.education.map((e) => e.school)].filter((n) => n && n !== "Azerit");
     return { li, gh, cmp, names };
   }

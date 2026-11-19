@@ -3,14 +3,14 @@
 // vient la preuve, jamais l'une contre l'autre. Le code pas encore prouvé (GitHub
 // « dossier vide ») et un lien entre les deux pièces que rien ne prouve encore se
 // disent sur leur propre ligne.
-import { declaredLabel } from "../../../shared/caseFile";
+import { codeJudged, declaredLabel } from "../../../shared/caseFile";
 import type { ComparisonData } from "../../../shared/types";
 import { useT } from "../i18n";
 
 export function Pieces({ cmp }: { cmp: ComparisonData }) {
   const { t, lang } = useT();
   const p = t.result.pieces;
-  const unproven = cmp.github.grid?.rule === "empty_file" || !!cmp.github.sealed;
+  const unproven = !codeJudged(cmp);
   return (
     <div className="pieces">
       <p className="pieces-line">{p.line(p.pair(declaredLabel(cmp, lang), "GitHub"))}</p>

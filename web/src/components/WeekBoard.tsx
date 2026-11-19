@@ -31,10 +31,25 @@ function useMinute(): number {
 }
 
 /** Ma ligne : la fiche en mémoire, ou une autre fiche du même pseudo. */
-const isMine = (e: TopEntry, mine: MyCard | null | undefined) => !!mine && (e.cardId === mine.id || (!!mine.login && e.login.toLowerCase() === mine.login));
+const isMine = (e: TopEntry, mine: MyCard | null | undefined) => !!mine && (e.cardId === mine.id || (!!mine.login && e.login?.toLowerCase() === mine.login));
 
 function Row({ e, me }: { e: TopEntry; me: boolean }) {
-  const { t } = useT();
+  const { t, lang } = useT();
+  // Une fiche LinkedIn seule : classée sur sa note, sans nom, sans portrait, sans lien.
+  if (!e.login || !e.cardId) {
+    const name = e.profile ? e.profile[lang] : t.home.top.anon;
+    return (
+      <li>
+        <div className="board-row" aria-label={t.home.top.rowLabelAnon(e.rank, e.overall)}>
+          <span className="board-rank">{e.rank}</span>
+          <Avatar login="in" src="" />
+          <span className="board-login">{name}</span>
+          <Stars n={e.stars} size={14} />
+          <span className="board-score">{e.overall}</span>
+        </div>
+      </li>
+    );
+  }
   const href = `/c/${e.cardId}`;
   return (
     <li>
@@ -160,7 +175,7 @@ export function WeekBoardView({ top, now, onPlay, mine }: { top: WeekTop; now: n
           </span>
           <ol className="board-list is-top">
             {first.map((e) => (
-              <Row key={e.cardId} e={e} me={isMine(e, mine)} />
+              <Row key={e.cardId ?? `rang-${e.rank}`} e={e} me={isMine(e, mine)} />
             ))}
             {first.length < TOP && <Free from={first.length + 1} onPlay={onPlay} />}
           </ol>
@@ -169,7 +184,7 @@ export function WeekBoardView({ top, now, onPlay, mine }: { top: WeekTop; now: n
       {rest.length > 0 && (
         <ol className="board-list is-rest" start={TOP + 1}>
           {rest.map((e) => (
-            <Row key={e.cardId} e={e} me={isMine(e, mine)} />
+            <Row key={e.cardId ?? `rang-${e.rank}`} e={e} me={isMine(e, mine)} />
           ))}
         </ol>
       )}

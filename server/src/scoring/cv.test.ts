@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { CvReading } from "../../../shared/readings";
 import { NOW, cvCounts, cvReading, daysAgo, facts, repo } from "./__fixtures__/make";
 import { AI_BUZZ_KEY } from "./config";
-import { compareCards, cvTextCounts, scoreCv, scoreGithub } from "./index";
+import { cvTextCounts, scoreCv, scoreDossier } from "./index";
 import { useTestSchools } from "./__fixtures__/schools";
 
 // Jamais la vraie liste des écoles : celles des lectures d'exemple, puis l'exemple aux écoles inventées.
@@ -176,13 +176,11 @@ describe("barème CV §4.5", () => {
   });
 });
 
-describe("compareCards §6.5", () => {
-  it("les deux pièces telles quelles, sans écart ni titre (§18.36)", () => {
-    const cv = { ...scoreCv(cvReading({ seniority_claimed: "lead" }), cvCounts(), opts), id: "cv1", createdAt: "x" };
-    const gh = { ...scoreGithub(facts(), null, opts), id: "gh1", createdAt: "x" };
-    const cmp = compareCards(cv, gh);
-    expect(cmp.cv).toBe(cv);
-    expect(cmp.github).toBe(gh);
+describe("scoreDossier §6.5", () => {
+  it("les deux pièces et la note du dossier, sans écart ni titre (§18.36)", () => {
+    const cmp = scoreDossier({ reading: cvReading({ seniority_claimed: "lead" }), counts: cvCounts() }, { facts: facts(), ai: null }, opts);
+    expect([cmp.cv.source, cmp.github.source]).toEqual(["cv", "github"]);
+    expect([cmp.cv.overall, cmp.github.overall]).toEqual([cmp.grid.overall, cmp.grid.overall]);
     expect(cmp).not.toHaveProperty("deltas");
     expect(cmp).not.toHaveProperty("headline");
   });

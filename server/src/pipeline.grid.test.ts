@@ -5,6 +5,12 @@
 // liste des employeurs à forte barre du serveur (HIGH_BAR_EMPLOYERS_FILE).
 
 import { copyFileSync, mkdtempSync } from "node:fs";
+import { fakeDossier } from "./__fixtures__/fakeDossier";
+import { fileOf } from "../../shared/caseFile";
+import { starsFor, type ComparisonData } from "../../shared/types";
+import { starsOfRow } from "./bands";
+import { latestCard, mainCard } from "./primes";
+import { weekRank, weekTop } from "./top";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -19,7 +25,7 @@ import type { CardBody, Deps } from "./pipeline";
 import { cvCounts, facts as githubFacts } from "./scoring/__fixtures__/make";
 import { EMPLOYERS_ENV, setHighBarEmployersForTests } from "./scoring/employers";
 import type { DeclaredProfile } from "./scoring/grid";
-import { scoreCv } from "./scoring/index";
+import { scoreCv, scoreDossier } from "./scoring/index";
 
 const URL_ = "https://www.linkedin.com/in/camille-ardent";
 
@@ -102,9 +108,10 @@ function setup(finder: { forGithub?: LinkedinFinder["forGithub"]; forUrl?: (url:
       if (opt.realScore) return scoreCv(r, c, opts as Parameters<typeof scoreCv>[2]);
       return { ...body(FIXTURES.cv), lang: opts.lang, judgedInSeconds: opts.judgedInSeconds };
     },
-    // Comme le moteur (scoring/compare.ts) : les deux pièces, sans écart ni titre.
-    compareCards(cv, github) {
-      return { cv, github };
+    // Comme le moteur (scoring/compare.ts) : les deux pièces et la seule note du dossier.
+    scoreDossier(declared, github, o) {
+      if (opt.realScore) return scoreDossier(declared as Parameters<typeof scoreDossier>[0], github as Parameters<typeof scoreDossier>[1], o);
+      return fakeDossier(this, declared, github, o);
     },
     async renderImage(input) {
       rendered.push(input);
@@ -210,8 +217,10 @@ describe("la liste des employeurs à forte barre, lue dans son fichier, va au sc
     const ctx = setup({ forGithub: async () => ({ profile: HIGH_BAR_PROFILE, proven: true }) }, { realScore: true });
     const s = await run(ctx, { login: "camille-ardent" });
     if (s.state !== "done" || s.kind !== "comparison") throw new Error(`pas une comparaison : ${JSON.stringify(s)}`);
-    expect(ctx.seen[0]!.github).toMatchObject({ login: "camille-ardent" });
-    expect(emp(s.comparison.cv).score).toBe(10);
+    // Un dossier, un calcul (SPEC §18.82) : la grille est celle du dossier, ses pièces n'en ont pas.
+    expect(s.comparison.grid!.criteria.find((c) => c.code === "EMP")!.score).toBe(10);
+    expect([s.comparison.cv.grid, s.comparison.github.grid]).toEqual([undefined, undefined]);
+    expect([s.comparison.cv.overall, s.comparison.github.overall]).toEqual([s.comparison.grid!.overall, s.comparison.grid!.overall]);
   });
 
   it("sans fichier : liste vide, rien ne plante, le parcours s'arrête au poste tenu deux ans", async () => {
@@ -254,8 +263,9 @@ describe("la page partagée : le serveur ne rend la grille entière qu'à la per
     ctx.store.claimOwner("camille-ardent", 42);
     const after = (await (await ctx.app.request(`/api/card/${s.comparison.id}`)).json()) as JobState;
     if (after.state !== "done" || after.kind !== "comparison") throw new Error("pas une comparaison");
-    expect(after.comparison.cv.grid).toBeDefined();
-    expect(after.comparison.cv.grid!.criteria.some((c) => c.next)).toBe(false);
+    expect(after.comparison.grid).toBeDefined();
+    expect(after.comparison.grid!.criteria.some((c) => c.next)).toBe(false);
+    expect(after.comparison.cv.grid).toBeUndefined();
   });
 
   it("fiche GitHub dénoncée, non revendiquée : aucune grille, ni au visiteur, ni au dénonciateur ; revendiquée : la grille revient", async () => {
@@ -337,5 +347,75 @@ describe("la page partagée : le serveur ne rend la grille entière qu'à la per
     // La fiche de qui a dénoncé n'est jamais scellée.
     await ctx.app.request(`/og/${by}.png`);
     expect(ctx.rendered[2]!.card!.sealed).toBeUndefined();
+  });
+});
+
+describe("garde-fou : une personne, un dossier, une note, partout (SPEC §18.82)", () => {
+  it("LinkedIn seul puis GitHub : un seul dossier, un seul chiffre en base, à l'API, au top, aux bandes, aux primes, dans l'aperçu et l'image", async () => {
+    const ctx = setup(
+      { forUrl: async (url) => ({ status: "found", profile: { ...PROFILE, url }, githubLogin: null }), forGithub: async () => ({ profile: PROFILE, proven: true }) },
+      { realScore: true },
+    );
+    // La personne entre par LinkedIn, sans GitHub : un dossier à une pièce.
+    const alone = await run(ctx, { linkedin: URL_ });
+    if (alone.state !== "done" || alone.kind !== "card") throw new Error("pas une fiche");
+    // Son GitHub arrive, lien prouvé : le dossier à deux pièces, recalculé sur tout ce qu'on sait d'elle.
+    const s = await run(ctx, { login: "camille-ardent" });
+    if (s.state !== "done" || s.kind !== "comparison") throw new Error(`pas un dossier : ${JSON.stringify(s)}`);
+    const id = s.comparison.id;
+    const note = s.comparison.grid!.overall;
+    const pieces = [s.comparison.cv.id, s.comparison.github.id];
+    const seen: [string, number][] = [];
+
+    // En base : la note est sur la ligne du dossier ; ses pièces n'ont ni grille ni note à elles.
+    expect(ctx.store.groupIds(id).sort()).toEqual([id, ...pieces].sort());
+    for (const rowId of ctx.store.groupIds(id)) {
+      const row = ctx.store.getCard(rowId)!;
+      if (row.kind === "comparison") seen.push([`base ${rowId}`, (row.data as ComparisonData).grid!.overall]);
+      else {
+        expect((row.data as CardData).grid, rowId).toBeUndefined();
+        expect((row.data as CardData).rank, rowId).toBeUndefined();
+        seen.push([`base ${rowId}`, (row.data as CardData).overall]);
+      }
+    }
+    // Les données brutes de la pièce GitHub sont rangées sans note : les faits et la lecture du code.
+    const ghRow = ctx.store.getCard(s.comparison.github.id)!;
+    expect(ghRow.facts).toMatchObject({ login: "camille-ardent" });
+    expect(ghRow.aiStored).toBe(true);
+
+    // L'API : l'adresse du dossier, de chaque pièce et de l'ancienne fiche LinkedIn seule servent le même dossier.
+    for (const address of [id, ...pieces, alone.card.id]) {
+      const got = (await (await ctx.app.request(`/api/card/${address}`)).json()) as JobState;
+      if (got.state !== "done" || got.kind !== "comparison") throw new Error(`${address} ne sert pas le dossier`);
+      expect(got.comparison.id).toBe(id);
+      seen.push([`api ${address} fiche`, fileOf(got.comparison).overall], [`api ${address} pièce`, got.comparison.cv.overall], [`api ${address} pièce`, got.comparison.github.overall]);
+      if (got.comparison.grid) seen.push([`api ${address} grille`, got.comparison.grid.overall]);
+    }
+    // La page : une pièce ou l'ancienne fiche mènent au dossier ; son aperçu dit sa note.
+    for (const address of [...pieces, alone.card.id]) {
+      const page = await ctx.app.request(`/c/${address}`);
+      expect([page.status, page.headers.get("location")], address).toEqual([302, `/c/${id}`]);
+    }
+    expect(await (await ctx.app.request(`/c/${id}`)).text()).toContain(`${note}/100`);
+    // L'image : celle du dossier, quelle que soit l'adresse.
+    for (const address of [id, ...pieces, alone.card.id]) {
+      ctx.rendered.length = 0;
+      expect((await ctx.app.request(`/og/${address}.png`)).status, address).toBe(200);
+      for (const r of ctx.rendered) seen.push([`image ${address}`, r.comparison ? fileOf(r.comparison).overall : r.card!.overall]);
+    }
+    // Le top de la semaine : une ligne pour la personne, sur la note du dossier.
+    const top = weekTop(ctx.store.db);
+    expect(top.entries.map((e) => e.cardId)).toEqual([id]);
+    seen.push(["top", top.entries[0]!.overall]);
+    for (const address of [id, ...pieces, alone.card.id]) expect(weekRank(ctx.store.db, address), address).toMatchObject({ rank: 1, total: 1 });
+    // Les bandes et les primes lisent la fiche du dossier.
+    const root = ctx.store.getCard(id)!;
+    expect(starsOfRow(root)).toBe(starsFor(note));
+    seen.push(["primes", mainCard(root).overall], ["primes, dernière fiche", mainCard(latestCard(ctx.store, "camille-ardent", Date.now() + 1000)!).overall]);
+
+    expect(seen.length).toBeGreaterThan(20);
+    for (const [where, n] of seen) expect(n, where).toBe(note);
+    // Et ce n'est pas un hasard : seule avec son LinkedIn, la même personne avait une autre note.
+    expect(alone.card.overall).not.toBe(note);
   });
 });

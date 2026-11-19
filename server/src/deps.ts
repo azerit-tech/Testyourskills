@@ -2,7 +2,7 @@
 // par ici : ils injectent leurs propres `Deps`.
 
 import { collectGithub, pickFilesForReading } from "./github/collect";
-import { scoreGithub, cvTextCounts, scoreCv, compareCards } from "./scoring/index";
+import { scoreGithub, cvTextCounts, scoreCv, scoreDossier } from "./scoring/index";
 import { readCode } from "./ai/readCode";
 import { readCv } from "./ai/readCv";
 import { aiConfigured } from "./ai/budget";
@@ -22,6 +22,6 @@ export const realDeps: Deps = {
   cvTextCounts,
   readCv,
   scoreCv,
-  compareCards,
+  scoreDossier,
   renderImage,
 };

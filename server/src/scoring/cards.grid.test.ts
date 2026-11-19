@@ -1,40 +1,14 @@
 // Barème 0.4.0 (docs/bareme-recrutement.md §8) : la note de chaque fiche est celle de
 // la grille, et la comparaison porte la note du dossier. Vérifié sur les deux fondateurs,
-// par les fonctions de fiche elles-mêmes (scoreGithub, scoreCv, compareCards).
+// par les fonctions de fiche elles-mêmes (scoreGithub, scoreCv, scoreDossier). Une personne a
+// une note : « LinkedIn 60, GitHub 77 » sont la même personne avec une seule de ses pièces.
 
 import { describe, expect, it } from "vitest";
-import type { CardData } from "../../../shared/types";
-import { cvCounts } from "./__fixtures__/make";
-import {
-  FOUNDERS_NOW,
-  JACQUES_AI,
-  jacquesFacts,
-  jacquesProfile,
-  jacquesReading,
-  lumineFacts,
-  lumineProfile,
-  lumineReading,
-} from "./__fixtures__/founders";
-import { compareCards, scoreCv, scoreGithub } from "./index";
+import { jacquesDossier as jacques, lumineDossier as lumine } from "./__fixtures__/dossiers";
 import { useTestSchools } from "./__fixtures__/schools";
 
 // Jamais la vraie liste des écoles : celles des lectures d'exemple, puis l'exemple aux écoles inventées.
 useTestSchools();
-
-const opts = { lang: "fr" as const, judgedInSeconds: 6 };
-const card = <T extends object>(c: T, id: string) => ({ ...c, id, createdAt: FOUNDERS_NOW }) as unknown as CardData;
-
-function jacques() {
-  const github = scoreGithub(jacquesFacts(), JACQUES_AI, opts);
-  const linkedin = scoreCv(jacquesReading(), cvCounts(), { ...opts, linkedin: jacquesProfile(), now: FOUNDERS_NOW, github: jacquesFacts() });
-  return { github, linkedin, cmp: compareCards(card(linkedin, "li"), card(github, "gh")) };
-}
-
-function lumine() {
-  const github = scoreGithub(lumineFacts(), null, opts);
-  const linkedin = scoreCv(lumineReading(), cvCounts(), { ...opts, linkedin: lumineProfile(), now: FOUNDERS_NOW, github: lumineFacts() });
-  return { github, linkedin, cmp: compareCards(card(linkedin, "li"), card(github, "gh")) };
-}
 
 describe("les fiches prennent la note de la grille", () => {
   // Barème 0.4.0 : 41, 61, 57. L'expérience donne le niveau (« Junior ») et ne pèse plus (0.5.0).
@@ -78,34 +52,16 @@ describe("les fiches prennent la note de la grille", () => {
     expect(own.source).toBe("both");
     expect(own.declared).toBe(4);
     expect(own.proven).toBe(8);
-    // Les fiches gardent chacune leur propre grille.
-    expect(cmp.cv.grid?.overall).toBe(cmp.cv.overall);
-    expect(cmp.github.grid?.overall).toBe(cmp.github.overall);
+    // Les pièces n'ont pas de grille à elles : leur note est celle du dossier (SPEC §18.82).
+    expect([cmp.cv.grid, cmp.github.grid]).toEqual([undefined, undefined]);
+    expect([cmp.cv.overall, cmp.github.overall]).toEqual([cmp.grid!.overall, cmp.grid!.overall]);
   });
 
   it("Sous couverture ne naît plus d'un écart entre les deux pièces (§18.36)", () => {
-    // Jacques : le code passe devant le profil (41 contre 61), pas de « Sous couverture ».
-    const j = jacques().cmp;
-    expect(j.cv.profile?.id).not.toBe("forger");
-    expect(j.github.profile?.id).not.toBe("forger");
-    // Lumine : 25 points d'écart, mais un GitHub vide ne prouve rien.
-    const l = lumine().cmp;
-    expect(l.cv.overall - l.github.overall).toBeGreaterThanOrEqual(15);
-    expect(l.cv.profile?.id).not.toBe("forger");
-    expect(l.github.profile?.id).not.toBe("forger");
-    // Même à 15 points ou plus d'écart, chaque pièce garde son profil.
-    const { github, linkedin } = jacques();
-    for (const n of [14, 15, 40]) {
-      const cmp = compareCards(card({ ...linkedin, overall: github.overall + n }, "li"), card(github, "gh"));
-      expect(cmp.cv.profile?.id).toBe(linkedin.profile?.id);
-      expect(cmp.github.profile?.id).toBe(github.profile?.id);
+    for (const cmp of [jacques().cmp, lumine().cmp]) {
+      expect(cmp.cv.profile?.id).not.toBe("forger");
+      expect(cmp.github.profile?.id).not.toBe("forger");
     }
   });
 
-  it("une fiche d'avant 0.4.0 (sans grille) : pas de note du dossier, pas de plantage", () => {
-    const { github, linkedin } = jacques();
-    const { grid: _g, ...old } = github;
-    const cmp = compareCards(card(linkedin, "li"), card(old, "gh"));
-    expect(cmp.grid).toBeUndefined();
-  });
 });

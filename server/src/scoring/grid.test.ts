@@ -22,7 +22,7 @@ import { GRID } from "./config";
 import { deriveGithub } from "./derive";
 import {
   analyzeRoles,
-  caseGrid,
+  dossierGrid,
   countedMonths,
   declaredGrid,
   declaredInput,
@@ -113,10 +113,10 @@ const fictivaProfile = (): FounderProfile => ({
 describe("les deux fondateurs (§7), à un point près", () => {
   const jGithub = githubGrid(gh(jacquesFacts(), JACQUES_AI));
   const jLinkedin = declaredGrid(decl(jacquesReading(), jacquesProfile()), gh(jacquesFacts()));
-  const jCase = caseGrid(jLinkedin, jGithub);
+  const jCase = dossierGrid({ declared: decl(jacquesReading(), jacquesProfile()), github: gh(jacquesFacts(), JACQUES_AI) });
   const lGithub = githubGrid(gh(lumineFacts()));
   const lLinkedin = declaredGrid(decl(lumineReading(), lumineProfile()), gh(lumineFacts()));
-  const lCase = caseGrid(lLinkedin, lGithub);
+  const lCase = dossierGrid({ declared: decl(lumineReading(), lumineProfile()), github: gh(lumineFacts()) });
 
   // Barème 0.4.0 : LinkedIn 41, GitHub 61, dossier 57. L'expérience (3, puis 4 estimée) pesait 1,5 ;
   // elle donne maintenant le niveau, « Junior », et le parcours, la stack et l'ownership se lisent à ce
@@ -192,9 +192,8 @@ describe("les deux fondateurs (§7), à un point près", () => {
 });
 
 describe("les recoupements LinkedIn × GitHub : la pièce « recoupé » (§3, §5)", () => {
-  const jGithub = githubGrid(gh(jacquesFacts(), JACQUES_AI));
   const jDeclared = (f = jacquesFacts()) => declaredGrid(decl(jacquesReading(), jacquesProfile()), gh(f));
-  const jCase = (f = jacquesFacts()) => caseGrid(jDeclared(f), githubGrid(gh(f, JACQUES_AI)));
+  const jCase = (f = jacquesFacts()) => dossierGrid({ declared: decl(jacquesReading(), jacquesProfile()), github: gh(f, JACQUES_AI) });
   const NAMES = /Azerit|McMaster|Hedge Fund|Centrale|Méditerranée|Research Intern|Co-founder|agda-notes|agda-stdlib/;
   const both = (g: Grid) => g.criteria.filter((c) => c.evidence?.source === "both").map((c) => c.code);
 
@@ -217,8 +216,8 @@ describe("les recoupements LinkedIn × GitHub : la pièce « recoupé » (§3, �
     const alone = declaredGrid(decl(jacquesReading(), jacquesProfile()));
     expect(scores(jDeclared())).toEqual(scores(alone));
     expect(jDeclared().overall).toBe(alone.overall);
-    expect(caseGrid(alone, jGithub).overall).toBe(jCase().overall);
-    expect(scores(caseGrid(alone, jGithub))).toEqual(scores(jCase()));
+    // Au dossier, les notes déclarées sont celles de la pièce lue seule.
+    for (const c of jCase().criteria) if (c.declared != null) expect(c.declared, c.code).toBe(score(alone, c.code));
   });
 
   it("moins d'années de code public que de métier compté : la pièce reste celle de LinkedIn, le point passe « à confirmer », pour la personne seule", () => {
@@ -281,7 +280,7 @@ describe("les recoupements LinkedIn × GitHub : la pièce « recoupé » (§3, �
   });
 
   it("un GitHub vide ne recoupe rien : les pièces restent celles de LinkedIn", () => {
-    const g = caseGrid(declaredGrid(decl(lumineReading(), lumineProfile()), gh(lumineFacts())), githubGrid(gh(lumineFacts())));
+    const g = dossierGrid({ declared: decl(lumineReading(), lumineProfile()), github: gh(lumineFacts()) });
     expect(both(g)).toEqual([]);
   });
 });
@@ -349,7 +348,7 @@ describe("aucune note par addition", () => {
   });
 
   it("aucun texte ne se lit « +n » ou « −n », tout existe en français et en anglais", () => {
-    for (const g of [...grids, caseGrid(grids[4], grids[0])])
+    for (const g of [...grids, dossierGrid({ declared: decl(jacquesReading(), jacquesProfile()), github: gh(jacquesFacts(), JACQUES_AI) })])
       for (const t of allTexts(g)) {
         for (const s of [t.fr, t.en]) {
           expect(s.trim().length, JSON.stringify(t)).toBeGreaterThan(1);
@@ -402,8 +401,8 @@ describe("l'école ne peut pas faire baisser la note (§4, règle 2)", () => {
       const withSchool = declaredGrid(decl({ ...r, school_name, school_tier }, p));
       expect(withSchool.overall, school_name).toBeGreaterThanOrEqual(none.overall);
       // Le cas du dossier aussi.
-      const proof = githubGrid(gh(jacquesFacts(), JACQUES_AI));
-      expect(caseGrid(withSchool, proof).overall).toBeGreaterThanOrEqual(caseGrid(none, proof).overall);
+      const file = (d: Parameters<typeof dossierGrid>[0]["declared"]) => dossierGrid({ declared: d, github: gh(jacquesFacts(), JACQUES_AI) }).overall;
+      expect(file(decl({ ...r, school_name, school_tier }, p))).toBeGreaterThanOrEqual(file(decl({ ...r, school_name: "", school_tier: "none" }, p && { ...p, education: [] })));
     }
   });
 
@@ -519,7 +518,7 @@ describe("les plafonds (§4, règles 3 et 4)", () => {
       [seniorReading(), fictivaProfile()],
     ] as const) {
       const d = declaredGrid(decl(r, p), gh(thin));
-      expect(caseGrid(d, alone).overall).toBe(d.overall);
+      expect(dossierGrid({ declared: decl(r, p), github: gh(thin) }).overall).toBe(d.overall);
     }
   });
 });
@@ -560,12 +559,13 @@ describe("les traces dans le code (§3.4)", () => {
   it("au dossier, sur LinkedIn, deux technos dont une absente : le signal suit la stack, pour la personne seule, et aucune note ne bouge", () => {
     const d = decl(seniorReading({ technos_listed: [], technos_described: ["TypeScript", "Kubernetes"] }), { ...fictivaProfile(), skills: ["TypeScript"] });
     const proven = githubGrid(gh(jacquesFacts(), JACQUES_AI));
-    const file = caseGrid(declaredGrid(d, gh(jacquesFacts())), proven);
+    const file = dossierGrid({ declared: d, github: gh(jacquesFacts(), JACQUES_AI) });
     const flag = crit(file, "STK").flags.find((x) => /^À confirmer/.test(x.fr))!;
     expect(flag.fr).toMatch(/^À confirmer\u00a0: Kubernetes\. Déclarées sur LinkedIn, pas encore visibles dans \d+ repos? publics?\.$/);
     expect(flag.fr).not.toContain("TypeScript");
-    expect(scores(file)).toEqual(scores(caseGrid(declaredGrid(d), proven)));
-    expect(file.overall).toBe(caseGrid(declaredGrid(d), proven).overall);
+    // Le signal ne note rien : la stack du dossier est celle que GitHub prouve.
+    expect(score(file, "STK")).toBe(score(githubGrid(gh(jacquesFacts(), JACQUES_AI), file.seniority), "STK"));
+    expect(score(proven, "STK")).not.toBeNull();
     const pub = publicGrid(file).criteria.find((c) => c.code === "STK")!;
     expect(JSON.stringify(pub)).not.toMatch(/À confirmer|To confirm/);
   });

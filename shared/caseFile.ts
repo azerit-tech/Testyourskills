@@ -43,7 +43,26 @@ export const pieceLabel = (p: Piece, lang: "fr" | "en" = "fr"): string => (p ===
 export const piecesOf = (cmp: Pick<ComparisonData, "declaredSource">): Piece[] => [declaredOf(cmp), "github"];
 
 /** Le code est jugeable : la pièce GitHub n'est ni un dossier vide, ni scellée (vue publique). */
-const codeJudged = (cmp: Pick<ComparisonData, "github">): boolean => cmp.github.grid?.rule !== "empty_file" && !cmp.github.sealed;
+export const codeJudged = (cmp: Pick<ComparisonData, "github">): boolean =>
+  // `unjudged` : dossiers 0.5.0 ; la grille de la pièce : dossiers d'avant, où chaque pièce avait la sienne.
+  !cmp.github.unjudged && cmp.github.grid?.rule !== "empty_file" && !cmp.github.sealed;
+
+/**
+ * Une personne, une note (SPEC §18.82), à la lecture des dossiers rangés avant 0.5.0, où
+ * chaque pièce portait sa grille et sa note : les pièces rendues n'ont plus que la note du
+ * dossier, et ce que leur grille disait du code (« dossier vide ») reste dans `unjudged`.
+ * Sans migration : rien n'est réécrit. Un dossier sans grille (avant 0.4.0) reste tel quel.
+ */
+export function oneNote<T extends CardData | ComparisonData>(data: T): T {
+  if (!("cv" in data && "github" in data) || !data.grid) return data;
+  const note = data.grid.overall;
+  const piece = (c: CardData, unjudged: boolean): CardData => {
+    if (!c.grid && c.rank === undefined && c.overall === note) return c;
+    const { grid: _grid, rank: _rank, ...rest } = c;
+    return { ...rest, overall: note, tier: tierFor(note), ...(unjudged ? { unjudged: true } : {}) };
+  };
+  return { ...data, cv: piece(data.cv, false), github: piece(data.github, data.github.grid?.rule === "empty_file") };
+}
 
 /** La fiche du dossier, à la lecture : voir l'en-tête. */
 export function caseCard(cmp: ComparisonData): CardData {

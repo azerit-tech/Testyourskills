@@ -1,21 +1,29 @@
-// Le top de la semaine (SPEC §18.22). Semaine du lundi 00:00 UTC au dimanche
-// 23:59 UTC. Entrent les fiches GitHub de la semaine (fiche seule ou carte
-// GitHub d'une comparaison), sorties avec la lecture IA, encore en ligne, dont le
-// login n'est pas masqué, et dont le compte a 5 000 abonnés au plus : les
-// célébrités gardent leur fiche mais ne bouchent pas le haut du tableau.
-// La carte GitHub d'une comparaison LinkedIn n'entre que si le lien est prouvé
-// (GitHub affiche ce LinkedIn, §18.24) : une comparaison montée par un tiers
-// sur le pseudo d'un autre ne le classe pas. De même, une fiche née d'une
-// dénonciation (`cards.denounce_born`) n'entre, et ne porte la spéciale, qu'une
-// fois son login revendiqué (`owners`) ; une fiche déjà faite, dénoncée ensuite
-// depuis le cache, garde sa place.
-// Une ligne par login : sa meilleure note de la semaine ; à égalité, la fiche la
-// plus ancienne passe devant. Tout se calcule à la lecture, rien n'est écrit.
+// Le top de la semaine (SPEC §18.22, §18.82). Semaine du lundi 00:00 UTC au dimanche
+// 23:59 UTC. Le top classe des personnes, une ligne par personne, sur leur seule
+// note : celle de leur dossier. Entrent les fiches racines de la semaine, sorties
+// avec la lecture IA, encore en ligne, pas remplacées par un dossier plus complet :
+// - un dossier à deux pièces LinkedIn et GitHub dont le lien est prouvé (GitHub
+//   affiche ce LinkedIn, §18.24) : la note du dossier, sous son login ;
+// - une fiche GitHub seule : sa note, sous son login ;
+// - une fiche LinkedIn seule : sa note, sur une ligne sans nom ni lien (comme les
+//   bandes, le nom d'une fiche LinkedIn ne s'affiche pas dans un classement).
+// Une pièce d'un dossier n'entre jamais : elle n'a pas de note à elle. Un dossier
+// dont le lien n'est pas prouvé (monté par un tiers sur le pseudo d'un autre, ou
+// un CV déposé avec un pseudo) ne classe personne. Pour un login : il n'est pas
+// masqué, son compte a 5 000 abonnés au plus (les célébrités gardent leur fiche
+// mais ne bouchent pas le haut du tableau), et une fiche née d'une dénonciation
+// (`cards.denounce_born`) n'entre, et ne porte la spéciale, qu'une fois son login
+// revendiqué (`owners`) ; une fiche déjà faite, dénoncée ensuite depuis le cache,
+// garde sa place. Une fiche LinkedIn seule née d'une dénonciation n'entre pas.
+// Une ligne par personne : son dossier s'il existe, sinon sa fiche seule ; entre
+// deux du même genre, la meilleure note de la semaine ; à égalité, la plus ancienne
+// passe devant. Tout se calcule à la lecture, rien n'est écrit.
 // Le classement d'une semaine est gardé 60 s en mémoire : il est demandé à
 // chaque page de fiche, chaque image et chaque lecture du top. La base
 // (db.ts) l'oublie dès qu'une fiche naît, part, ou qu'un login est masqué.
 
 import type Database from "better-sqlite3";
+import { fileOf } from "../../shared/caseFile";
 import { catalogProfile } from "../../shared/profileCatalog";
 import type { CardData, ComparisonData, Fact, TopEntry, WeekRank, WeekTop } from "../../shared/types";
 import { starsFor } from "../../shared/types";
@@ -30,10 +38,14 @@ export const TOP_N = 5;
 export const TOTW_MIN_ENTRIES = 20;
 
 interface Ranked {
+  /** La fiche racine qui porte le rang de la personne : son dossier, sinon sa fiche seule. */
   id: string;
-  login: string;
+  /** Son login GitHub ; null pour une fiche LinkedIn seule. */
+  login: string | null;
   overall: number;
   createdAt: number;
+  /** Toutes ses fiches racines de la semaine qui entrent au classement. */
+  ids: string[];
 }
 
 /** Numéro de la semaine ISO de ce lundi (« 2026-W46 » donne 46). */
@@ -41,22 +53,28 @@ export function isoWeekNumber(monday: number): number {
   return Number(isoWeekLabel(monday).slice(-2));
 }
 
-/** Écarte la carte `c` d'une comparaison LinkedIn dont le lien avec ce GitHub n'est pas prouvé. */
-const PROVEN_SQL = `NOT EXISTS (
-           SELECT 1 FROM cards p
-           WHERE p.id = c.parent_id AND p.source = 'linkedin'
-             AND COALESCE(json_extract(p.facts_json, '$.linkedinProven'), 0) <> 1)`;
+/** Les abonnés du compte GitHub d'une fiche racine : sur ses faits, ou sur ceux de sa pièce GitHub. */
+const FOLLOWERS_SQL = `COALESCE(
+           json_extract(c.facts_json, '$.profile.followers'),
+           (SELECT json_extract(g.facts_json, '$.profile.followers') FROM cards g WHERE g.parent_id = c.id AND g.source = 'github' LIMIT 1),
+           0)`;
 
 /**
- * Écarte la carte `c` née d'une dénonciation (elle, ou la comparaison dont elle
- * est la carte GitHub, a `denounce_born`) tant que son login n'est pas revendiqué :
- * une fiche faite par un tiers ne classe pas quelqu'un qui n'a rien demandé.
- * Dénoncer après coup une fiche déjà faite ne la fait pas sortir.
+ * Les fiches racines `c` qui peuvent porter le rang d'une personne (voir l'en-tête).
+ * Paramètres, dans l'ordre : `now` (expiration), le plafond d'abonnés.
  */
-const CLAIMED_IF_DENOUNCED_SQL = `(
-           EXISTS (SELECT 1 FROM owners o WHERE o.login = c.login)
-           OR (c.denounce_born = 0
-               AND NOT EXISTS (SELECT 1 FROM cards p WHERE p.id = c.parent_id AND p.denounce_born = 1)))`;
+const ENTERS_SQL = `c.parent_id IS NULL AND c.degraded = 0
+         AND NOT EXISTS (SELECT 1 FROM cards s WHERE s.id = c.superseded_by AND s.denounce_born = 0)
+         AND (c.expires_at IS NULL OR c.expires_at > ?)
+         AND (
+           (c.login IS NOT NULL
+             AND ((c.kind = 'card' AND c.source = 'github')
+               OR (c.kind = 'comparison' AND c.source = 'linkedin' AND COALESCE(json_extract(c.facts_json, '$.linkedinProven'), 0) = 1))
+             AND ${FOLLOWERS_SQL} <= ?
+             AND NOT EXISTS (SELECT 1 FROM owners o WHERE o.login = c.login AND o.hidden = 1)
+             AND (c.denounce_born = 0 OR EXISTS (SELECT 1 FROM owners o WHERE o.login = c.login)))
+           OR (c.login IS NULL AND c.kind = 'card' AND c.source = 'linkedin' AND c.denounce_born = 0)
+         )`;
 
 /** Durée pendant laquelle le classement d'une semaine est gardé en mémoire. */
 export const RANK_CACHE_MS = 60_000;
@@ -82,35 +100,54 @@ function rankWeek(db: Database.Database, monday: number, now: number): readonly 
   return ranked;
 }
 
+interface WeekRow {
+  id: string;
+  login: string | null;
+  kind: "card" | "comparison";
+  createdAt: number;
+  overall: number | null;
+  linkedinUrl: string | null;
+}
+
 /**
- * Le classement d'une semaine, du premier au dernier : une ligne par login.
- * La requête rend toutes les fiches qui entrent, dans l'ordre du classement ;
- * la première de chaque login est la sienne.
+ * Le classement d'une semaine, du premier au dernier : une ligne par personne,
+ * sur la note de son dossier (la seule), sinon de sa fiche seule.
  */
 function computeWeek(db: Database.Database, monday: number, now: number): Ranked[] {
   const rows = db
     .prepare(
-      `SELECT c.id, c.login, c.created_at AS createdAt, json_extract(c.json, '$.overall') AS overall
+      `SELECT c.id, c.login, c.kind, c.created_at AS createdAt,
+              CASE WHEN c.kind = 'comparison'
+                   THEN COALESCE(json_extract(c.json, '$.grid.overall'), json_extract(c.json, '$.github.overall'))
+                   ELSE json_extract(c.json, '$.overall') END AS overall,
+              COALESCE(json_extract(c.facts_json, '$.linkedinUrl'), json_extract(c.json, '$.linkedinUrl')) AS linkedinUrl
        FROM cards c
        WHERE c.created_at >= ? AND c.created_at < ?
-         AND c.kind = 'card' AND c.source = 'github' AND c.login IS NOT NULL
-         AND c.degraded = 0
-         AND (c.expires_at IS NULL OR c.expires_at > ?)
-         AND COALESCE(json_extract(c.facts_json, '$.profile.followers'), 0) <= ?
-         AND NOT EXISTS (SELECT 1 FROM owners o WHERE o.login = c.login AND o.hidden = 1)
-         AND ${PROVEN_SQL}
-         AND ${CLAIMED_IF_DENOUNCED_SQL}
+         AND ${ENTERS_SQL}
        ORDER BY overall DESC, c.created_at ASC, c.id ASC`,
     )
-    .all(monday, monday + WEEK_MS, now, CELEBRITY_FOLLOWERS) as Ranked[];
-  const seen = new Set<string>();
-  const out: Ranked[] = [];
+    .all(monday, monday + WEEK_MS, now, CELEBRITY_FOLLOWERS) as WeekRow[];
+  // La personne d'une fiche : son login ; une fiche LinkedIn seule dont un dossier de la
+  // semaine porte l'adresse est celle de ce login ; sinon son adresse LinkedIn.
+  const loginOf = new Map<string, string>();
+  for (const r of rows) if (r.login && r.linkedinUrl) loginOf.set(r.linkedinUrl, r.login);
+  const person = (r: WeekRow) => (r.login ? `gh:${r.login}` : r.linkedinUrl ? (loginOf.has(r.linkedinUrl) ? `gh:${loginOf.get(r.linkedinUrl)}` : `li:${r.linkedinUrl}`) : `card:${r.id}`);
+  // Les lignes arrivent dans l'ordre du classement : la première de chaque personne est
+  // la sienne, sauf si elle a un dossier plus bas, qui passe devant ses fiches seules.
+  const best = new Map<string, { row: WeekRow; ids: string[] }>();
   for (const r of rows) {
-    if (typeof r.overall !== "number" || seen.has(r.login)) continue;
-    seen.add(r.login);
-    out.push(r);
+    if (typeof r.overall !== "number") continue;
+    const key = person(r);
+    const cur = best.get(key);
+    if (!cur) best.set(key, { row: r, ids: [r.id] });
+    else {
+      cur.ids.push(r.id);
+      if (r.kind === "comparison" && cur.row.kind !== "comparison") cur.row = r;
+    }
   }
-  return out;
+  return [...best.values()]
+    .map(({ row, ids }) => ({ id: row.id, login: row.login, overall: row.overall!, createdAt: row.createdAt, ids }))
+    .sort((a, b) => b.overall - a.overall || a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1));
 }
 
 /** Le haut du classement de la semaine en cours. */
@@ -119,16 +156,17 @@ export function weekTop(db: Database.Database, opts: { now?: number; limit?: num
   const limit = Math.max(0, Math.floor(opts.limit ?? 10));
   const monday = weekStart(now);
   const ranked = rankWeek(db, monday, now);
-  const get = db.prepare(`SELECT json FROM cards WHERE id = ?`);
+  const get = db.prepare(`SELECT json, kind FROM cards WHERE id = ?`);
   const entries: TopEntry[] = ranked.slice(0, limit).map((r, i) => {
-    const raw = get.get(r.id) as { json: string } | undefined;
-    const card = (raw ? JSON.parse(raw.json) : {}) as Partial<CardData>;
+    const raw = get.get(r.id) as { json: string; kind: string } | undefined;
+    const data = raw ? JSON.parse(raw.json) : {};
+    // La fiche telle qu'elle se montre : celle du dossier pour deux pièces (§18.36).
+    const card = (raw?.kind === "comparison" ? fileOf(data as ComparisonData) : data) as Partial<CardData>;
     const profile: Fact | undefined = card.profile ? catalogProfile(card.profile).label : undefined;
     return {
       rank: i + 1,
-      cardId: r.id,
-      login: card.login ?? r.login,
-      ...(card.avatarUrl ? { avatarUrl: card.avatarUrl } : {}),
+      // Une fiche LinkedIn seule : ni nom, ni portrait, ni lien dans le classement.
+      ...(r.login ? { cardId: r.id, login: card.login ?? r.login, ...(card.avatarUrl ? { avatarUrl: card.avatarUrl } : {}) } : {}),
       overall: r.overall,
       stars: starsFor(r.overall),
       ...(profile ? { profile } : {}),
@@ -138,35 +176,31 @@ export function weekTop(db: Database.Database, opts: { now?: number; limit?: num
 }
 
 /**
- * Rang du login de cette fiche dans la semaine où elle est née, ou null si la
- * fiche n'entre pas au classement (CV, sortie sans IA, célébrité, masquée,
- * expirée). `entry` dit si c'est cette fiche-là qui porte le rang du login.
+ * Rang de la personne de cette fiche dans la semaine où la fiche est née, ou null si
+ * la fiche n'entre pas au classement (CV, sortie sans IA, célébrité, masquée, expirée,
+ * lien non prouvé, remplacée). L'id d'une pièce vaut celui de son dossier. `entry` dit
+ * si c'est cette fiche-là qui porte le rang de la personne.
  */
 export function weekRankDetail(
   db: Database.Database,
   cardId: string,
   now = Date.now(),
 ): (WeekRank & { entry: boolean; createdAt: number }) | null {
-  const row = db.prepare(`SELECT login, created_at FROM cards WHERE id = ?`).get(cardId) as
-    | { login: string | null; created_at: number }
-    | undefined;
-  if (!row?.login) return null;
+  // La fiche qui se montre à cette adresse : le dossier d'une pièce, ou celui qui a remplacé la fiche (db.ts, fileRow).
+  const get = db.prepare(
+    `SELECT c.id, c.created_at, COALESCE(c.parent_id, (SELECT s.id FROM cards s WHERE s.id = c.superseded_by AND s.denounce_born = 0)) AS next
+     FROM cards c WHERE c.id = ?`,
+  );
+  type Hop = { id: string; created_at: number; next: string | null };
+  let row = get.get(cardId) as Hop | undefined;
+  for (let hops = 0; row?.next && hops < 8; hops++) row = (get.get(row.next) as Hop | undefined) ?? { ...row, next: null };
+  if (!row) return null;
+  const rootId = row.id;
   const monday = weekStart(row.created_at);
   const ranked = rankWeek(db, monday, now);
-  const i = ranked.findIndex((r) => r.login === row.login);
-  if (i < 0) return null;
   // Cette fiche doit entrer elle-même : une fiche dégradée ne prend pas le rang d'une autre.
-  const own = db
-    .prepare(
-      `SELECT 1 FROM cards c
-       WHERE c.id = ? AND c.kind = 'card' AND c.source = 'github' AND c.degraded = 0
-         AND (c.expires_at IS NULL OR c.expires_at > ?)
-         AND COALESCE(json_extract(c.facts_json, '$.profile.followers'), 0) <= ?
-         AND ${PROVEN_SQL}
-         AND ${CLAIMED_IF_DENOUNCED_SQL}`,
-    )
-    .get(cardId, now, CELEBRITY_FOLLOWERS);
-  if (!own) return null;
+  const i = ranked.findIndex((r) => r.ids.includes(rootId));
+  if (i < 0) return null;
   const me = ranked[i]!;
   const fifth = ranked[TOP_N - 1];
   const inTop5 = i < TOP_N;
@@ -178,7 +212,7 @@ export function weekRankDetail(
     inTop5,
     week: isoWeekNumber(monday),
     closed: now >= monday + WEEK_MS,
-    entry: me.id === cardId,
+    entry: me.id === rootId,
     createdAt: row.created_at,
   };
 }
@@ -196,9 +230,10 @@ export function weekRank(db: Database.Database, cardId: string, now = Date.now()
 
 /**
  * La spéciale « Top 5 de la semaine », posée à la lecture (jamais écrite) :
- * sur la fiche qui porte le rang d'un login du top 5 de sa semaine, en direct
+ * sur la fiche qui porte le rang d'une personne du top 5 de sa semaine, en direct
  * pendant la semaine et pour toujours ensuite. Une fiche qui a déjà une
- * spéciale garde la sienne. Pour une comparaison, c'est sa carte GitHub.
+ * spéciale garde la sienne. Pour un dossier, elle se pose sur sa pièce GitHub,
+ * d'où la fiche du dossier la lit (shared/caseFile.ts).
  * Seulement si la semaine compte au moins TOTW_MIN_ENTRIES logins classés
  * (une semaine close : son total final) : portée par tous, elle ne dirait rien.
  * `live` : la semaine de la fiche n'est pas finie, la spéciale peut encore
@@ -213,7 +248,8 @@ export function withWeekSpecial<T extends CardData | ComparisonData>(
   const card = isCmp ? (data as ComparisonData).github : (data as CardData);
   const born = Date.parse(card.createdAt);
   const live = Number.isFinite(born) && now < weekStart(born) + WEEK_MS;
-  const d = weekRankDetail(db, card.id, now);
+  // Le rang est celui de la personne, sur la note de son dossier : la fiche racine.
+  const d = weekRankDetail(db, data.id, now);
   const week = d ? publicRank(d) : null;
   if (!d || d.total < TOTW_MIN_ENTRIES || !d.inTop5 || !d.entry || card.special) return { data, totw: false, live, week };
   const marked: CardData = { ...card, special: "totw" };
