@@ -144,7 +144,7 @@ export function Bands() {
   // Rien à montrer : ni bande au tableau, ni bande en formation, ni la sienne.
   const empty = BAND_TYPES.every((k) => data[k].entries.length === 0 && data[k].forming.length === 0 && !data[k].extra);
   // Le partage de sa bande en formation : le même que sur sa page.
-  const shareBand = (band: BandStanding) => void share(band, t.bands.page.shareText(band.label, t.bands.rank(band)), mine?.id ?? null);
+  const shareBand = (band: BandStanding) => void share(band, t.bands.page.shareText(band), mine?.id ?? null);
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
     const next = type === "ecole" ? "boite" : "ecole";
@@ -422,7 +422,7 @@ export function BandPage({ type, id }: { type: BandType; id: string }) {
   // La répartition seulement si la page a reçu toutes les fiches anonymes (le serveur en envoie 50 au plus).
   const anonList = data.members.filter((m) => !m.login || !m.cardId);
   const spread = anonList.length === anonymous ? starSpread(anonList) : null;
-  const shareBand = () => void share(band, tp.shareText(band.label, rank), mine?.id ?? null);
+  const shareBand = () => void share(band, tp.shareText(band), mine?.id ?? null);
 
   return (
     <main className="page page-band" id="main">

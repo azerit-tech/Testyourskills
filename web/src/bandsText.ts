@@ -11,15 +11,25 @@ const n = (k: number, one: string, many: string) => `${k}\u00a0${k > 1 ? many : 
 const nEn = (k: number, one: string, many: string) => `${k}\u00a0${k === 1 ? one : many}`;
 const lowerFirst = (s: string) => `${s.charAt(0).toLowerCase()}${s.slice(1)}`;
 
+/** « 3e des écoles, à 6 étoiles de la 2e. » ; « N° 1 des boîtes. » ; « Bande en formation : encore 2 fiches. » Une phrase : elle commence par une majuscule. */
+function rankFr(b: Rank): string {
+  if (!b.rank) return `Bande en formation : encore ${n(b.missing, "fiche", "fiches")}.`;
+  const ord = `${b.rank === 1 ? "N° 1" : `${b.rank}e`} des ${b.type === "ecole" ? "écoles" : "boîtes"}`;
+  if (!b.ahead || b.gap === null) return `${ord}.`;
+  const ahead = b.ahead.rank === 1 ? "la tête" : `la ${b.ahead.rank}e`;
+  return b.gap > 0 ? `${ord}, à ${n(b.gap, "étoile", "étoiles")} de ${ahead}.` : `${ord}, à égalité avec ${ahead}.`;
+}
+
+function rankEn(b: Rank): string {
+  if (!b.rank) return `Crew forming: ${nEn(b.missing, "more sheet", "more sheets")} needed.`;
+  const ord = `#${b.rank} among ${b.type === "ecole" ? "schools" : "companies"}`;
+  if (!b.ahead || b.gap === null) return `${ord}.`;
+  const ahead = b.ahead.rank === 1 ? "the leader" : `#${b.ahead.rank}`;
+  return b.gap > 0 ? `${ord}, ${nEn(b.gap, "star", "stars")} behind ${ahead}.` : `${ord}, level with ${ahead}.`;
+}
+
 const fr = {
-  /** « 3e des écoles, à 6 étoiles de la 2e. » ; « N° 1 des boîtes. » ; « Bande en formation : encore 2 fiches. » Une phrase : elle commence par une majuscule. */
-  rank(b: Rank): string {
-    if (!b.rank) return `Bande en formation : encore ${n(b.missing, "fiche", "fiches")}.`;
-    const ord = `${b.rank === 1 ? "N° 1" : `${b.rank}e`} des ${b.type === "ecole" ? "écoles" : "boîtes"}`;
-    if (!b.ahead || b.gap === null) return `${ord}.`;
-    const ahead = b.ahead.rank === 1 ? "la tête" : `la ${b.ahead.rank}e`;
-    return b.gap > 0 ? `${ord}, à ${n(b.gap, "étoile", "étoiles")} de ${ahead}.` : `${ord}, à égalité avec ${ahead}.`;
-  },
+  rank: rankFr,
   dossiers: (k: number) => n(k, "fiche", "fiches"),
   score: (k: number) => n(k, "étoile", "étoiles"),
   /** Le mot seul, sous le grand nombre de la page d'une bande. */
@@ -84,7 +94,9 @@ const fr = {
     recruiterText: "Azerit te présente des devs lus comme leurs fiches : l'expérience d'abord, le code comme preuve.",
     recruiterLink: "azerit.tech",
     share: "Partager la bande",
-    shareText: (label: string, rank: string) => `${label} : ${lowerFirst(rank)} Viens grossir les rangs :`,
+    /** Le texte du partage d'une bande, une seule phrase avant l'appel : son rang, ou ce qu'il lui manque. */
+    shareText: (b: Rank & { label: string }) =>
+      b.rank ? `${b.label} : ${lowerFirst(rankFr(b))} Viens grossir les rangs :` : `${b.label} est en formation : encore ${n(b.missing, "fiche", "fiches")} pour entrer au tableau. Viens grossir les rangs :`,
     ahead: "Devant\u00a0:",
     all: "Toutes les bandes",
     notFound: "Cette bande n'existe pas. Pas encore.",
@@ -133,13 +145,7 @@ const fr = {
 export type BandsDict = typeof fr;
 
 const en: BandsDict = {
-  rank(b: Rank): string {
-    if (!b.rank) return `Crew forming: ${nEn(b.missing, "more sheet", "more sheets")} needed.`;
-    const ord = `#${b.rank} among ${b.type === "ecole" ? "schools" : "companies"}`;
-    if (!b.ahead || b.gap === null) return `${ord}.`;
-    const ahead = b.ahead.rank === 1 ? "the leader" : `#${b.ahead.rank}`;
-    return b.gap > 0 ? `${ord}, ${nEn(b.gap, "star", "stars")} behind ${ahead}.` : `${ord}, level with ${ahead}.`;
-  },
+  rank: rankEn,
   dossiers: (k: number) => nEn(k, "sheet", "sheets"),
   score: (k: number) => nEn(k, "star", "stars"),
   scoreWord: (k: number) => (k === 1 ? "star" : "stars"),
@@ -195,7 +201,8 @@ const en: BandsDict = {
     recruiterText: "Azerit brings you devs read like their sheets: experience first, code as proof.",
     recruiterLink: "azerit.tech",
     share: "Share the crew",
-    shareText: (label: string, rank: string) => `${label}: ${rank} Come add your stars:`,
+    shareText: (b: Rank & { label: string }) =>
+      b.rank ? `${b.label}: ${rankEn(b)} Come add your stars:` : `${b.label} is forming: ${nEn(b.missing, "more sheet", "more sheets")} to make the board. Come add your stars:`,
     ahead: "Ahead:",
     all: "All crews",
     notFound: "This crew doesn't exist. Not yet.",
