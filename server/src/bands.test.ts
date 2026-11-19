@@ -60,6 +60,8 @@ interface CardOpts {
   linkedinUrl?: string;
   createdAt?: number;
   name?: string;
+  initials?: string;
+  avatarUrl?: string;
 }
 
 let seq = 0;
@@ -75,6 +77,8 @@ function insert(store: Store, o: CardOpts = {}): string {
     createdAt: new Date(createdAt).toISOString(),
     overall: OVERALL[o.stars ?? 4],
     name: o.name ?? "Camille Ardent",
+    ...(o.initials ? { initials: o.initials } : {}),
+    ...(o.avatarUrl ? { avatarUrl: o.avatarUrl } : {}),
     club: o.club === undefined ? "Doctolib" : o.club,
     ...(login ? { login } : {}),
     ...(o.school ? { school: o.school } : {}),
@@ -371,26 +375,60 @@ describe("retrait", () => {
 });
 
 describe("pages publiques", () => {
-  it("la page d'une bande : jamais un nom ; le @pseudo seulement si la fiche est revendiquée ; aucun rang d'école", async () => {
+  it("la page d'une bande montre les vraies personnes : nom, photo ou initiales, lien vers la fiche ; aucun rang d'école (§18.88)", async () => {
     const ctx = setup();
-    const claimed = insert(ctx.store, { login: "leamd", stars: 6, name: "Léa Martin-Dubois" });
-    const plain = insert(ctx.store, { login: "anonyme", stars: 5, name: "Nom Caché" });
-    const li = insert(ctx.store, { login: null, stars: 4, linkedinUrl: "https://www.linkedin.com/in/x", name: "Personne LinkedIn" });
+    const photo = "https://avatars.githubusercontent.com/u/1?v=4";
+    const claimed = insert(ctx.store, { login: "LeaMD", stars: 6, name: "Léa Martin-Dubois", avatarUrl: photo });
+    // Une fiche GitHub pas revendiquée, faite par la porte ordinaire : montrée aussi ; sans nom, son @pseudo.
+    const plain = insert(ctx.store, { login: "nour-rs", stars: 5, name: "nour-rs", initials: "NO" });
+    // Les fiches LinkedIn et CV seules : le nom de la fiche, ses initiales, pas de pseudo.
+    const li = insert(ctx.store, { login: null, stars: 4, linkedinUrl: "https://www.linkedin.com/in/x", name: "Florence Delmas", initials: "FD" });
+    const cv = insert(ctx.store, { login: null, stars: 3, name: "Yann Perrot", initials: "YP" });
     ctx.store.claimOwner("leamd", 3);
-    for (const id of [claimed, plain, li]) put(ctx.store, id, school("centralesupelec"));
+    for (const id of [claimed, plain, li, cv]) put(ctx.store, id, school("centralesupelec"));
     const r = await call<BandPage>(ctx, "/api/bands/ecole/centralesupelec");
     expect(r.status).toBe(200);
-    expect(r.json.band).toMatchObject({ label: "CentraleSupélec", score: 15, members: 3, rank: 1 });
-    expect(r.json.members.map((m) => [m.stars, m.login ?? null, m.cardId ?? null])).toEqual([
-      [6, "leamd", claimed],
-      [5, null, null],
-      [4, null, null],
+    expect(r.json.band).toMatchObject({ label: "CentraleSupélec", score: 18, members: 4, rank: 1 });
+    const person = ({ stars, cardId, name, login, avatarUrl, initials }: BandPage["members"][number]) => ({ stars, cardId, name, login, avatarUrl, initials });
+    expect(r.json.members.map(person)).toEqual([
+      { stars: 6, cardId: claimed, name: "Léa Martin-Dubois", login: "LeaMD", avatarUrl: photo, initials: "LM" },
+      { stars: 5, cardId: plain, name: undefined, login: "nour-rs", avatarUrl: undefined, initials: "NO" },
+      { stars: 4, cardId: li, name: "Florence Delmas", login: undefined, avatarUrl: undefined, initials: "FD" },
+      { stars: 3, cardId: cv, name: "Yann Perrot", login: undefined, avatarUrl: undefined, initials: "YP" },
     ]);
     expect(r.json.members[0]!.profile).toEqual(FIXTURES.gold.profile!.label);
     // Le poste de la fiche, déjà public, distingue deux dossiers du même profil.
-    expect(r.json.members.map((m) => m.position)).toEqual([FIXTURES.gold.position, FIXTURES.gold.position, FIXTURES.gold.position]);
-    const text = JSON.stringify(r.json);
-    expect(text).not.toMatch(/Léa Martin|Nom Caché|Personne LinkedIn|anonyme|linkedin\.com|rang [SABC]|tier|"school"/);
+    expect(r.json.members.map((m) => m.position)).toEqual(Array(4).fill(FIXTURES.gold.position));
+    // Rien d'autre de la fiche ne part : ni l'adresse LinkedIn, ni l'école, ni un rang.
+    expect(JSON.stringify(r.json)).not.toMatch(/linkedin\.com|rang [SABC]|tier|"school"|"club"/);
+  });
+
+  it("une fiche née d'une dénonciation reste anonyme tant qu'elle n'est pas revendiquée ; un pseudo masqué n'y est pas", async () => {
+    const ctx = setup();
+    const by = insert(ctx.store, { login: "balance", stars: 6, name: "Bal Ance" });
+    const tip = insert(ctx.store, { login: "victime", stars: 5, name: "Nom Caché", avatarUrl: "https://avatars.githubusercontent.com/u/2?v=4" });
+    const tipLi = insert(ctx.store, { login: null, stars: 4, linkedinUrl: "https://www.linkedin.com/in/y", name: "Personne Dénoncée" });
+    const hidden = insert(ctx.store, { login: "parti", stars: 3, name: "Partie Loin" });
+    ctx.store.markDenounced(tip, by, "balance");
+    ctx.store.markDenounced(tipLi, by, "balance");
+    for (const id of [by, tip, tipLi, hidden]) put(ctx.store, id, school("epitech"));
+    ctx.store.claimOwner("parti", 9);
+    ctx.store.setOwnerHidden("parti", true);
+    const page = async () => (await call<BandPage>(ctx, "/api/bands/ecole/epitech")).json;
+    const before = await page();
+    // Le profil et les étoiles, sans nom, sans visage, sans lien ; la fiche masquée n'est pas rendue.
+    expect(before.members.map((m) => [m.stars, m.cardId ?? null, m.name ?? null, m.login ?? null, m.initials ?? null])).toEqual([
+      [6, by, "Bal Ance", "balance", "LM"],
+      [5, null, null, null, null],
+      [4, null, null, null, null],
+    ]);
+    expect(before.members[1]!.profile).toEqual(FIXTURES.gold.profile!.label);
+    expect(JSON.stringify(before)).not.toMatch(/Nom Caché|victime|Personne Dénoncée|Partie Loin|parti|avatars\.githubusercontent/);
+    // « C'est moi » : la fiche revendiquée se montre ; la fiche LinkedIn seule ne se revendique pas.
+    ctx.store.claimOwner("victime", 4);
+    const after = await page();
+    expect(after.members[1]).toMatchObject({ cardId: tip, name: "Nom Caché", login: "victime" });
+    expect(after.members[2]!.cardId).toBeUndefined();
   });
 
   it("une école de la liste sans membre existe, en formation ; une boîte inconnue non", async () => {

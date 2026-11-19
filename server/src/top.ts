@@ -5,8 +5,10 @@
 // - un dossier à deux pièces LinkedIn et GitHub dont le lien est prouvé (GitHub
 //   affiche ce LinkedIn, §18.24) : la note du dossier, sous son login ;
 // - une fiche GitHub seule : sa note, sous son login ;
-// - une fiche LinkedIn seule : sa note, sur une ligne sans nom ni lien (comme les
-//   bandes, le nom d'une fiche LinkedIn ne s'affiche pas dans un classement).
+// - une fiche LinkedIn seule : sa note, sous le nom de sa fiche.
+// Chaque ligne est la vraie personne (§18.88, shared/boardPerson.ts) : le nom de sa
+// fiche (le @pseudo d'une fiche GitHub sans nom), sa photo ou ses initiales, et le
+// lien vers sa fiche. Personne d'anonyme n'entre : voir la dénonciation plus bas.
 // Une pièce d'un dossier n'entre jamais : elle n'a pas de note à elle. Un dossier
 // dont le lien n'est pas prouvé (monté par un tiers sur le pseudo d'un autre, ou
 // un CV déposé avec un pseudo) ne classe personne. Pour un login : il n'est pas
@@ -23,6 +25,7 @@
 // (db.ts) l'oublie dès qu'une fiche naît, part, ou qu'un login est masqué.
 
 import type Database from "better-sqlite3";
+import { boardPerson } from "../../shared/boardPerson";
 import { fileOf } from "../../shared/caseFile";
 import { catalogProfile } from "../../shared/profileCatalog";
 import type { CardData, ComparisonData, Fact, TopEntry, WeekRank, WeekTop } from "../../shared/types";
@@ -165,8 +168,8 @@ export function weekTop(db: Database.Database, opts: { now?: number; limit?: num
     const profile: Fact | undefined = card.profile ? catalogProfile(card.profile).label : undefined;
     return {
       rank: i + 1,
-      // Une fiche LinkedIn seule : ni nom, ni portrait, ni lien dans le classement.
-      ...(r.login ? { cardId: r.id, login: card.login ?? r.login, ...(card.avatarUrl ? { avatarUrl: card.avatarUrl } : {}) } : {}),
+      // La personne de la fiche : son nom, son visage, sa fiche (une fiche LinkedIn seule comprise).
+      ...boardPerson(card, r.id, r.login),
       overall: r.overall,
       stars: starsFor(r.overall),
       ...(profile ? { profile } : {}),

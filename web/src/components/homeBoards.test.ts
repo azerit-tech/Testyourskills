@@ -16,7 +16,7 @@ function render(el: ReactElement, language = "fr-FR"): string {
   return renderToStaticMarkup(createElement(LangProvider, null, el));
 }
 
-const entry = (rank: number): TopEntry => ({ rank, cardId: `Card00000${rank}`, login: `dev${rank}`, avatarUrl: "", overall: 90 - rank, stars: 5 });
+const entry = (rank: number): TopEntry => ({ rank, cardId: `Card00000${rank}`, login: `dev${rank}`, avatarUrl: "", initials: "DE", overall: 90 - rank, stars: 5 });
 const week = (n: number): WeekTop => ({ weekStart: 0, endsAt: 3_600_000, week: 46, total: n, entries: Array.from({ length: n }, (_, i) => entry(i + 1)) });
 const board = (n: number, language?: string) => render(createElement(WeekBoardView, { top: week(n), now: 0, onPlay: () => undefined }), language);
 const count = (html: string, needle: string) => html.split(needle).length - 1;

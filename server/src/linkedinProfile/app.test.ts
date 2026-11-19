@@ -441,15 +441,19 @@ describe("entrée LinkedIn (le champ unique)", () => {
     expect(s).toMatchObject({ state: "done", kind: "comparison", comparison: { declaredSource: "linkedin" } });
   });
 
-  it("pas de GitHub : une fiche LinkedIn seule, classée sur sa note sans nom ni lien, en cache 24 h par adresse", async () => {
+  it("pas de GitHub : une fiche LinkedIn seule, classée sur sa note sous le nom de sa fiche, en cache 24 h par adresse", async () => {
     const ctx = setup({ forUrl: async () => ({ status: "found", profile: PROFILE, githubLogin: null }) });
     const { json } = await post(ctx, { linkedin: "linkedin.com/in/camille-ardent" });
     const s = await state(ctx, json.id);
     expect(s).toMatchObject({ state: "done", kind: "card", card: { source: "cv", declaredSource: "linkedin", linkedinUrl: URL_ } });
     expect(ctx.store.getCard(json.id)).toMatchObject({ source: "linkedin", login: null, facts: { linkedinUrl: URL_ } });
-    // Le top classe des personnes (SPEC §18.84) : la fiche LinkedIn seule y entre, sans rien qui la nomme.
+    // Le top classe des personnes (SPEC §18.84) : la fiche LinkedIn seule y entre sous le nom de sa fiche,
+    // avec le lien vers elle (§18.88) ; son adresse LinkedIn ne part pas.
     expect(weekRank(ctx.store.db, json.id)).toMatchObject({ rank: 1, total: 1 });
-    expect(JSON.stringify(weekTop(ctx.store.db).entries)).not.toMatch(new RegExp(`${json.id}|Camille|camille`));
+    const entries = weekTop(ctx.store.db).entries;
+    const { name, initials } = ctx.store.getCard(json.id)!.data as { name: string; initials: string };
+    expect(entries).toMatchObject([{ cardId: json.id, name, initials }]);
+    expect(JSON.stringify(entries)).not.toMatch(/linkedin\.com|camille-ardent/);
     expect(ctx.calls.collect).toHaveLength(0);
     expect(s.state === "done" && s.kind === "card" && s.card.findings?.[0]?.text.fr).toBe("LinkedIn retrouvé : « Senior Full-Stack Engineer ».");
     const again = await post(ctx, { linkedin: "https://fr.linkedin.com/in/camille-ardent?trk=abc" });
