@@ -211,7 +211,7 @@ const THIRD_PARTY_TAG = "-tp";
 
 export async function removeImages(ogDir: string, ids: string[]) {
   await Promise.all([
-    // Les duels où paraît l'une de ces fiches (§18.91, duel.ts).
+    // Les duels où paraît l'une de ces fiches (§18.94, duel.ts).
     removeDuels(ogDir, ids),
     ...ids.flatMap((id) =>
       OG_SUFFIXES.flatMap((s) =>
@@ -942,7 +942,7 @@ export function createApp(opts: AppOptions) {
   });
 
   /**
-   * Le duel d'une dénonciation (§18.91, duel.ts) : `/og/{fiche}-vs-{dénonciateur}.png`. Rien
+   * Le duel d'une dénonciation (§18.94, duel.ts) : `/og/{fiche}-vs-{dénonciateur}.png`. Rien
    * (404) si `r` n'est pas le dénonciateur de la fiche, ou si l'une des deux est masquée.
    * Rendu une fois par état des deux fiches (la clé du fichier), cache court : une
    * revendication change l'image.
@@ -999,7 +999,7 @@ export function createApp(opts: AppOptions) {
     }
     // L'aperçu est lu par tout le monde : la version publique (shared/publicView.ts).
     const found = row ? metaFor(publicView(withWeekSpecial(store.db, row.data).data, { thirdParty: thirdParty(row) }), baseUrl) : genericMeta(baseUrl, `/c/${id}`, requestLang(c.req.query("lang"), c.req.header("Accept-Language")));
-    // Le lien envoyé par le dénonciateur (?r= sa fiche) : l'aperçu est le duel (§18.91) ; tout autre r, l'aperçu habituel.
+    // Le lien envoyé par le dénonciateur (?r= sa fiche) : l'aperçu est le duel (§18.94) ; tout autre r, l'aperçu habituel.
     const duel = row ? duelOf(store, row, c.req.query("r"), thirdParty) : null;
     const meta = { ...(duel ? duelMeta(duel, found, baseUrl) : found), noindex: true };
     const html = template ? injectMeta(template, meta) : standalonePage(meta);

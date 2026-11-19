@@ -39,7 +39,7 @@ describe("Dénoncer : la fiche du complice", () => {
     expect(html).not.toContain("Machine à livrer");
   });
 
-  it("au bureau : la rangée des canaux, WhatsApp en rose ; aucun partage public, X n'est pas un bouton (§18.48, §18.91)", () => {
+  it("au bureau : la rangée des canaux, WhatsApp en rose ; aucun partage public, X n'est pas un bouton (§18.48, §18.94)", () => {
     vi.stubGlobal("window", { location: { origin: "https://skills.test", pathname: "/", search: "" }, matchMedia: () => ({ matches: false }) });
     vi.stubGlobal("localStorage", { getItem: () => "fr", setItem: () => undefined });
     const wanted = (card: CardData) =>
@@ -95,7 +95,7 @@ describe("Dénoncer : la fiche du complice", () => {
     expect(src).toContain('api.track("card_shared", card.id, { channel, kind: "denounce" })');
   });
 
-  it("l'aperçu de ce qui part : l'image du duel, paresseuse, ratio réservé (§18.91)", () => {
+  it("l'aperçu de ce qui part : l'image du duel, paresseuse, ratio réservé (§18.94)", () => {
     vi.stubGlobal("window", { location: { origin: "https://skills.test", pathname: "/", search: "" }, matchMedia: () => ({ matches: false }) });
     vi.stubGlobal("localStorage", { getItem: () => "fr", setItem: () => undefined });
     const card = { ...FIXTURES.silver, login: "camroux" };
@@ -111,7 +111,7 @@ describe("Dénoncer : la fiche du complice", () => {
     expect(readFileSync(join(__dirname, "denounce.css"), "utf8")).toMatch(/\.denounce-preview \{[^}]*aspect-ratio: 1200 \/ 630;[^}]*border-radius/);
   });
 
-  it("le message envoyé : on l'a dénoncé, le duel en chiffres, puis le lien (§18.91)", () => {
+  it("le message envoyé : on l'a dénoncé, le duel en chiffres, puis le lien (§18.94)", () => {
     const fr = (s: string) => s.replace(/ /g, " ");
     const d = DICTS.fr.denounce;
     expect(fr(d.sendText("@camroux", 79, 67, d.iLead(d.starsAhead(1))))).toBe("@camroux, je viens de te dénoncer sur Azerit : 79 contre 67, j'ai une étoile d'avance. À toi de jouer :");
@@ -182,7 +182,7 @@ describe("Dénoncer : la fiche du complice", () => {
   });
 });
 
-describe("Dénoncer : le lien envoyé (§18.91)", () => {
+describe("Dénoncer : le lien envoyé (§18.94)", () => {
   it("porte ?r= de la fiche du dénonciateur, pas celle du complice", async () => {
     vi.stubGlobal("window", { location: { origin: "https://skills.test" } });
     const { shareUrl } = await import("../lib/util");

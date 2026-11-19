@@ -1,4 +1,4 @@
-// Le duel d'une dénonciation (SPEC §18.91). Le lien que le dénonciateur envoie porte
+// Le duel d'une dénonciation (SPEC §18.94). Le lien que le dénonciateur envoie porte
 // `?r={sa fiche}` ; quand `r` est bien `cards.denounced_by` de la fiche ouverte et que
 // la fiche du dénonciateur est visible, l'aperçu du lien devient le face-à-face :
 // og:image `/og/{fiche}-vs-{dénonciateur}.png`, og:title « @moi te dénonce : 78 contre 71 ».

@@ -1,6 +1,6 @@
 // La comparaison de deux fiches (§18.7) : « Toi 78 · @X 71 · une étoile d'avance ».
 // Les étoiles d'abord, c'est ce qui se voit ; à étoiles égales, les points. Le front
-// (lib/versus.ts) et le serveur (l'aperçu du duel d'une dénonciation, §18.91) la lisent ici.
+// (lib/versus.ts) et le serveur (l'aperçu du duel d'une dénonciation, §18.94) la lisent ici.
 import { starsFor } from "./types";
 
 export type Verdict =

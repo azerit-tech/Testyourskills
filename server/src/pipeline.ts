@@ -38,7 +38,7 @@ export interface RenderInput {
   /** `prime` : l'aperçu de lien d'une prime (§18.4), et son logo en data URI s'il en a un. */
   prime?: PrimeView;
   logo?: PrimeLogo | null;
-  /** `duel` : l'aperçu du lien d'une dénonciation (§18.91), les deux fiches en vues publiques. */
+  /** `duel` : l'aperçu du lien d'une dénonciation (§18.94), les deux fiches en vues publiques. */
   duel?: { by: CardData; target: CardData };
   lang: Lang;
 }

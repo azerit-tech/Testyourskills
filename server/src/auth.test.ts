@@ -680,7 +680,7 @@ describe("masquer", () => {
   });
 });
 
-describe("revendication et duels (§18.91)", () => {
+describe("revendication et duels (§18.94)", () => {
   it("revendiquer efface les duels en cache des fiches du login, pas ceux des autres", async () => {
     const ctx = setup();
     insertCard(ctx.store);

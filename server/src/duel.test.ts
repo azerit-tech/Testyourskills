@@ -1,4 +1,4 @@
-// Le duel d'une dénonciation (§18.91) : l'aperçu du lien envoyé par le dénonciateur.
+// Le duel d'une dénonciation (§18.94) : l'aperçu du lien envoyé par le dénonciateur.
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -96,7 +96,7 @@ async function page(ctx: Ctx, path: string) {
   return (await ctx.app.request(path)).text();
 }
 
-describe("le duel dans l'aperçu du lien envoyé (§18.91)", () => {
+describe("le duel dans l'aperçu du lien envoyé (§18.94)", () => {
   it("og:image et twitter:image : le duel seulement quand r est le dénonciateur de la fiche", async () => {
     const ctx = setup();
     const by = await post(ctx, { login: "leamd" });

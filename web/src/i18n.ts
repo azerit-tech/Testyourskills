@@ -787,7 +787,7 @@ const fr = frTypoDeep({
     charge: (status: string) => `Chef d'accusation : ${status}`,
     /* le seul bouton : à la personne elle-même, pour qu'elle la reprenne (parcours 2 et 25) */
     send: (who: string) => `Envoyer à ${who}`,
-    /* le message envoyé (§18.91) : on l'a dénoncé, le duel en chiffres, puis le lien. `them` nul : dossier scellé ; `me` nul : sa note inconnue */
+    /* le message envoyé (§18.94) : on l'a dénoncé, le duel en chiffres, puis le lien. `them` nul : dossier scellé ; `me` nul : sa note inconnue */
     sendText: (who: string, me: number | null, them: number | null, lead: string) =>
       me === null
         ? `${who}, je viens de te dénoncer sur Azerit. À toi de jouer :`

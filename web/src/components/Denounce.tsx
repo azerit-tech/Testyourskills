@@ -90,7 +90,7 @@ interface Props {
   toast: (m: string) => void;
   /** Le champ déjà rempli (l'accueil ouvert sur /<pseudo> par qui a déjà sa fiche). */
   initial?: string;
-  /** La note du dénonciateur : le duel en chiffres dans le message envoyé (§18.91). */
+  /** La note du dénonciateur : le duel en chiffres dans le message envoyé (§18.94). */
   mine?: number | null;
 }
 
@@ -283,7 +283,7 @@ export function Denounce({ cardId, selfLogin, toast, initial, mine }: Props) {
 /**
  * Ce que le dénonciateur reçoit : la fiche du complice résumée, prête à envoyer. Dénoncer s'adresse à une
  * personne (§18.48) : aucun partage public, la fiche d'un tiers ne part pas dans un post. Au-dessus des
- * boutons, l'aperçu de ce qui part : l'image du duel (§18.91), celle que la messagerie montrera. Sur
+ * boutons, l'aperçu de ce qui part : l'image du duel (§18.94), celle que la messagerie montrera. Sur
  * téléphone, « Envoyer à @x » ouvre la feuille du système (texte et lien, sans fichier : WhatsApp,
  * iMessage et Messenger bâtissent eux-mêmes l'aperçu), WhatsApp et SMS en raccourcis dessous ; sur
  * ordinateur, une rangée de canaux : WhatsApp, e-mail, LinkedIn (message copié avant l'ouverture), Copier.
@@ -313,7 +313,7 @@ export function Wanted({ card, byId, mine, toast, onAgain }: { card: CardData; b
   const tag = tagOf(card, lang);
   const status = bestStatus(card, lang);
   const level = pick(LEVEL_LABELS[n], lang);
-  // Le lien porte la fiche du dénonciateur (?r=) : son aperçu est le duel (§18.91).
+  // Le lien porte la fiche du dénonciateur (?r=) : son aperçu est le duel (§18.94).
   const url = shareUrl(card.id, byId);
   const canNative = isTouch() && hasNativeShare();
   const track = (channel: string) => api.track("card_shared", card.id, { channel, kind: "denounce" });

@@ -1,4 +1,4 @@
-// L'aperçu du lien d'une dénonciation (SPEC §18.91), 1200 × 630 : le face-à-face.
+// L'aperçu du lien d'une dénonciation (SPEC §18.94), 1200 × 630 : le face-à-face.
 // Les deux fiches en vis-à-vis, le dénonciateur à gauche, la personne dénoncée à
 // droite, chacune avec son halo de ★★★★★★ ; entre elles, ce qu'une vignette de
 // messagerie doit dire en une demi-seconde : les deux noms, les deux notes en très

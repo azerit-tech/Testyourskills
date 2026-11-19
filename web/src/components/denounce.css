@@ -113,7 +113,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* ce qui part (§18.91) : l'image du duel, telle que la messagerie la montrera ; le ratio est réservé */
+/* ce qui part (§18.94) : l'image du duel, telle que la messagerie la montrera ; le ratio est réservé */
 .denounce-preview {
   display: block;
   width: 100%;
