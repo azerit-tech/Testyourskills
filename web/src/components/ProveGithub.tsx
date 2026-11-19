@@ -21,9 +21,11 @@ interface Props {
   strong?: boolean;
   /** Le nom de la fiche : le champ en part, les comptes à ce nom sont proposés d'emblée. */
   name?: string;
+  /** La fiche que le GitHub complète : ses bandes suivent le dossier (§18.82). */
+  cardId?: string;
 }
 
-export function ProveGithub({ linkedinUrl, strong = false, name = "" }: Props) {
+export function ProveGithub({ linkedinUrl, strong = false, name = "", cardId }: Props) {
   const { t, lang } = useT();
   const p = t.result.prove;
   const uid = useId().replace(/:/g, "");
@@ -39,7 +41,7 @@ export function ProveGithub({ linkedinUrl, strong = false, name = "" }: Props) {
     setBusy(true);
     setError(null);
     try {
-      const res = await api.createCard({ login: gh, linkedin: linkedinUrl, lang });
+      const res = await api.createCard({ login: gh, linkedin: linkedinUrl, lang, from: cardId });
       if (res.deleteToken) tokens.set(res.id, res.deleteToken);
       rememberInput({ login: gh, file: null });
       markFresh(res.id, gh);

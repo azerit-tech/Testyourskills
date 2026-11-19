@@ -620,7 +620,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
     visitor || item.kind !== "card" ? null : proveFirst ? (
       <AddSource card={main} strong={!!addFirst} />
     ) : item.card.source === "github" && item.card.login ? (
-      <AddLinkedin login={item.card.login} strong={!!addFirst} name={item.card.name} />
+      <AddLinkedin login={item.card.login} cardId={item.card.id} strong={!!addFirst} name={item.card.name} />
     ) : null;
 
   // « Revoir ma poursuite » : dans la tête de la fiche ; sur un téléphone court, la tête se masque

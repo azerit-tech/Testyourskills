@@ -29,6 +29,8 @@ const fr = {
   pick: {
     title: "Tu roules pour qui ?",
     intro: "Tes étoiles comptent pour l'école et la boîte que tu choisis.",
+    /** Déjà dedans (l'entrée d'office, §18.82) : c'est fait, et ça se change. */
+    introIn: "Tes étoiles comptent déjà. Tu peux changer.",
     school: "Ton école",
     company: "Ta boîte",
     schoolLabel: "Cherche ton école",
@@ -37,6 +39,9 @@ const fr = {
     join: "J'en suis",
     /** « Tu rapportes ★★★★ à CentraleSupélec. » : les étoiles et le nom vont entre ces mots. */
     line: ["Tu rapportes", "à"] as [string, string],
+    change: "Changer",
+    changeLabel: (label: string) => `Changer de bande, à la place de ${label}`,
+    cancel: "Annuler",
     leave: "Sortir",
     leaveLabel: (label: string) => `Sortir de la bande ${label}`,
     share: "Partager",
@@ -58,7 +63,7 @@ const fr = {
     rowLabel: (rank: number | null, label: string, score: number, dossiers: number) =>
       `${rank ? (rank === 1 ? "n° 1" : `${rank}e`) : "En formation"}, ${label}, ${n(score, "étoile", "étoiles")}, ${n(dossiers, "fiche", "fiches")}`,
     makeTitle: "Fais gagner ta bande",
-    make: "Fais ta fiche, puis choisis ton école et ta boîte juste sous elle : tes étoiles comptent pour elles.",
+    make: "Fais ta fiche : ses étoiles comptent pour ton école et ta boîte. Tu peux changer juste sous elle.",
   },
   page: {
     make: (label: string) => `Fais ta fiche pour ${label}`,
@@ -137,6 +142,7 @@ const en: BandsDict = {
   pick: {
     title: "Who do you ride for?",
     intro: "Your stars count for the school and the company you pick.",
+    introIn: "Your stars already count. You can switch.",
     school: "Your school",
     company: "Your company",
     schoolLabel: "Find your school",
@@ -144,6 +150,9 @@ const en: BandsDict = {
     companyLabel: "Your company's name",
     join: "I'm in",
     line: ["You add", "to"],
+    change: "Switch",
+    changeLabel: (label: string) => `Switch crew, instead of ${label}`,
+    cancel: "Cancel",
     leave: "Leave",
     leaveLabel: (label: string) => `Leave the ${label} crew`,
     share: "Share",
@@ -163,7 +172,7 @@ const en: BandsDict = {
     rowLabel: (rank: number | null, label: string, score: number, dossiers: number) =>
       `${rank ? `#${rank}` : "Forming"}, ${label}, ${nEn(score, "star", "stars")}, ${nEn(dossiers, "sheet", "sheets")}`,
     makeTitle: "Put your crew on top",
-    make: "Get your rap sheet, then pick your school and your company right under it: your stars count for them.",
+    make: "Get your rap sheet: its stars count for your school and your company. You can switch right under it.",
   },
   page: {
     make: (label: string) => `Get your rap sheet for ${label}`,
