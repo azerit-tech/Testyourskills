@@ -396,6 +396,8 @@ Dans cet ordre, sous la carte :
 
 ### 6.5 Comparaison
 
+*Abandonné : plus de comparaison entre deux sources. Une personne qui a les deux a une fiche, une lecture, une note (§18.36, §18.84, §18.93).*
+
 Quand les deux sources sont là : les deux cartes côte à côte sur desktop, empilées avec un curseur sur mobile. Entre les deux, le delta par stat en pastilles colorées. Un titre généré par règle : « Ton CV te vend {n} points de plus que ton code » ou l'inverse « Ton code vaut {n} points de plus que ton CV, change de CV ».
 
 ## 7. Partage
@@ -970,6 +972,8 @@ Après chaque fusion, on vérifie la grille suivante. On corrige ce qui manque, 
 - **Pas fait** : « Voir l'arrestation ». `seek` n'existe que dans le crochet de mise au point (`__tys3d`, en dev) ; démarrer la scène aux portes demande une option de départ dans `createWalkout`, la version CSS des téléphones faibles, et télécharge plusieurs Mo de 3D pour un visiteur venu de LinkedIn. À reprendre avec le clip du §18.8, qui couvre le même besoin. Pas fait non plus : les dénonciations dans le tableau de `npm run weekly`.
 
 ### 18.24 LinkedIn contre GitHub (9 novembre 2026)
+
+*Depuis le 19 novembre 2026, plus rien ne se lit « contre » : LinkedIn et GitHub font une fiche, une lecture, une note (§18.36, §18.84, §18.93). Ce paragraphe vaut encore pour l'entrée, la lecture du profil et la preuve du lien entre les deux.*
 
 *Ce que la personne déclare contre ce qu'elle prouve. Construit sur le moteur de la comparaison CV.*
 
@@ -2474,3 +2478,56 @@ Jacques, devant l'accueil du §18.89 : « mais école et boîte, je veux un clas
 - **Serveur** : `GET /api/bands/top` rend, par ligue, ces cinq lignes (une bande en formation y a `rank` nul ; sa place est sa position). `?ecole=<id>` et `?boite=<id>` : sa propre bande, si elle est plus bas, dans `mine` avec sa place. `GET /api/bands` et `/bandes` ne changent pas.
 - **Téléphone, d'abord** : les deux classements l'un sous l'autre, 40 px entre eux. **Bureau** : côte à côte pour le visiteur ; l'un sous l'autre, dans la colonne des classements, pour qui a sa fiche (§18.89).
 - **Vérifié** : `tsc -b` et `vitest run` verts (le classement de l'accueil côté serveur, la route et ses paramètres ; les deux tableaux, les places libres, sa bande dans la liste et sous le filet, ce qui n'y est plus, en français et en anglais). Chrome sans tête et muet, API simulée, à 390, 320 et 1280 px, connecté et visiteur : la production du jour (Écoles : CentraleSupélec, Centrale Méditerranée en formation, places 3 à 5 libres ; Boîtes : Azerit, places 2 à 5 libres), des ligues pleines (son école 8e sous le filet, sa boîte 2e, deux boîtes en formation en 4e et 5e), sa bande en formation dans la liste, une ligue vide. Aucun défilement horizontal ; la ligne des places libres ramène au formulaire. **Pas vérifié** : un vrai téléphone.
+
+### 18.93 La lecture rapide : où passent les secondes d'une fiche, et une seule fiche pour LinkedIn et GitHub (19 novembre 2026, branche `perf/lecture-rapide`)
+
+Jacques, jour du lancement : « 25 secondes la lecture d'un profil c'est trop long, ça peut pas être plus rapide ? », puis « je m'en fiche de la comparaison, on peut presque la supprimer ». Les fiches du jour disaient « Lue par Azerit en 9, 15, 21, 25, 31 s ». Cible : une fiche courante sous 10 s, LinkedIn et GitHub ensemble sous 12 s, sans toucher au barème ni à ses notes.
+
+**Mesurer d'abord**
+
+- **Une ligne par fiche au journal** (`server/src/timing.ts`, une trace par fiche portée par `AsyncLocalStorage` : aucun module ne reçoit de paramètre en plus). Chaque phase `nom@début+durée` en secondes : `faits` (la collecte GitHub, avec sa dernière étape finie et ses comptes d'appels), `linkedin` (la lecture du profil), `fichiers` (le choix et le téléchargement des fichiers lus), `code` et `parcours` (les deux lectures IA : modèle, fournisseur, tokens d'entrée → de sortie, raisonnement, cache, durée), `barème`. Exemple : `[fiche Ab12…] 9.3 s · dossier linkedin · file 0.0 · faits@0.0+3.7 (fin premier_commit, rest 65, graphql 16, raw 60) · linkedin@0.7+4.0 · fichiers@2.0+1.6 · code@3.6+4.0 (claude-haiku-5.5@Azure 25444→579 cache 7057 4.0s) · parcours@4.8+4.5 (claude-haiku-5.5@Azure 12708→1085 4.4s) · barème@9.2+0.1`. Jamais un pseudo, une adresse ni un contenu. Une fiche en échec a sa ligne aussi (`échec unknown_user`, la phase fautive porte un `!`). Le rendu d'une image dit sa durée à part (`[image] og 180 ms`) : il n'est pas dans l'attente de la fiche.
+- **`scripts/mesure-fiche.ts`** fait tourner le vrai pipeline, ses vrais modules, sur une base en mémoire : `npx tsx --env-file=.env scripts/mesure-fiche.ts <pseudo | lien LinkedIn> [--detail] [--json dossier]`. Sans `APIFY_TOKEN` en local, la lecture du profil est simulée (`--profil-simule`, un profil fictif rendu après 4 s, la durée vue en production) : **la lecture LinkedIn réelle n'a pas été mesurée ici**, tout le reste l'est (GitHub, OpenRouter).
+
+**Ce qui prenait le temps**
+
+- **Haiku 5.5 raisonnait encore**, malgré `reasoning: { effort: "minimal" }` (§18.32) : 1 678 tokens de raisonnement sur une lecture de code (10,9 s), 4 642 sur un profil LinkedIn riche (23,8 s). C'était l'essentiel des 25 s. Coupé (`effort: "none"`, accepté par les fournisseurs vus : Azure, Google, Anthropic) : zéro token de raisonnement, 3,1 à 4,3 s pour le code, 4,4 à 7,1 s pour le profil. La sortie est une extraction contrainte par schéma ; pour le code, le champ `observations` ancre déjà le niveau avant qu'il soit donné. GLM reste au minimum (il refuse la coupure). Un fournisseur qui refuserait la coupure (400 ou 404 citant le raisonnement) ramène le modèle au minimum, pour l'appel et les suivants.
+- **Le LinkedIn attendait la fin de la collecte GitHub** (3 à 4 s) avant d'être lu, alors qu'il ne lui faut que le profil GitHub (0,5 s).
+- **Le fournisseur** : OpenRouter route Haiku 5.5 vers Azure, Google ou Anthropic, qui ne répondent pas à la même vitesse. Le même profil courant : 4,4 s chez Azure, 9,5 s chez Google ; un profil riche : 6,1 à 7,1 s chez Azure, 9,8 s chez Anthropic. Azure a été le plus rapide et le plus régulier sur une quinzaine d'appels (échantillon court, un seul soir).
+
+**Ce qui change**
+
+- **Rien n'attend ce qui ne lui sert pas** (`pipeline.ts`, `github/collect.ts`). La collecte donne en avance le profil seul (`onProfile`) : la recherche et la lecture du LinkedIn partent à 0,6 s. Elle donne aussi les arbres et les commits (`onReadable`) : le choix des fichiers et la lecture du code partent sans attendre les années, les langages ni le premier commit. Une collecte qui ne donne rien en avance marche comme avant : tout part à sa fin. Une seule lecture, un seul appel au chercheur, quoi qu'il arrive.
+- **Entrée LinkedIn avec un GitHub prouvé par l'email** (§18.80) : ce pseudo sera celui de la fiche quoi que dise le profil ; sa collecte et la lecture de son code partent pendant la lecture du profil.
+- **Les appels que la suite attend passent devant** (`github/http.ts`, `urgent`) : profil, calendrier, liste des dépôts, arbres, commits. Même plafond de 16 appels en vol par collecte, même nombre d'appels (le test de référence de la collecte ne bouge pas) : seul l'ordre change. Les fichiers des trois dépôts lus se téléchargent ensemble.
+- **`AI_PROVIDER_ORDER`** (noms OpenRouter séparés par des virgules) : les fournisseurs à essayer d'abord, les autres restant en repli. **À poser sur le VPS : `AI_PROVIDER_ORDER=Azure`.** Vide, le routage d'OpenRouter. La ligne du journal dit qui a répondu : c'est elle qui dira quand changer.
+- **Les replis tiennent** : fiche dégradée si la lecture du code échoue, `closed` si l'IA est fermée, fiche LinkedIn seule si le GitHub du profil n'existe plus, fiche GitHub seule si le LinkedIn ne vient pas avant la marge du délai, rallonge du délai pour une lecture LinkedIn lente. Si la collecte échoue après le départ de la lecture, c'est son erreur qui sort.
+- **`Pipeline.wait`** attend aussi une fiche tout juste sortie de la file : qui arrivait à cet instant passait devant les suites déjà inscrites (la marque d'une dénonciation). Le défaut dormait ; le chronométrage, en déplaçant quelques tours de boucle, l'a fait sortir dans deux tests.
+
+**Une fiche pour LinkedIn et GitHub**
+
+- **Audit** : c'est déjà le cas depuis le lot du §18.36 et le barème 0.5.0 (§18.84). Un dossier, `scoreDossier`, une grille, une note ; la page montre une fiche (`shared/caseFile.ts`), sans onglets, sans écart. L'expérience, l'école et les employeurs se lisent sur LinkedIn, le code sur GitHub.
+- **« Un jugement au lieu de deux »** : il n'y a qu'un jugement (la grille, en code). Les deux appels IA sont deux lectures, celle du code et celle du parcours, dont la grille a besoin toutes les deux ; elles tournent ensemble, l'attente est la plus longue des deux, pas leur somme. Les fondre en un appel ne gagnerait rien : la sortie se génère token après token, et les deux sorties s'ajouteraient. Le levier mesuré était ailleurs (le raisonnement, puis le départ du LinkedIn).
+- **Sous la fiche** : « D'après LinkedIn et GitHub » (« D'après le CV et GitHub », "Based on LinkedIn and GitHub"), à la place de « Sources au dossier : LinkedIn et GitHub ». Le même mot que le tampon « D'APRÈS LINKEDIN » d'une fiche à une source.
+- **Les anciens dossiers** s'ouvrent comme avant, à leur adresse `/c/{id}`, sans migration (`oneNote`, `caseCard`). La vitrine est un dossier comme un autre.
+- **« Prouvée » et le top** ne bougent pas (§18.24, §18.80) : un GitHub trouvé par le nom ne prouve pas le lien (testé).
+
+**Mesures, mêmes entrées avant et après** (Haiku 5.5, Mac local, LinkedIn simulé à 4 s)
+
+- **GitHub seul, compte courant** (@jmougeot, 65 appels REST, 3 dépôts lus) : 8,5 s → 8,1 à 9,0 s (une lecture à 10,7 s, le soir où l'IA a mis 5,2 s). Inchangé : cette fiche ne raisonnait presque pas, et son temps est celui de GitHub (2 à 3 s de collecte utile, 2 s pour les 36 détails de commits qui choisissent les fichiers, 3,5 s de lecture IA).
+- **GitHub seul, rien à lire** (@LumBuilds0) : 1,8 s → 1,6 s.
+- **GitHub seul, 1 100 dépôts** (@sindresorhus) : 21,1 s (une sortie IA invalide en 9,2 s, puis la relance) → 12,6 à 19,6 s. La lecture IA tient en 3,1 à 3,7 s ; le reste est la collecte, que GitHub servait lentement ce soir-là (9 à 11 s, contre 6,3 s la veille).
+- **LinkedIn + GitHub par un pseudo**, profil riche (7 postes, 30 compétences) : **29,1 s → 12,3 s** au routage d'OpenRouter, **10,9 s** avec Azure d'abord. Avant : `linkedin@3.6+4.0`, `code` 10,4 s, `parcours@7.7+21.3`. Après : `linkedin@0.5+4.0`, `code` 3,5 s, `parcours@4.6+6.2`. Profil courant (3 postes) : **9,3 s** avec Azure, 14,5 s le soir où Google a lu le profil.
+- **LinkedIn + GitHub par un lien LinkedIn** (le profil donne le GitHub), profil riche : **26,1 s → 14,0 s** (Anthropic a lu le profil en 9,8 s), **12,5 s** avec Azure. Avec le GitHub prouvé par l'email : **11,3 s et 10,8 s**.
+- **Ce qui borne un dossier désormais** : la lecture du profil par Apify (4 s) puis sa lecture par l'IA (4 à 7 s selon sa longueur). Rien de GitHub n'est plus sur ce chemin.
+
+**Les notes ne bougent pas** (mêmes entrées, la variance ordinaire de l'IA comprise)
+
+- @jmougeot : 72 dans les quatre lectures d'après comme avant, mêmes critères (XP 4, stack 6, code 7, activité 8, ownership 8, open source 6) ; niveaux du code 4, 3, 3, sauf une lecture à 4, 3, 4, note inchangée. @sindresorhus : 89 trois fois, mêmes critères, niveaux 4, 4, 4. @LumBuilds0 : 20.
+- Le dossier au profil riche : 66 avant (deux lectures), 66 dans quatre lectures sur six après, mêmes huit critères ; **72 dans deux** (le parcours à 8 au lieu de 6 : le type d'employeur lu « scale-up » au lieu d'« inconnu »). Cet écart de lecture existait avant la coupure du raisonnement, sur le même profil ; six lectures ne disent pas s'il est devenu plus fréquent. À regarder sur les fiches réelles.
+
+**Laissé de côté**
+
+- **Le GitHub trouvé par le nom** (connexion LinkedIn sans email reconnu) attend encore la lecture du profil, qui peut en donner un autre : 12,5 s sur un profil riche. Le lancer en avance, à part, et le couper si le profil en décide autrement a été construit et mesuré (9,0 s, profil courant), puis retiré : les tests de l'entrée fixent qu'un compte trouvé par le nom n'est pas collecté quand le profil donne un autre GitHub. À décider avec l'entrée.
+- **La fiche GitHub seule** ne descend pas sous 8 s sans lire moins de commits pour choisir les fichiers (ce qui changerait les fichiers lus, donc la lecture) ou sans monter le plafond d'appels en vol (16 par collecte ; GitHub en tolère 100 par jeton, quatre fiches tournent ensemble).
+- **Le fournisseur par défaut** reste le routage d'OpenRouter dans le code : la vitesse d'un fournisseur change d'un jour à l'autre, le réglage se fait dans `.env`.
+- **Vérifié** : `tsc -b`, `vitest run` (2 143 tests) et `npm run build` verts. Tests neufs : la trace et sa ligne, le chronométrage du pipeline (fiche, CV, dossier, échec, file), le raisonnement par modèle et son repli, le fournisseur, les faits donnés en avance et leur nombre d'appels, le limiteur et ses appels urgents, les téléchargements ensemble, les départs en avance et leurs replis (treize cas), la légende du dossier. Une vingtaine de vraies fiches.
