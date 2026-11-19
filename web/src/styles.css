@@ -1110,9 +1110,6 @@ svg {
   .page-home .board > * {
     max-width: none;
   }
-  .page-home .board > .bands-top-all {
-    justify-self: start;
-  }
   /* le dernier formulaire : une seule colonne centrée de 560 px, le titre en grand */
   .home-last {
     grid-template-columns: minmax(0, 560px);
@@ -1276,25 +1273,11 @@ svg {
 .home-mine-line .home-back {
   margin: 0;
 }
-/* les bandes : les deux ligues l'une sous l'autre, chacune sous son nom */
-.home-bands-cols {
-  display: grid;
-  gap: 28px;
-  margin-top: 8px;
-}
-.home-league {
-  display: grid;
-  align-content: start;
-  gap: 12px;
-  min-width: 0;
-}
-.home-league-name {
-  font: var(--font-block);
-  text-transform: uppercase;
-  color: var(--cream);
-}
-.home-bands .bands-top-all {
-  margin-top: 6px;
+/* les classements des bandes : dans la colonne des classements, l'un sous l'autre */
+.home-mine > .leagues {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: none;
+  padding: 0;
 }
 /* tout en bas : « Faire une autre fiche », un lien ; touché, le formulaire prend sa place */
 .home-more {
@@ -1320,7 +1303,8 @@ svg {
     grid-row: 1 / span 2;
     align-self: start;
   }
-  .home-mine > .board {
+  .home-mine > .board,
+  .home-mine > .leagues {
     grid-column: 2;
   }
   .home-mine > .primes-strip {
