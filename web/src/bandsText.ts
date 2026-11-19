@@ -80,6 +80,8 @@ const fr = {
     missing: (k: number) => `Encore ${n(k, "fiche", "fiches")}`,
     /** Sa propre bande en formation : ce qu'il lui manque, en une phrase. */
     toBoard: (k: number) => `Encore ${n(k, "fiche", "fiches")} pour entrer au tableau.`,
+    /** La règle, dite quand rien n'est encore au tableau (la page d'une bande). */
+    rule: "Trois fiches pour entrer au tableau.",
     makeTitle: "Fais gagner ta bande",
     make: "Fais ta fiche : ses étoiles comptent pour ton école et ta boîte. Tu peux changer juste sous elle.",
   },
@@ -87,6 +89,9 @@ const fr = {
     make: (label: string) => `Fais ta fiche pour ${label}`,
     makeNote: "Une fois ta fiche faite, un geste juste sous elle et tes étoiles comptent pour la bande.",
     roster: "Les fiches",
+    /** Le classement de sa ligue, à côté des fiches ; l'étiquette de sa ligne si elle est plus bas que les dix premières. */
+    board: "Le classement",
+    thisBand: "Cette bande",
     rosterNone: "Personne pour l'instant. La place est libre.",
     unnamed: "Fiche sans profil",
     more: (k: number) => `Et ${n(k, "autre fiche", "autres fiches")}.`,
@@ -187,6 +192,7 @@ const en: BandsDict = {
     formingLabel: (label: string, dossiers: number) => `${label}, forming, ${dossiers} of ${BAND_MIN_MEMBERS} sheets`,
     missing: (k: number) => nEn(k, "more sheet", "more sheets"),
     toBoard: (k: number) => `${nEn(k, "more sheet", "more sheets")} to make the board.`,
+    rule: "Three sheets to make the board.",
     makeTitle: "Put your crew on top",
     make: "Get your rap sheet: its stars count for your school and your company. You can switch right under it.",
   },
@@ -194,6 +200,8 @@ const en: BandsDict = {
     make: (label: string) => `Get your rap sheet for ${label}`,
     makeNote: "Once your sheet is out, one tap right under it and your stars count for the crew.",
     roster: "The sheets",
+    board: "The ranking",
+    thisBand: "This crew",
     rosterNone: "Nobody yet. The spot is open.",
     unnamed: "Sheet without a profile",
     more: (k: number) => `And ${nEn(k, "other sheet", "other sheets")}.`,
