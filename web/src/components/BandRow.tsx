@@ -9,14 +9,13 @@ import { onLinkClick } from "../lib/router";
 import { BandSlots } from "./BandSlots";
 import "./bands.css";
 
-/** `me` : sa propre bande, sur l'accueil de qui a sa fiche (§18.89), mise en évidence comme sa ligne au top de la semaine. */
-export function BandRow({ b, current = false, me = false }: { b: BandStanding; current?: boolean; me?: boolean }) {
+export function BandRow({ b, current = false }: { b: BandStanding; current?: boolean }) {
   const { t } = useT();
   const tb = t.bands.board;
   const href = bandPath(b);
   const forming = b.rank === null;
   const label = b.rank === null ? tb.formingLabel(b.label, b.members) : tb.rowLabel(b.rank, b.label, b.score, b.members);
-  const cls = `board-row band-row${forming ? " is-forming" : ""}${current ? " is-current" : ""}${me ? " is-me" : ""}`;
+  const cls = `board-row band-row${forming ? " is-forming" : ""}${current ? " is-current" : ""}`;
   const cells = (
     <>
       {!forming && <span className="board-rank">{b.rank}</span>}
@@ -41,7 +40,7 @@ export function BandRow({ b, current = false, me = false }: { b: BandStanding; c
   }
   return (
     <li>
-      <a className={cls} href={href} onClick={(e) => onLinkClick(e, href)} aria-label={label} aria-current={me ? "true" : undefined}>
+      <a className={cls} href={href} onClick={(e) => onLinkClick(e, href)} aria-label={label}>
         {cells}
       </a>
     </li>
