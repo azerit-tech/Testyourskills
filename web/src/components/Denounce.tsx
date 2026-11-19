@@ -195,7 +195,7 @@ export function Denounce({ cardId, selfLogin, toast, initial }: Props) {
     run(value);
   };
 
-  if (state.s === "done") return <Wanted card={state.card} toast={toast} onAgain={() => setState({ s: "idle" })} />;
+  if (state.s === "done") return <Wanted card={state.card} byId={cardId} toast={toast} onAgain={() => setState({ s: "idle" })} />;
 
   // « @x est dans le viseur », tout de suite : le titre de la fiche prête, avec sa barre en attendant les étoiles.
   if (state.s === "pending")
@@ -282,7 +282,7 @@ export function Denounce({ cardId, selfLogin, toast, initial }: Props) {
  * personne : un seul bouton, qui lui envoie le lien (§18.48), et « Copier le lien ». Aucun partage public :
  * la fiche d'un tiers ne part pas dans un post ; une fois reprise, c'est la personne qui la partage.
  */
-export function Wanted({ card, toast, onAgain }: { card: CardData; toast: (m: string) => void; onAgain: () => void }) {
+export function Wanted({ card, byId, toast, onAgain }: { card: CardData; byId: string; toast: (m: string) => void; onAgain: () => void }) {
   const { t, lang } = useT();
   const d = t.denounce;
   // La fiche prête prend plus de place que son attente : si son titre est passé au-dessus de l'écran, il y revient.
@@ -307,7 +307,8 @@ export function Wanted({ card, toast, onAgain }: { card: CardData; toast: (m: st
   const tag = tagOf(card, lang);
   const status = bestStatus(card, lang);
   const level = pick(LEVEL_LABELS[n], lang);
-  const url = shareUrl(card.id);
+  // Le lien porte la fiche du dénonciateur (?r=) : son aperçu est le duel (§18.91).
+  const url = shareUrl(card.id, byId);
   const canNative = isTouch() && hasNativeShare();
   const track = (channel: string) => api.track("card_shared", card.id, { channel, kind: "denounce" });
 

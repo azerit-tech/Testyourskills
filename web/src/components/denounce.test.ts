@@ -21,7 +21,7 @@ describe("Dénoncer : la fiche du complice", () => {
     const six = starsLine(starsFor(card.overall));
     expect(six).toHaveLength(6);
     const html = renderToStaticMarkup(
-      createElement(LangProvider, null, createElement(Wanted, { card, toast: () => undefined, onAgain: () => undefined })),
+      createElement(LangProvider, null, createElement(Wanted, { card, byId: "denouncer1", toast: () => undefined, onAgain: () => undefined })),
     );
     // Le dessin commun du site (SPEC §18.48) : six formes, les allumées d'abord, plus de glyphes dans le titre.
     const shapes = [...html.matchAll(/class="star-shape( on)?"/g)].map((m) => (m[1] ? "★" : "☆")).join("");
@@ -30,7 +30,7 @@ describe("Dénoncer : la fiche du complice", () => {
     expect(html).not.toMatch(/[★☆]/);
     // Dossier vide, pas encore revendiqué : aucune étoile.
     const sealed = renderToStaticMarkup(
-      createElement(LangProvider, null, createElement(Wanted, { card: { ...card, sealed: true }, toast: () => undefined, onAgain: () => undefined })),
+      createElement(LangProvider, null, createElement(Wanted, { card: { ...card, sealed: true }, byId: "denouncer1", toast: () => undefined, onAgain: () => undefined })),
     );
     expect(sealed).not.toMatch(/[★☆]/);
     expect(sealed).not.toContain("star-shape");
@@ -43,7 +43,7 @@ describe("Dénoncer : la fiche du complice", () => {
     vi.stubGlobal("window", { location: { origin: "https://skills.test", pathname: "/", search: "" }, matchMedia: () => ({ matches: false }) });
     vi.stubGlobal("localStorage", { getItem: () => "fr", setItem: () => undefined });
     const wanted = (card: CardData) =>
-      renderToStaticMarkup(createElement(LangProvider, null, createElement(Wanted, { card, toast: () => undefined, onAgain: () => undefined })));
+      renderToStaticMarkup(createElement(LangProvider, null, createElement(Wanted, { card, byId: "denouncer1", toast: () => undefined, onAgain: () => undefined })));
     const html = wanted({ ...FIXTURES.silver, login: "camroux" });
     const buttons = [...html.matchAll(/<button type="button" class="(pill[^"]*)">(.*?)<\/button>/g)].map((m) => [m[1], m[2].replace(/<svg.*?<\/svg>/g, "").replace(/<[^>]+>/g, "")]);
     // Un seul bouton, à la personne : aucun partage public de la fiche d'un tiers.
@@ -122,5 +122,15 @@ describe("Dénoncer : la fiche du complice", () => {
   it("« Droit de faire appel » ne s'écrit plus nulle part : faire appel, c'est contester la note", () => {
     expect(JSON.stringify(DICTS.fr.denounce)).not.toContain("Droit de faire appel");
     expect(JSON.stringify(DICTS.en.denounce)).not.toContain("Right to appeal");
+  });
+});
+
+describe("Dénoncer : le lien envoyé (§18.91)", () => {
+  it("porte ?r= de la fiche du dénonciateur, pas celle du complice", async () => {
+    vi.stubGlobal("window", { location: { origin: "https://skills.test" } });
+    const { shareUrl } = await import("../lib/util");
+    expect(shareUrl("abc123")).toBe("https://skills.test/c/abc123?r=abc123");
+    expect(shareUrl("target1", "denouncer1")).toBe("https://skills.test/c/target1?r=denouncer1");
+    expect(readFileSync(join(__dirname, "Denounce.tsx"), "utf8")).toContain("shareUrl(card.id, byId)");
   });
 });
