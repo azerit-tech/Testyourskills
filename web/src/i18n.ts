@@ -131,6 +131,12 @@ const fr = frTypoDeep({
       see: "Voir ma fiche",
       another: "Faire une autre fiche",
     },
+    /** Connecté avec une fiche au compte (§18.91) : le rose y mène, la petite ligne dessous. */
+    account: {
+      see: "Voir ma fiche",
+      redo: "Refaire ma fiche",
+      out: "Se déconnecter",
+    },
     /* Mur des 13 profils (§18.28) */
     wall: {
       title: "Quel profil es-tu ?",
@@ -975,6 +981,11 @@ const en: Dict = {
       owedGo: "Watch it",
       see: "See my sheet",
       another: "Make another sheet",
+    },
+    account: {
+      see: "See my sheet",
+      redo: "Redo my sheet",
+      out: "Sign out",
     },
     wall: {
       title: "Which profile are you?",

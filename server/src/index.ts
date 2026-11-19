@@ -140,6 +140,8 @@ const { app, pipeline, refreshShowcase } = createApp({
   linkedin,
   githubAuth,
   githubLogin,
+  // Le compte léger (§18.91) : sans SESSION_SECRET, pas de compte, tout marche comme avant.
+  accountSecret: process.env.SESSION_SECRET?.trim() || undefined,
   secureCookies: prod,
   avatarDir,
   filmTraceFile,

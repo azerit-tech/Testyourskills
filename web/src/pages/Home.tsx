@@ -35,6 +35,7 @@ import { homeHook, useAppConfig } from "../lib/season";
 import { returnPending } from "../lib/entryApi";
 import { MINE_EVENT, clearPending, dropPrefill, filmOwed, myCard, peekPrefill, pendingFile, type MyCard } from "../lib/session";
 import { ReturnCall } from "../components/ReturnCall";
+import { signOut, useAccount } from "../lib/account";
 
 export { ReturnCall };
 
@@ -352,6 +353,10 @@ export function Home() {
   // Qui a déjà sa fiche (§18.89) : sa fiche, les classements, et le formulaire replié tout en bas
   // sous « Faire une autre fiche ».
   const mineHome = returning && !denounce && !fromPrefill && !returnBack;
+  // Connecté (§18.91) : « Se déconnecter » à côté de « Faire une autre fiche ». Une fiche déjà là :
+  // les formulaires de l'accueil gardent leurs boutons, la ligne de sa fiche dit déjà où elle est.
+  const acct = useAccount();
+  const another = !!mem.mine || !!mem.pending;
   const showcase = useShowcase(!mineHome);
   const toast = useMiniToast();
 
@@ -393,7 +398,17 @@ export function Home() {
         </div>
         <div className="home-more" ref={moreRef}>
           {open ? (
-            <EntryForm inputRef={inputRef} />
+            <EntryForm inputRef={inputRef} another />
+          ) : acct ? (
+            <div className="entry-foot entry-or home-another">
+              <button type="button" className="link-alt" aria-expanded={false} onClick={openForm}>
+                {h.back.another}
+              </button>
+              <span aria-hidden>·</span>
+              <button type="button" className="link-alt" onClick={() => void signOut()}>
+                {h.account.out}
+              </button>
+            </div>
           ) : (
             <button type="button" className="link-alt home-another" aria-expanded={false} onClick={openForm}>
               {h.back.another}
@@ -429,7 +444,7 @@ export function Home() {
           ) : (
             <>
               {mem.mine || mem.pending ? <BackLine mine={mem.mine} pending={mem.pending} owed={owed} /> : <p className="hero-hook">{hook}</p>}
-              <EntryForm inputRef={inputRef} />
+              <EntryForm inputRef={inputRef} another={another} />
             </>
           )}
         </section>
@@ -460,7 +475,7 @@ export function Home() {
           </h2>
           <p>{hook}</p>
         </div>
-        <EntryForm secondary />
+        <EntryForm secondary another={another} />
       </section>
     </main>
   );

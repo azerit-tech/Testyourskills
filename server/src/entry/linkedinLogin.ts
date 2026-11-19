@@ -86,6 +86,8 @@ interface Session {
   exp: number;
   resolving: Promise<Resolution>;
   resolved?: Resolution;
+  /** Le compte de la personne connectée (§18.91) : la fiche qu'elle lance y sera liée. */
+  accountId?: string;
 }
 
 /** Ce que `tys_who` retient : le nom, puis le profil sûr et la fiche. */
@@ -109,6 +111,8 @@ export interface EntryIdentity {
   github: GithubIdentity | null;
   /** Le profil lancé est le profil sûr (email ou photo), pas un choix parmi des homonymes. */
   sureProfile: boolean;
+  /** Le compte de la personne connectée (§18.91), sinon absent. */
+  accountId?: string;
 }
 
 export interface LinkedinEnterOptions {
@@ -270,7 +274,7 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
 
   const hook: LinkedinEnterHook = {
     allow: (c) => o.limiter.take("li-enter", clientIp(c), ENTER_STARTS_PER_DAY),
-    finish(c, returnPath, profile) {
+    finish(c, returnPath, profile, accountId) {
       sweep();
       const id = randomBytes(18).toString("base64url");
       const who = { ...profile, name: profile.name ?? "" };
@@ -281,6 +285,7 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
         exp: now() + ENTER_TTL_MS,
         // La recherche part tout de suite : elle tourne pendant que la page se recharge.
         resolving: Promise.race([resolve(who, clientIp(c)), new Promise<Resolution>((res) => setTimeout(() => res(failed()), RESOLVE_MAX_MS).unref?.())]).catch(failed),
+        ...(accountId ? { accountId } : {}),
       };
       void session.resolving.then((r) => (session.resolved = r));
       sessions.set(id, session);
@@ -343,6 +348,7 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
       github: r.github,
       // Le profil au seul nom et employeur fait partir la fiche, sans valoir la preuve d'un email ou d'une photo.
       sureProfile: sure && r.how !== "employer",
+      ...(found.session.accountId ? { accountId: found.session.accountId } : {}),
       used() {
         sessions.delete(found.id);
         deleteCookie(c, ENTER_COOKIE, cookieBase);
@@ -371,5 +377,20 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
     deleteCookie(c, KNOWN_COOKIE, { ...cookieBase, httpOnly: false });
   };
 
-  return { hook, identityFor, rememberCard, forgetCard };
+  /** La fiche que `tys_who` désigne (« Voir ma fiche », §18.90), sans droit ; null s'il ne désigne rien. */
+  const knownOf = (c: Context): KnownCard | null => {
+    const w = whoOf(c);
+    return w && (w.url || w.cardId) ? (o.knownCard?.(w) ?? null) : null;
+  };
+
+  /** Se déconnecter, ou sa fiche supprimée par son compte (§18.91) : ce navigateur oublie tout de l'entrée. */
+  const forgetAll = (c: Context) => {
+    const found = sessionOf(c);
+    if (found) sessions.delete(found.id);
+    deleteCookie(c, ENTER_COOKIE, cookieBase);
+    deleteCookie(c, WHO_COOKIE, cookieBase);
+    deleteCookie(c, KNOWN_COOKIE, { ...cookieBase, httpOnly: false });
+  };
+
+  return { hook, identityFor, rememberCard, forgetCard, knownOf, forgetAll };
 }
