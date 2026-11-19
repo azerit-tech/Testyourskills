@@ -102,7 +102,7 @@ function ScoreDigits({ n, className }: { n: number; className: string }) {
 
 /**
  * Le relevé des critères (§18.95), à gauche sous le score : une étiquette (le nom court du critère, celui du dos de
- * la fiche), puis sa note sur 10 qui claque et compte, ou son état sans chiffre. Toutes les lignes sont posées dès la
+ * la fiche), puis sa note sur 10 qui claque et compte, « ?/10 » en retrait sans note, « comptée » pour l'école. Toutes les lignes sont posées dès la
  * première image, invisibles tant qu'elles ne sont pas tombées : le relevé ne bouge pas en se remplissant. Posé sur
  * l'image, ou dans la marge d'encre de gauche (téléphone couché, Film.tsx).
  */
@@ -114,18 +114,26 @@ export function FilmDetail({ hud }: { hud: Hud }) {
       {hud.detail.map((r) => (
         <li
           key={r.code}
-          className={`film-detail-row${r.hit ? " is-hit" : ""}${r.out ? " is-out" : ""}${r.kind === "note" ? "" : " is-state"}`}
+          className={`film-detail-row${r.hit ? " is-hit" : ""}${r.out ? " is-out" : ""}${r.unknown ? " is-unknown" : ""}`}
           style={{ visibility: r.shown ? undefined : "hidden", "--enter": r.enter, "--slap": r.slap } as CSSProperties}
         >
           <small className="film-detail-name">{r.label}</small>
-          {r.kind === "note" ? (
+          {r.state ? (
+            <span className="film-detail-state">{r.state}</span>
+          ) : (
             <b className="film-detail-note">
-              <ScoreDigits n={r.value} className="film-detail-run" />
-              <ScoreDigits n={r.step} className="film-detail-step" />
+              {r.unknown ? (
+                <span>
+                  <i>?</i>
+                </span>
+              ) : (
+                <>
+                  <ScoreDigits n={r.value} className="film-detail-run" />
+                  <ScoreDigits n={r.step} className="film-detail-step" />
+                </>
+              )}
               <small>/10</small>
             </b>
-          ) : (
-            <span className="film-detail-state">{r.state}</span>
           )}
         </li>
       ))}

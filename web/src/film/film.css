@@ -446,18 +446,20 @@
 /* Le relevé des critères (§18.95) : une colonne étroite à gauche, juste sous
    la rangée des étoiles, au-dessus de l'horizon (de 12 à 37 % de la hauteur
    environ), à gauche du score et de l'étoile qui tombe (au centre) : à 390 px
-   de large, elle ne dépasse pas 140 px. Une ligne par critère : l'étiquette en
-   mono, crème sur un aplat d'encre, de largeur fixe (--w, le nom le plus long
-   du relevé), puis la note dans la police du titre, crème cernée d'encre comme
-   le score, « /10 » en petit ; ou l'état sans chiffre, en mono sur deux lignes
-   au plus. Au coup d'un critère, l'étiquette s'inverse, la note claque
-   (--slap) et compte. Sous l'étoile qui tombe (z-index 1). */
+   de large, elle s'arrête avant 136 px, l'étoile posée commence à 143. Une
+   ligne par critère : l'étiquette en mono, crème sur un aplat d'encre, de
+   largeur fixe (--w, le nom le plus long du relevé), puis la note dans la
+   police du titre, crème cernée d'encre comme le score, « /10 » en petit ;
+   sans note (non prouvé, pas au dossier), « ?/10 » en retrait, à la même
+   place ; l'école, « comptée », sur une ligne. Au coup d'un critère,
+   l'étiquette s'inverse, la note claque (--slap) et compte. Sous l'étoile qui
+   tombe (z-index 1). */
 .film-detail {
   --d-name: clamp(9.5px, 1.15cqh, 10.5px);
   --d-note: clamp(15px, 2.5cqh, 22px);
   position: absolute;
   top: calc(var(--row-top) + var(--star) * 1.14 + 1.2cqh);
-  left: max(12px, 3.2cqw);
+  left: max(10px, 2.6cqw);
   z-index: 1;
   display: flex;
   flex-direction: column;
@@ -471,7 +473,7 @@
 .film-detail-row {
   display: flex;
   align-items: center;
-  gap: 0.36em;
+  gap: 0.3em;
   height: calc(var(--d-note) * 1.12);
   font-size: var(--d-note);
   opacity: var(--enter, 1);
@@ -480,13 +482,13 @@
 .film-detail-name {
   box-sizing: border-box;
   flex: none;
-  width: calc(var(--w, 11) * (1ch + 0.05em) + 10px);
-  padding: 2px 5px;
+  width: calc(var(--w, 11) * (1ch + 0.02em) + 8px);
+  padding: 2px 4px;
   border-radius: 2px;
   background: rgb(12 13 27 / 0.86);
   color: #fff9cb;
   font: 500 var(--d-name)/1.35 var(--f-mono);
-  letter-spacing: 0.05em;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -520,22 +522,23 @@
 .film-detail-step {
   display: none;
 }
-/* hors moyenne (l'open source sous la moyenne des autres) : la note en retrait */
+/* hors moyenne (l'open source sous la moyenne des autres) : la note en retrait ; sans note, « ?/10 » plus en retrait */
 .film-detail-row.is-out .film-detail-note {
   opacity: 0.55;
 }
-/* sans chiffre : « non prouvé », « pas au dossier », « comptée », en mono, plus petit, sur deux lignes au plus
-   (« pas au / dossier ») pour tenir dans la colonne, sur un aplat plus léger */
+.film-detail-row.is-unknown .film-detail-note {
+  opacity: 0.45;
+}
+/* l'école : « comptée », en mono, sur une ligne, sur un aplat plus léger */
 .film-detail-state {
-  box-sizing: content-box;
-  max-width: calc(8 * (1ch + 0.02em));
   padding: 1px 4px;
   border-radius: 2px;
   background: rgb(12 13 27 / 0.6);
   color: rgb(255 249 203 / 0.88);
-  font: 500 calc(var(--d-name) * 0.9)/1.12 var(--f-mono);
+  font: 500 calc(var(--d-name) * 0.9)/1.25 var(--f-mono);
   letter-spacing: 0.02em;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 /* téléphone couché : le relevé passe dans la marge d'encre de gauche (plus bas) */
 .film-detail-wide {

@@ -104,8 +104,10 @@ export interface DetailRowHud {
   kind: DetailKind;
   /** Le nom court du critère, celui du dos de la fiche : « Parcours », « Code ». */
   label: string;
-  /** L'état sans chiffre (« non prouvé », « pas au dossier », « comptée ») ; vide pour une note. */
+  /** L'état en mots : « comptée » pour l'école ; vide sinon (une note, ou la marque « ?/10 »). */
   state: string;
+  /** Sans note (non prouvé ou pas au dossier) : une seule marque courte à la place du chiffre, « ?/10 », en retrait. */
+  unknown: boolean;
   /** La note qui compte de 0 à sa valeur (montée), puis la valeur ; `step` : la valeur tout de suite (mouvement réduit). */
   value: number;
   step: number;
@@ -270,7 +272,8 @@ export function hudAt(plan: FilmPlan, t: number, lang: Lang): Hud {
       code: b.code,
       kind: b.kind,
       label: back.criteria[b.code],
-      state: b.kind === "unproven" ? back.unproven : b.kind === "missing" ? back.missing : b.kind === "counted" ? back.counted : "",
+      state: b.kind === "counted" ? back.counted : "",
+      unknown: b.kind === "unproven" || b.kind === "missing",
       value: !shown ? 0 : k >= 1 ? n : Math.floor(n * easeOut(k)),
       step: n,
       out: b.out,
