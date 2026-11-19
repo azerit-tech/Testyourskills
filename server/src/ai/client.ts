@@ -46,7 +46,7 @@ export interface ChatRequest {
   }[];
   tool_choice?: { type: "function"; function: { name: string } };
   provider?: { require_parameters?: boolean };
-  reasoning?: { effort: "minimal" | "low" };
+  reasoning?: { effort: "none" | "minimal" | "low" };
 }
 
 export interface ChatResponse {
@@ -149,11 +149,31 @@ function supportsTemperature(model: string): boolean {
  * consigne, le raisonnement mange `max_tokens` (réponse vide ou tronquée,
  * `finish_reason: length`) et fait dépasser le délai de la fiche. GLM refuse
  * qu'on le coupe (« Reasoning is mandatory ») : on le réduit au minimum.
- * Mesuré le 10 novembre 2026 sur une vraie lecture de code : Haiku 5.5 passe de
- * 14,5 s (2 313 tokens de raisonnement) à 5,5 s, GLM 5.3 Flash répond en 5,2 s.
+ *
+ * Haiku 5.x : coupé (`effort: "none"`). Au minimum, il raisonnait encore, et
+ * c'était l'essentiel de l'attente (SPEC §18.89, mesuré le 19 novembre 2026 sur
+ * les mêmes entrées) : 1 678 tokens de raisonnement sur une lecture de code
+ * (10,9 s, 3,9 s sans), 4 642 sur un profil LinkedIn (23,8 s, 6,9 s sans), pour
+ * les mêmes niveaux lus. La sortie est une extraction contrainte par schéma, et
+ * `observations` y ancre déjà le niveau. Un fournisseur qui refuserait la coupure
+ * ramène le modèle au minimum (`minimalOnly`).
  */
 function reasoningFor(model: string): ChatRequest["reasoning"] | undefined {
-  return /(^|\/)glm-5|claude-haiku-5/.test(model) ? { effort: "minimal" } : undefined;
+  if (/claude-haiku-5/.test(model)) return { effort: minimalOnly.has(model) ? "minimal" : "none" };
+  return /(^|\/)glm-5/.test(model) ? { effort: "minimal" } : undefined;
+}
+
+/** Modèles pour lesquels un fournisseur a refusé qu'on coupe le raisonnement : ils restent au minimum. */
+const minimalOnly = new Set<string>();
+
+/** L'erreur dit-elle qu'on ne peut pas couper le raisonnement de ce modèle ? */
+function isReasoningRefused(err: unknown, model: string): boolean {
+  return (
+    err instanceof ChatHttpError &&
+    (err.status === 400 || err.status === 404) &&
+    reasoningFor(model)?.effort === "none" &&
+    /reasoning|thinking/i.test(err.message)
+  );
 }
 
 /** Modèles pour lesquels aucun fournisseur n'accepte `response_format` : repli sur un outil forcé. */
@@ -306,14 +326,22 @@ export async function callStructured<T>(call: StructuredCall<T>): Promise<T | nu
         finish,
       });
     try {
+      const send = () => client.complete(buildRequest(call, userParts, toolMode), { signal: call.signal });
       try {
-        res = await client.complete(buildRequest(call, userParts, toolMode), { signal: call.signal });
+        res = await send();
       } catch (err) {
-        // Aucun fournisseur n'accepte response_format : on réessaie avec un outil forcé.
-        if (toolMode || !isUnsupportedParams(err)) throw err;
-        toolMode = true;
-        toolModeModels.add(call.model);
-        res = await client.complete(buildRequest(call, userParts, toolMode), { signal: call.signal });
+        if (isReasoningRefused(err, call.model)) {
+          // Le fournisseur refuse qu'on coupe le raisonnement : au minimum, pour cet appel et les suivants.
+          minimalOnly.add(call.model);
+          console.warn(`[ai] ${call.label}: raisonnement impossible à couper sur ${call.model}, réduit au minimum`);
+          res = await send();
+        } else {
+          // Aucun fournisseur n'accepte response_format : on réessaie avec un outil forcé.
+          if (toolMode || !isUnsupportedParams(err)) throw err;
+          toolMode = true;
+          toolModeModels.add(call.model);
+          res = await send();
+        }
       }
     } catch (err) {
       timed(undefined, call.signal?.aborted ? "aborted" : "error");
@@ -387,6 +415,7 @@ export async function callStructured<T>(call: StructuredCall<T>): Promise<T | nu
 /** Pour les tests uniquement. */
 export function resetToolModeForTests(): void {
   toolModeModels.clear();
+  minimalOnly.clear();
 }
 
 // ---------------------------------------------------------------------------
