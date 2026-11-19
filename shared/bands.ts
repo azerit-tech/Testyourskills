@@ -69,6 +69,11 @@ export interface BandBoard {
   total: number;
   /** Les vingt premières. */
   entries: BandStanding[];
+  /**
+   * Les bandes en formation (un ou deux dossiers) qui ont leur page publique, les
+   * plus avancées d'abord, dix au plus ; sans celle rendue dans `extra`.
+   */
+  forming: BandStanding[];
   /** La bande demandée par `with`, si elle est plus bas ou en formation. */
   extra: BandStanding | null;
 }

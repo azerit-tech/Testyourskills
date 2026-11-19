@@ -331,7 +331,7 @@ describe("bloc recruteur", () => {
     // La personne fichée a le pied de page, qui dit déjà qu'Azerit recrute.
     expect(owner).not.toContain('class="after-block hire"');
     const block = /<section class="after-block hire".*?<\/section>/.exec(visitor)?.[0] ?? "";
-    expect(block).toContain('<h2 id="hire-title">Vous recrutez ?</h2>');
+    expect(block).toContain('<h2 id="hire-title">Tu recrutes ?</h2>');
     expect(block).toMatch(/<a class="pill pill-ghost" href="https:\/\/azerit\.tech" target="_blank" rel="noopener">azerit\.tech/);
     expect(visitor).not.toContain("azerit-cta");
   });

@@ -51,11 +51,13 @@ export const bandsApi = {
     if (isMock()) return mock.top();
     return getJson<BandsTop>("/api/bands/top").catch(() => null);
   },
-  /** Le tableau d'une ligue, et sa propre bande si elle est plus bas. Une panne remonte en ApiError. */
+  /** Le tableau d'une ligue, sa propre bande si elle est plus bas, et les bandes en formation. Une panne remonte en ApiError. */
   async board(type: BandType, withId?: string | null): Promise<BandBoard> {
     if (isMock()) return mock.board(type, withId ?? null);
     const q = withId ? `&with=${encodeURIComponent(withId)}` : "";
-    return getJson<BandBoard>(`/api/bands?type=${type}${q}`);
+    const board = await getJson<BandBoard>(`/api/bands?type=${type}${q}`);
+    // Une réponse gardée en cache d'avant les bandes en formation n'a pas la liste.
+    return { ...board, forming: board.forming ?? [] };
   },
   /** La page d'une bande ; null si elle n'existe pas. Une panne réseau remonte en ApiError. */
   async page(type: BandType, id: string): Promise<BandPage | null> {
@@ -242,7 +244,12 @@ const mock = {
     const all = mockStandings(type);
     const entries = all.filter((b) => b.rank !== null).sort((a, b) => a.rank! - b.rank!);
     const extra = withId && !entries.some((b) => b.id === withId) ? (all.find((b) => b.id === withId && b.hasPage) ?? null) : null;
-    return { type, total: entries.length, entries: entries.slice(0, 20), extra };
+    // Comme le serveur : les bandes en formation qui ont leur page, les plus avancées d'abord, sans la sienne.
+    const forming = all
+      .filter((b) => b.rank === null && b.hasPage && b.id !== extra?.id)
+      .sort((a, b) => b.members - a.members || b.score - a.score)
+      .slice(0, 10);
+    return { type, total: entries.length, entries: entries.slice(0, 20), forming, extra };
   },
   page(type: BandType, id: string): BandPage | null {
     const band = mockStandings(type).find((b) => b.id === id) ?? (type === "ecole" && schoolById(id) ? { ...standing("ecole", id, schoolById(id)!.label, 0, 0), rank: null, gap: null, ahead: null } : null);

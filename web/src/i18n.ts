@@ -488,8 +488,8 @@ const fr = frTypoDeep({
       error: "Ça n'a pas pris. Réessaie.",
       note: "Laisse ton email : ta fiche reste en ligne, et Azerit peut t'écrire pour un poste.",
     },
-    /* le bloc recruteur, en fin de page : on vouvoie qui recrute */
-    cta: { title: "Vous recrutez ?", text: "Azerit vous présente des devs lus comme ici : l'expérience d'abord, le code comme preuve.", link: "azerit.tech" },
+    /* le bloc recruteur, en fin de page : on tutoie partout, qui recrute compris (§18.86) */
+    cta: { title: "Tu recrutes ?", text: "Azerit te présente des devs lus comme ici : l'expérience d'abord, le code comme preuve.", link: "azerit.tech" },
     del: {
       link: "Supprimer ma fiche",
       confirm: "Supprimer définitivement ?",

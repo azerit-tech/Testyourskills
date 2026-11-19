@@ -165,7 +165,7 @@ const fr = {
   card: { enter: "Entrer dans la course", see: "Voir la prime", board: "Voir le classement" },
   /** Une prime terminée, pour qui n'y était pas : une sortie, la fiche (SPEC §18.52). */
   over: { text: "Fais ta fiche : la prochaine prime se joue dessus.", mine: "Voir ma fiche" },
-  /** /reglement : le résumé en tête (au « tu », repris du texte qui suit, qui garde son « vous »), le sommaire, et la note de la page anglaise. */
+  /** /reglement : le résumé en tête (repris du texte qui suit, au « tu » comme lui, §18.86), le sommaire, et la note de la page anglaise. */
   rulesPage: {
     summaryTitle: "En trois lignes",
     summary: [

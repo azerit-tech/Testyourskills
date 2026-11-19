@@ -10,7 +10,7 @@ import { FIXTURES } from "../../shared/fixtures";
 import type { CardData } from "../../shared/types";
 import { createApp, purge } from "./app";
 import { SESSION_COOKIE, signSession } from "./auth";
-import { bandBoard, bandsTop, bandStanding, joinBand } from "./bands";
+import { bandBoard, bandsTop, bandStanding, FORMING_SIZE, joinBand } from "./bands";
 import { migrate, RETENTION_MS, Store } from "./db";
 import type { Deps } from "./pipeline";
 
@@ -288,6 +288,42 @@ describe("le score d'une bande", () => {
     expect(bandsTop(ctx.store.db).boite).toEqual([]);
   });
 
+  it("les bandes en formation suivent le tableau : les plus avancées d'abord, sans la sienne, dix au plus", () => {
+    const ctx = setup();
+    const t = 1_800_000_000_000;
+    const add = (band: string, stars: (1 | 2 | 3 | 4 | 5 | 6)[], at: number) => stars.forEach((s, i) => put(ctx.store, insert(ctx.store, { stars: s }), school(band), at + i));
+    add("epitech", [5, 5, 5], t); // au tableau
+    add("centralesupelec", [3], t + 100); // 1 dossier, 3 étoiles
+    add("esiea", [2, 2], t + 200); // 2 dossiers : devant, malgré moins d'étoiles par tête
+    add("efrei", [6], t + 300); // 1 dossier, 6 étoiles : devant CentraleSupélec
+    add("epita", [3], t + 400); // 1 dossier, 3 étoiles, plus récente que CentraleSupélec
+    const board = bandBoard(ctx.store.db, "ecole");
+    expect(board.entries.map((e) => e.id)).toEqual(["epitech"]);
+    expect(board.forming.map((b) => [b.id, b.members, b.missing, b.rank])).toEqual([
+      ["esiea", 2, 1, null],
+      ["efrei", 1, 2, null],
+      ["centralesupelec", 1, 2, null],
+      ["epita", 1, 2, null],
+    ]);
+    expect(board.forming.every((b) => b.hasPage && b.gap === null && b.ahead === null)).toBe(true);
+    // Sa propre bande en formation sort de la liste : elle vient dans `extra`.
+    const mine = bandBoard(ctx.store.db, "ecole", "efrei");
+    expect(mine.extra).toMatchObject({ id: "efrei", members: 1, missing: 2 });
+    expect(mine.forming.map((b) => b.id)).toEqual(["esiea", "centralesupelec", "epita"]);
+    // Une bande au tableau demandée par `with` ne retire rien.
+    expect(bandBoard(ctx.store.db, "ecole", "epitech").forming).toHaveLength(4);
+    // Une ligue sans bande : une liste vide, pas une absence.
+    expect(bandBoard(ctx.store.db, "boite")).toMatchObject({ entries: [], forming: [], extra: null });
+  });
+
+  it("dix bandes en formation au plus", () => {
+    const ctx = setup();
+    const ids = ["epitech", "epita", "efrei", "esiea", "esilv", "isep", "supinfo", "centralesupelec", "ensimag", "utc", "ecole-42", "insa-lyon"];
+    expect(ids.length).toBeGreaterThan(FORMING_SIZE);
+    for (const id of ids) put(ctx.store, insert(ctx.store), school(id));
+    expect(bandBoard(ctx.store.db, "ecole").forming).toHaveLength(FORMING_SIZE);
+  });
+
   it("l'écart avec la bande de devant", () => {
     const ctx = setup();
     for (const s of [6, 6, 6] as const) put(ctx.store, insert(ctx.store, { stars: s }), school("epitech"));
@@ -408,6 +444,9 @@ describe("le nom libre d'une boîte", () => {
     expect((await ctx.app.request("/og/b/boite/petite-boite.png")).status).toBe(404);
     expect((await ctx.app.request("/bandes/boite/petite-boite")).status).toBe(404);
     expect((await call<BandBoard>(ctx, "/api/bands?type=boite&with=petite-boite")).json.extra).toBeNull();
+    // En formation, elle reste cachée du tableau public ; une boîte de la table d'alias s'y montre.
+    expect((await join_(ctx, insert(ctx.store), { type: "boite", name: "Facebook" }, { ip: "203.0.113.200" })).status).toBe(200);
+    expect((await call<BandBoard>(ctx, "/api/bands?type=boite")).json.forming.map((b) => b.id)).toEqual(["meta"]);
     // Trois dossiers : la page, l'image et le tableau.
     for (const id of [insert(ctx.store), insert(ctx.store)]) expect((await join_(ctx, id, { type: "boite", name: "Petite boîte" }, { ip: `203.0.113.${id.slice(-2)}` })).status).toBe(200);
     const page = await call<BandPage>(ctx, "/api/bands/boite/petite-boite");

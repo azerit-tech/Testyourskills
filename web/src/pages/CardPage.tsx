@@ -803,7 +803,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
             <Contest card={main} cardId={id} onDeleted={onDeleted} />
           </div>
         )}
-        {/* « Vous recrutez ? » : au visiteur seulement (§18.76) ; à la personne fichée, le pied de page le dit. */}
+        {/* « Tu recrutes ? » : au visiteur seulement (§18.76) ; à la personne fichée, le pied de page le dit. */}
         {visitor && <Hiring cardId={id} />}
         {/* « Supprimer ma fiche » n'est que dans le pli « Fais appel » : une action, un endroit. */}
         {!visitor && (
