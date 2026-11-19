@@ -12,7 +12,6 @@
 // téléphone (§18.48) : les étoiles, le niveau, « Avis de recherche » et l'appel
 // s'y lisent. Les étoiles suivent la règle du site (StarRow), le rose poudré ne
 // sert qu'à l'appel (CtaPill), la citation est pêche.
-import type { ReactNode } from "react";
 import { LEVEL_LABELS, starsFor, type CardData, type Lang } from "../../../shared/types";
 import { AzeritGem } from "../../../shared/card/AzeritGem";
 import { CardGraphic } from "../../../shared/card/Card";
@@ -22,18 +21,8 @@ import { t } from "../../../shared/card/i18n";
 import { fit, fitLines, measure, upper, wrap } from "../../../shared/card/text";
 import { PALETTE, themeOf } from "../../../shared/card/themes";
 import { HOME_PROMISE } from "../../../shared/promise";
+import { SUNSET as SCENE, skyline } from "../../../shared/sunset";
 import type { SceneImage } from "./scenes";
-
-/** Aplats de l'illustration (maquette validée du 9 novembre 2026, dans l'historique git). */
-const SCENE = {
-  sky: "#2d2a66",
-  sun: "#e98a98",
-  far: "#463b84",
-  palm: "#241f55",
-  near: "#1d1946",
-  ground: "#121130",
-  window: "#ffc46b",
-};
 
 const PALM = "M46 140c2-34 5-62 12-86l4 1c-8 24-11 52-12 85zM60 54C40 38 20 38 4 50c18-4 36 0 56 7zM60 54C36 56 18 68 10 88c14-14 30-22 50-30zM60 54c18-22 40-28 60-20-20 0-40 8-60 24zM60 54c26-2 44 10 54 30-14-14-32-22-54-26zM60 54c-6-22-2-40 8-52-2 16 0 32-4 50zM60 54c10-20 26-32 44-34-16 8-30 20-42 36zM60 54c-14-14-18-30-14-48 4 16 10 30 16 46z";
 
@@ -59,26 +48,6 @@ export function ctaHost(): string {
 /* ------------------------------------------------------------------ */
 /* Décor                                                                */
 /* ------------------------------------------------------------------ */
-
-/** Une rangée d'immeubles en aplat jusqu'à l'horizon `y`, pseudo-aléatoire mais stable. */
-function skyline(w: number, y: number, fill: string, seed: number, maxH: number, lights: boolean): ReactNode[] {
-  const out: ReactNode[] = [];
-  let x = 0;
-  let r = seed;
-  const rnd = () => (r = (r * 9301 + 49297) % 233280) / 233280;
-  while (x < w) {
-    const bw = 26 + rnd() * 50;
-    const bh = 30 + rnd() * (maxH - 30);
-    out.push(<rect key={`b${x}`} x={+x.toFixed(1)} y={+(y - bh).toFixed(1)} width={+(bw + 1).toFixed(1)} height={+(bh + 2).toFixed(1)} fill={fill} />);
-    if (lights) {
-      for (let k = 0; k < bh / 18 - 1; k++)
-        for (let j = 0; j < bw / 14 - 1; j++)
-          if (rnd() > 0.55) out.push(<rect key={`w${x}-${k}-${j}`} x={+(x + 6 + j * 13).toFixed(1)} y={+(y - bh + 10 + k * 17).toFixed(1)} width={4} height={5} fill={SCENE.window} fillOpacity={0.75} />);
-    }
-    x += bw;
-  }
-  return out;
-}
 
 function Palm({ x, y, k, flip }: { x: number; y: number; k: number; flip?: boolean }) {
   return (
