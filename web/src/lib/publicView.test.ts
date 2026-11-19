@@ -149,6 +149,19 @@ describe("la démo applique la même vue que le serveur", () => {
     return s.kind === "card" ? s.card.grid : (s.comparison.grid ?? s.comparison.cv.grid ?? s.comparison.github.grid);
   };
 
+  it("un dossier de démo : une note, celle du dossier ; ses pièces n'ont ni grille ni note à elles (SPEC §18.83)", async () => {
+    for (const id of ["m-cmp-abcd", "m-licmp-abcd", "m-liempty-abcd"]) {
+      const s = await mockApi.getJob(id);
+      if (s.state !== "done" || s.kind !== "comparison") throw new Error("pas un dossier");
+      const { cv, github, grid } = s.comparison;
+      expect(grid).toBeDefined();
+      for (const piece of [cv, github]) {
+        expect(piece.grid).toBeUndefined();
+        expect(piece.overall).toBe(grid!.overall);
+      }
+    }
+  });
+
   it("dénoncée anonymement ou par un nom, non revendiquée : pas de grille, ni ligne ni tuiles", async () => {
     expect(gridOf(await mockApi.getJob("m-silver-Dabcd"))).toBeUndefined();
     expect(gridOf(await mockApi.getJob("m-silver-Nabcd"))).toBeUndefined();

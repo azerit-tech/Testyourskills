@@ -7,6 +7,7 @@
 import type { CardData, ComparisonData, Finding, Grid, JobState, ProgressEvent, Stat, StatCode } from "../../../shared/types";
 import { tierFor } from "../../../shared/types";
 import { FIXTURES, FIXTURE_COMPARISON } from "../../../shared/fixtures";
+import { oneNote } from "../../../shared/caseFile";
 import { asLinkedinCard, asLinkedinComparison } from "../../../shared/linkedinText";
 import { publicView } from "../../../shared/publicView";
 import type { CaseInfo, CreateInput, CreateResult, Jury, Showcase, Verdict } from "./api";
@@ -292,7 +293,8 @@ function buildComparison(id: string, job: MockJob | null, mg: MockGrids, linkedi
     cmp.cv = { ...cmp.cv, avatarUrl: MOCK_PHOTO };
     cmp.github = { ...cmp.github, avatarUrl: MOCK_PHOTO };
   }
-  return cmp;
+  // Comme le serveur (SPEC §18.83) : les pièces rendues ne portent que la note du dossier, sans grille à elles.
+  return oneNote(cmp);
 }
 
 function kindFromId(id: string): Kind | null {
