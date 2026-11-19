@@ -261,6 +261,7 @@ const fr = {
           [
             "Les faits tirés de tes sources, les constats de l'IA, les notes de la fiche.",
             "Le profil LinkedIn lu, 30 jours, pour ne pas le relire.",
+            `Le lien entre ton GitHub et ton LinkedIn, et le profil LinkedIn lu, sont aussi gardés par Azerit, le cabinet de recrutement qui fait ce jeu, pour te proposer des entretiens. Supprimer ta fiche ne les retire pas de chez Azerit : pour ça, un email à ${email}.`,
             `Ton email, seulement si tu le laisses : il garde ta fiche en ligne au-delà de 90 jours et rejoint les contacts d'Azerit, qui peut alors t'écrire pour un poste. Pour le retirer : « Supprimer ma fiche », sous ta fiche, ou un email à ${email}.`,
             "Si tu viens du lien d'une fiche partagée, l'identifiant de cette fiche.",
             "Pour une fiche née d'une dénonciation, l'identifiant de la fiche qui a dénoncé, et son pseudo seulement si elle est revendiquée.",
@@ -458,6 +459,7 @@ const en: PagesDict = {
           [
             "The facts drawn from your sources, the AI's findings, the sheet's ratings.",
             "The LinkedIn profile we read, for 30 days, so we don't read it twice.",
+            `Azerit, the recruiting firm behind this game, also keeps the link between your GitHub and your LinkedIn, and the LinkedIn profile we read, to offer you interviews. Deleting your sheet doesn't remove them from Azerit: for that, email ${email}.`,
             `Your email, only if you leave it: it keeps your sheet up past 90 days and joins Azerit's contacts, so Azerit may reach out about a job. To remove it: “Delete my sheet”, under your sheet, or an email to ${email}.`,
             "If you arrived through a shared sheet's link, that sheet's ID.",
             "For a sheet born from a tip-off, the ID of the sheet that turned it in, and its username only if that sheet is claimed.",
