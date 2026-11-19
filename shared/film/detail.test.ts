@@ -165,6 +165,22 @@ describe("le relevé dans le HUD", () => {
     expect(fr[0].state).toBe("comptée");
     expect(en[0]).toMatchObject({ label: "School", state: "counted" });
     expect(en.map((r) => r.label)).toContain("Career");
+    // une note : ni mots ni marque
+    expect(fr.filter((r) => r.kind === "note").every((r) => r.state === "" && !r.unknown)).toBe(true);
+  });
+
+  it("sans note (non prouvé, pas au dossier) : une seule marque courte, « ?/10 », à la place du chiffre, jamais 0 ni de mots", () => {
+    const thin: Grid = {
+      ...FULL,
+      criteria: [crit("EDU", null, { state: "missing" }), crit("XP", 4), crit("EMP", null, { state: "missing" }), crit("STK", 2), crit("CODE", null), crit("ACT", null), crit("OWN", null), crit("OSS", null)],
+      rule: "empty_file",
+    };
+    const p = filmPlan(cardAt(1, thin));
+    const rows = hudAt(p, at(p.freeze), "fr").detail;
+    const marks = rows.filter((r) => r.kind === "unproven" || r.kind === "missing");
+    expect(marks.length).toBe(5);
+    for (const r of marks) expect(r).toMatchObject({ unknown: true, state: "", value: 0, step: 0 });
+    expect(rows.filter((r) => r.unknown).length).toBe(5);
   });
 
   it("le score de §18.78 ne bouge pas : le relevé ne change ni ses paliers ni la note au gel", () => {
