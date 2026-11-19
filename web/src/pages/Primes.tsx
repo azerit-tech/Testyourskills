@@ -89,7 +89,7 @@ function Row({ r, me }: { r: BoardRow; me: boolean }) {
   const href = `/c/${r.cardId}`;
   return (
     <li>
-      <a className={`board-row prime-row${me ? " is-me" : ""}`} href={href} onClick={(e) => onLinkClick(e, href)} aria-label={t.home.top.rowLabel(r.rank, r.login, r.overall)}>
+      <a className={`board-row prime-row${me ? " is-me" : ""}`} href={href} onClick={(e) => onLinkClick(e, href)} aria-label={t.home.top.rowLabel(r.rank, `@${r.login}`, r.overall)}>
         <span className="board-rank">{r.rank}</span>
         <Avatar login={r.login} />
         <span className="board-login">@{r.login}</span>

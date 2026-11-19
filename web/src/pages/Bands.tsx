@@ -2,7 +2,9 @@
 // les bandes en formation (§18.85) ; /bandes/ecole/:id et /bandes/boite/:id, la
 // page d'une bande. Même système que le top de la semaine (WeekBoard) : lignes
 // sur aplat marine, titres crème.
-// Jamais un nom de personne, jamais un rang d'école du barème.
+// Jamais un rang d'école du barème. Les membres d'une bande sont les vraies
+// personnes (§18.88) : leur nom, leur visage, le lien vers leur fiche ; seule une
+// fiche née d'une dénonciation et pas encore revendiquée reste anonyme.
 //
 // La page d'une bande a trois états (SPEC §18.48) : sans fiche (le formulaire,
 // et la bande suit jusqu'à la fiche posée), avec une fiche (« Rejoindre avec ma
@@ -12,6 +14,7 @@
 // Serveur muet : « le commissariat ne répond pas », jamais « introuvable ».
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
+import { personLabel } from "../../../shared/boardPerson";
 import type { BandBoard, BandMember, BandPage as BandPageData, BandStanding, BandType, MyBands } from "../../../shared/bands";
 import { BAND_TYPES, bandPath } from "../../../shared/bands";
 import { Avatar } from "../components/Avatar";
@@ -235,8 +238,12 @@ export function longestWord(label: string): number {
   return Math.max(1, ...label.split(/[\s-]+/).map((w) => [...w].length));
 }
 
-/** Une fiche revendiquée : son visage, son pseudo, son profil, ses étoiles ; la ligne mène à la fiche. */
-function Member({ m }: { m: BandMember & { login: string; cardId: string } }) {
+/** Un membre montré : le serveur a rendu sa personne (son nom ou son pseudo, son visage, sa fiche). */
+type Shown = BandMember & { cardId: string };
+const isShown = (m: BandMember): m is Shown => !!m.cardId;
+
+/** La vraie personne (§18.88) : son visage, son nom (le @pseudo d'une fiche GitHub sans nom), son profil, ses étoiles ; la ligne mène à sa fiche. */
+function Member({ m }: { m: Shown }) {
   const { t, lang } = useT();
   // Le poste à côté du profil : deux fiches du même profil ne se lisent pas comme un doublon.
   const about = [m.profile ? pick(m.profile, lang) : null, m.position ? t.positions[m.position] : null].filter(Boolean).join(", ");
@@ -244,9 +251,10 @@ function Member({ m }: { m: BandMember & { login: string; cardId: string } }) {
   return (
     <li>
       <a className="board-row band-member" href={href} onClick={(e) => onLinkClick(e, href)}>
-        <Avatar login={m.login} />
+        {/* la photo de la fiche ; sans photo sûre, ses initiales (Avatar.tsx) */}
+        <Avatar login={m.login} src={m.avatarUrl ?? ""} initials={m.initials} />
         <span className="band-name">
-          <span className="board-login">@{m.login}</span>
+          <span className="board-login">{personLabel(m) || m.initials}</span>
           {about && <span className="band-count">{about}</span>}
         </span>
         <Stars n={m.stars} size={14} label={t.bands.score(m.stars)} />
@@ -263,10 +271,12 @@ export function starSpread(members: BandMember[]): [number, number][] {
 }
 
 /**
- * Les fiches sans pseudo, en dernière ligne de la liste : une pile de silhouettes (huit au
+ * Les fiches que la liste ne nomme pas, en dernière ligne : une pile de silhouettes (huit au
  * plus), leur nombre, et leur répartition en étoiles quand la page les a toutes reçues.
+ * `label` : « 2 fiches anonymes » (nées d'une dénonciation, pas encore revendiquées), ou
+ * « 12 autres fiches » quand la bande compte plus de fiches que la page n'en a reçu.
  */
-function Anonymous({ count, spread }: { count: number; spread: [number, number][] | null }) {
+function Anonymous({ count, label, spread }: { count: number; label: string; spread: [number, number][] | null }) {
   const { t } = useT();
   const ts = t.bands.states;
   return (
@@ -282,7 +292,7 @@ function Anonymous({ count, spread }: { count: number; spread: [number, number][
         ))}
       </span>
       <span className="band-anon-text">
-        <span className="band-anon-count">{ts.anonymous(count)}</span>
+        <span className="band-anon-count">{label}</span>
         {spread && spread.length > 0 && (
           <span className="band-anon-spread" role="img" aria-label={ts.spread(spread)}>
             {/* « 6★ × 2 » : le nombre d'étoiles, puis combien de fiches ; rien à compter à l'œil */}
@@ -441,11 +451,13 @@ export function BandPage({ type, id }: { type: BandType; id: string }) {
 
   const rank = t.bands.rank(band);
   const aheadHref = band.ahead ? bandPath({ type: band.type, id: band.ahead.id }) : null;
-  const named = data.members.filter((m): m is BandMember & { login: string; cardId: string } => !!m.login && !!m.cardId);
-  const anonymous = Math.max(0, band.members - named.length);
-  // La répartition seulement si la page a reçu toutes les fiches anonymes (le serveur en envoie 50 au plus).
-  const anonList = data.members.filter((m) => !m.login || !m.cardId);
-  const spread = anonList.length === anonymous ? starSpread(anonList) : null;
+  const named = data.members.filter(isShown);
+  // Ce que la liste ne nomme pas : les fiches anonymes reçues, et celles que la page n'a pas reçues (le serveur en envoie 50 au plus).
+  const anonList = data.members.filter((m) => !isShown(m));
+  const unnamed = Math.max(0, band.members - named.length);
+  const allAnonymous = anonList.length === unnamed;
+  // La répartition seulement si la page a reçu toutes ces fiches.
+  const spread = allAnonymous ? starSpread(anonList) : null;
   const shareBand = () => void share(band, tp.shareText(band), mine?.id ?? null);
   // Le retour ouvre /bandes sur sa ligue.
   const backHref = leagueHref(band.type);
@@ -500,11 +512,11 @@ export function BandPage({ type, id }: { type: BandType; id: string }) {
               {named.map((m) => (
                 <Member key={m.cardId} m={m} />
               ))}
-              {/* les fiches sans pseudo : dans le même bloc, en dernière ligne, comptées et réparties */}
-              {anonymous > 0 && <Anonymous count={anonymous} spread={spread} />}
+              {/* les fiches non nommées : dans le même bloc, en dernière ligne, comptées et réparties */}
+              {unnamed > 0 && <Anonymous count={unnamed} label={allAnonymous ? t.bands.states.anonymous(unnamed) : t.bands.states.others(unnamed)} spread={spread} />}
             </ol>
           )}
-          {anonymous > 0 && named.length === 0 && <p className="band-more">{t.bands.states.claimHint}</p>}
+          {anonList.length > 0 && named.length === 0 && <p className="band-more">{t.bands.states.claimHint}</p>}
           {band.members === 0 && <p className="bands-empty">{tp.rosterNone}</p>}
         </section>
         {league.s !== "down" && league.s !== "none" && <BandBoardSection board={league.s === "ok" ? league.data : null} band={band} />}

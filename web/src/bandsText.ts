@@ -132,10 +132,12 @@ const fr = {
     landed: (label: string) => `Tu roules pour ${label}.`,
     /** Les trois emplacements d'une bande en formation, pour un lecteur d'écran. */
     slots: (k: number) => `${n(k, "fiche", "fiches")} sur ${BAND_MIN_MEMBERS}`,
-    /** Les fiches sans pseudo, en dernière ligne de la liste, derrière une pile de silhouettes. */
+    /** Les fiches nées d'une dénonciation et pas encore revendiquées, en dernière ligne de la liste, derrière une pile de silhouettes (§18.88). */
     anonymous: (k: number) => n(k, "fiche anonyme", "fiches anonymes"),
-    /** Sous la liste, quand aucune fiche n'a de pseudo. */
-    claimHint: "Une fiche revendiquée avec « C'est moi » s'affiche ici avec son pseudo.",
+    /** La même ligne quand la bande compte plus de fiches que la page n'en montre. */
+    others: (k: number) => n(k, "autre fiche", "autres fiches"),
+    /** Sous la liste, quand elle ne nomme personne. */
+    claimHint: "Une fiche faite pour dénoncer s'affiche ici avec son nom une fois revendiquée avec « C'est moi ».",
     /** La répartition des anonymes, pour un lecteur d'écran : « 2 fiches à 6 étoiles, 5 fiches à 5 étoiles ». */
     spread: (parts: [number, number][]) => parts.map(([s, k]) => `${n(k, "fiche", "fiches")} à ${n(s, "étoile", "étoiles")}`).join(", "),
   },
@@ -233,7 +235,8 @@ const en: BandsDict = {
     landed: (label: string) => `You ride for ${label}.`,
     slots: (k: number) => `${k} of ${BAND_MIN_MEMBERS} sheets`,
     anonymous: (k: number) => nEn(k, "anonymous sheet", "anonymous sheets"),
-    claimHint: "A sheet claimed with “That's me” shows here with its username.",
+    others: (k: number) => nEn(k, "more sheet", "more sheets"),
+    claimHint: "A sheet made to tip someone off shows here with its name once claimed with “That's me”.",
     spread: (parts: [number, number][]) => parts.map(([s, k]) => `${nEn(k, "sheet", "sheets")} at ${nEn(s, "star", "stars")}`).join(", "),
   },
   none: {

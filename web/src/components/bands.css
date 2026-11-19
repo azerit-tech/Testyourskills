@@ -424,7 +424,7 @@
   text-transform: uppercase;
   color: var(--cream);
 }
-/* une fiche revendiquée : visage, pseudo et profil, étoiles ; la ligne mène à la fiche */
+/* un membre (§18.88) : visage, nom et profil, étoiles ; la ligne mène à sa fiche */
 .board-row.band-member {
   grid-template-columns: 32px minmax(0, 1fr) auto;
   gap: 12px;
@@ -435,13 +435,17 @@
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-/* téléphone étroit : le profil et le poste reviennent à la ligne plutôt que d'être coupés */
+/* téléphone étroit : le nom, puis le profil et le poste, reviennent à la ligne plutôt que d'être coupés */
 @media (max-width: 399px) {
+  .band-member .board-login,
   .band-member .band-count {
     display: -webkit-box;
     white-space: normal;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
+  }
+  .band-member .board-login {
+    line-height: 1.25;
   }
 }
 /* les fiches anonymes : la dernière ligne du bloc, une pile de silhouettes puis leur nombre */

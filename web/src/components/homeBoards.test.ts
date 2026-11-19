@@ -53,6 +53,22 @@ describe("le top de la semaine sur l'accueil", () => {
     expect(count(html, 'class="board-row"')).toBe(7);
     expect(html).toContain("is-rest");
   });
+
+  it("chaque ligne est la vraie personne : le nom de la fiche, ses initiales, le lien vers elle ; sans nom, le @pseudo (§18.88)", () => {
+    const top = week(3);
+    // Une fiche LinkedIn seule : un nom, pas de pseudo ; une fiche GitHub avec un nom ; une fiche GitHub sans nom.
+    top.entries[0] = { rank: 1, cardId: "Lnkd000001", name: "Florence Delmas", initials: "FD", overall: 88, stars: 5 };
+    top.entries[1] = { ...entry(2), name: "Léa Martin-Dubois", initials: "LM" };
+    const html = render(createElement(WeekBoardView, { top, now: 0, onPlay: () => undefined }));
+    expect(count(html, 'class="board-row"')).toBe(3);
+    expect(html).toMatch(/href="\/c\/Lnkd000001" aria-label="Place 1\s: Florence Delmas, note 88\/100"/);
+    expect(html).toContain('<span class="board-avatar">FD</span><span class="board-login">Florence Delmas</span>');
+    expect(html).toContain('<span class="board-avatar">LM</span><span class="board-login">Léa Martin-Dubois</span>');
+    expect(html).toContain('<span class="board-login">@dev3</span>');
+    expect(html).toMatch(/aria-label="Place 3\s: @dev3, note 87\/100"/);
+    // Plus de ligne anonyme : ni la lettre de remplacement, ni « Fiche LinkedIn ».
+    expect(html).not.toMatch(/board-avatar[^>]*>I<|Fiche LinkedIn/);
+  });
 });
 
 describe("le top de la semaine avant la réponse du serveur", () => {

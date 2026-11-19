@@ -1745,9 +1745,9 @@ svg {
   margin-top: 4px;
   border-top: 1px solid var(--c-line);
 }
-/* téléphone de 320 : les étoiles passent sous le pseudo, qui garde sa largeur
-   (dix caractères au moins) ; rang, visage et note restent sur l'axe de la ligne */
-@media (max-width: 359px) {
+/* téléphone : les étoiles passent sous le nom, qui garde la largeur de la ligne (un nom
+   entier tient à 390 px, §18.88) ; rang, visage et note restent sur l'axe de la ligne */
+@media (max-width: 479px) {
   .board-row:has(> .board-score) {
     grid-template-columns: 24px 32px minmax(0, 1fr) 30px;
     row-gap: 4px;
