@@ -80,6 +80,8 @@ export const BAND_PAGE_MEMBERS = 50;
 /** Bandes du tableau d'une ligue ; l'accueil en montre cinq. */
 export const BOARD_SIZE = 20;
 export const HOME_SIZE = 5;
+/** Bandes en formation listées sous le tableau d'une ligue. */
+export const FORMING_SIZE = 10;
 
 const f = (fr: string, en: string): Fact => ({ fr: frTypo(fr), en });
 
@@ -242,12 +244,22 @@ export function publicBandStanding(db: Database.Database, type: BandType, id: st
   return b?.hasPage ? b : null;
 }
 
-/** Le tableau d'une ligue : les vingt premières, et `withId` si elle est plus bas ou en formation. */
+/**
+ * Le tableau d'une ligue : les vingt premières ; `withId` si elle est plus bas ou en
+ * formation ; puis les bandes en formation qui ont leur page publique (une boîte au
+ * nom libre reste cachée avant trois dossiers), les plus avancées d'abord.
+ */
 export function bandBoard(db: Database.Database, type: BandType, withId?: string | null, now = Date.now()): BandBoard {
   const c = league(db, type, now);
   const entries = c.ranked.slice(0, BOARD_SIZE).map((b) => toStanding(c, b));
-  const extra = withId && !entries.some((e) => e.id === withId) ? publicBandStanding(db, type, withId, now) : null;
-  return { type, total: c.ranked.length, entries, extra: extra && extra.members > 0 ? extra : null };
+  const found = withId && !entries.some((e) => e.id === withId) ? publicBandStanding(db, type, withId, now) : null;
+  const extra = found && found.members > 0 ? found : null;
+  const forming = [...c.all.values()]
+    .filter((b) => b.members < BAND_MIN_MEMBERS && b.id !== extra?.id && bandHasPage(b.type, b.id, b.members))
+    .sort((a, b) => b.members - a.members || b.score - a.score || a.since - b.since || a.id.localeCompare(b.id))
+    .slice(0, FORMING_SIZE)
+    .map((b) => toStanding(c, b));
+  return { type, total: c.ranked.length, entries, forming, extra };
 }
 
 /** Les cinq premières de chaque ligue, pour l'accueil. */
