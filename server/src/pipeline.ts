@@ -30,7 +30,7 @@ export type GithubAuth = string | TokenPool;
 
 export interface RenderInput {
   /** `home` : l'aperçu de lien de l'accueil (/og/home.png), avec la fiche de la vitrine. `story` : 9:16, une fiche seule. */
-  format: "card" | "og" | "portrait" | "story" | "home" | "band" | "prime";
+  format: "card" | "og" | "portrait" | "story" | "home" | "band" | "prime" | "duel";
   card?: CardData;
   comparison?: ComparisonData;
   /** `band` : l'aperçu de lien d'une bande (§18.38). */
@@ -38,6 +38,8 @@ export interface RenderInput {
   /** `prime` : l'aperçu de lien d'une prime (§18.4), et son logo en data URI s'il en a un. */
   prime?: PrimeView;
   logo?: PrimeLogo | null;
+  /** `duel` : l'aperçu du lien d'une dénonciation (§18.91), les deux fiches en vues publiques. */
+  duel?: { by: CardData; target: CardData };
   lang: Lang;
 }
 

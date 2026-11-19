@@ -98,7 +98,7 @@ function CardHalo({ card, x, y, w, id }: { card: CardData; x: number; y: number;
 }
 
 /** La fiche posée dans une composition, avec son halo si elle est ★★★★★★. */
-function Placed({ card, lang, avatars, id, x, y, w }: { card: CardData; lang: Lang; avatars: Avatars; id: string; x: number; y: number; w: number }) {
+export function Placed({ card, lang, avatars, id, x, y, w }: { card: CardData; lang: Lang; avatars: Avatars; id: string; x: number; y: number; w: number }) {
   return (
     <>
       <CardHalo card={card} x={x} y={y} w={w} id={id} />

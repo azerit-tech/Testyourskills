@@ -9,6 +9,7 @@ import type { PrimeView } from "../../../shared/primes";
 import type { CardData, ComparisonData, Lang } from "../../../shared/types";
 import { fetchAvatar } from "./avatar";
 import { BandOg } from "./band";
+import { DuelOg } from "./duel";
 import { PrimeOg, type PrimeLogo } from "./prime";
 import { CardOnly, HomeOg, OgImage, PortraitImage, StoryImage, type Avatars } from "./compositions";
 import { fontFiles } from "./fonts";
@@ -20,7 +21,7 @@ import { sceneFor } from "./scenes";
  * `story` : 9:16 pour Instagram et TikTok, une fiche seule.
  * Un dossier à deux pièces prend les compositions d'une fiche : celle du dossier (§18.36).
  */
-export type ImageFormat = "card" | "og" | "portrait" | "story" | "home" | "band" | "prime";
+export type ImageFormat = "card" | "og" | "portrait" | "story" | "home" | "band" | "prime" | "duel";
 
 export interface RenderInput {
   format: ImageFormat;
@@ -31,11 +32,13 @@ export interface RenderInput {
   /** `prime` : l'aperçu de lien d'une prime (§18.4, prime.tsx), son logo s'il en a un. */
   prime?: PrimeView;
   logo?: PrimeLogo | null;
+  /** `duel` : l'aperçu du lien d'une dénonciation (§18.91, duel.tsx), le dénonciateur et la fiche dénoncée, en vues publiques. */
+  duel?: { by: CardData; target: CardData };
   lang: Lang;
 }
 
 /** Largeur de sortie par format (la hauteur suit le viewBox). */
-const OUTPUT_WIDTH: Record<ImageFormat, number> = { card: 1080, og: 1200, portrait: 1080, story: 1080, home: 1200, band: 1200, prime: 1200 };
+const OUTPUT_WIDTH: Record<ImageFormat, number> = { card: 1080, og: 1200, portrait: 1080, story: 1080, home: 1200, band: 1200, prime: 1200, duel: 1200 };
 
 async function avatarsFor(cards: CardData[]): Promise<Avatars> {
   const out: Avatars = {};
@@ -57,6 +60,11 @@ export async function buildElement(input: RenderInput): Promise<ReactElement> {
   if (format === "prime") {
     if (!input.prime) throw new Error("renderImage : prime requise");
     return createElement(PrimeOg, { prime: input.prime, logo: input.logo ?? null, lang });
+  }
+  if (format === "duel") {
+    if (!input.duel) throw new Error("renderImage : duel requis");
+    const { by, target } = input.duel;
+    return createElement(DuelOg, { by, target, lang, avatars: await avatarsFor([by, target]) });
   }
   // Un dossier, une fiche, une note (shared/caseFile.ts).
   const card = comparison ? fileOf(comparison) : input.card;

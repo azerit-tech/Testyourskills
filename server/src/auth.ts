@@ -252,6 +252,8 @@ export interface AuthRoutesOptions {
   fetchImpl: typeof fetch;
   /** Invalide les PNG en cache des ids donnés (fiches masquées). */
   removeImages(ids: string[]): Promise<void>;
+  /** Efface les duels en cache de ces fiches (§18.91) : revendiquée, une fiche n'est plus scellée. */
+  removeDuels?(ids: string[]): Promise<void>;
 }
 
 type ClaimResult = "ok" | "mismatch" | "error" | "limited";
@@ -354,6 +356,8 @@ export function mountAuth(app: Hono, o: AuthRoutesOptions) {
     if (user.login !== cardLogin.toLowerCase()) return c.redirect(back(st.r, "mismatch", user.login), 302);
 
     const owner = o.store.claimOwner(user.login, user.githubId);
+    // Ses duels d'avant (scellés, faits par un tiers) ne servent plus : l'état a changé (§18.91).
+    await o.removeDuels?.(o.store.idsForLogin(user.login));
     // La cible d'une dénonciation a appelé son avocat (§18.6).
     if (row?.denouncedBy) o.store.recordEvent("denounce_claimed", row.id);
     // La fiche revendiquée entre d'office dans la bande de son école et de sa boîte (§18.82) : une
