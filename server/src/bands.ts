@@ -48,6 +48,7 @@ import {
   BAND_JOINS_PER_DAY,
   BAND_MIN_MEMBERS,
   BAND_TOP_MEMBERS,
+  BAND_TYPES,
   COMPANY_INPUT_MAX,
   bandHasPage,
   cleanCompanyLabel,
@@ -265,13 +266,33 @@ export function bandBoard(db: Database.Database, type: BandType, withId?: string
   return { type, total: c.ranked.length, entries, forming, extra };
 }
 
-/** Les cinq premières de chaque ligue, pour l'accueil. */
-export function bandsTop(db: Database.Database, now = Date.now()): BandsTop {
-  const top = (type: BandType) => {
+/**
+ * L'ordre de l'accueil (§18.91) : les bandes au tableau, puis les bandes en formation qui
+ * ont leur page publique (une boîte au nom libre reste cachée avant trois dossiers), le
+ * plus d'étoiles d'abord, puis le plus de dossiers, puis la plus ancienne.
+ */
+function homeOrder(c: Computed): League[] {
+  const forming = [...c.all.values()]
+    .filter((b) => b.members < BAND_MIN_MEMBERS && bandHasPage(b.type, b.id, b.members))
+    .sort((a, b) => b.score - a.score || b.members - a.members || a.since - b.since || a.id.localeCompare(b.id));
+  return [...c.ranked, ...forming];
+}
+
+/**
+ * Le classement de chaque ligue pour l'accueil : cinq lignes au plus, le tableau d'abord,
+ * les bandes en formation pour les places qui restent. `mine` : la bande de la personne
+ * dans chaque ligue ; plus bas que les cinq lignes, elle vient en plus, avec sa place.
+ */
+export function bandsTop(db: Database.Database, now = Date.now(), mine: Partial<Record<BandType, string | null>> = {}): BandsTop {
+  const out: BandsTop = { ecole: [], boite: [] };
+  for (const type of BAND_TYPES) {
     const c = league(db, type, now);
-    return c.ranked.slice(0, HOME_SIZE).map((b) => toStanding(c, b));
-  };
-  return { ecole: top("ecole"), boite: top("boite") };
+    const order = homeOrder(c);
+    out[type] = order.slice(0, HOME_SIZE).map((b) => toStanding(c, b));
+    const i = mine[type] ? order.findIndex((b) => b.id === mine[type]) : -1;
+    if (i >= HOME_SIZE) (out.mine ??= {})[type] = { place: i + 1, band: toStanding(c, order[i]!) };
+  }
+  return out;
 }
 
 /**
@@ -582,10 +603,14 @@ export function mountBands(app: Hono, o: BandsOptions): void {
     return c.json(bandBoard(store.db, type, w && BAND_ID_RE.test(w) ? w : null));
   });
 
-  // GET /api/bands/top : les cinq premières de chaque ligue (l'accueil).
+  // GET /api/bands/top : le classement de chaque ligue pour l'accueil ; `?ecole=`, `?boite=` : sa propre bande, si elle est plus bas.
   app.get("/api/bands/top", (c) => {
+    const own = (type: BandType) => {
+      const id = c.req.query(type);
+      return id && BAND_ID_RE.test(id) ? id : null;
+    };
     c.header("Cache-Control", "public, max-age=60");
-    return c.json(bandsTop(store.db));
+    return c.json(bandsTop(store.db, Date.now(), { ecole: own("ecole"), boite: own("boite") }));
   });
 
   // GET /api/bands/:type/:id : la page d'une bande.
