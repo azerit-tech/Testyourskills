@@ -1,4 +1,4 @@
-// Les bandes sur l'accueil (§18.91) : un classement par ligue, les écoles puis les
+// Les bandes sur l'accueil (§18.92) : un classement par ligue, les écoles puis les
 // boîtes, fait comme le top de la semaine (WeekBoard). Cinq lignes : la place, le
 // nom, les fiches, les étoiles ; une seule ligne pour les places libres, qui ramène
 // au formulaire. Sa propre bande est mise en évidence ; plus bas que la cinquième

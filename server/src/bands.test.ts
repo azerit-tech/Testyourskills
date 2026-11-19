@@ -297,7 +297,7 @@ describe("le score d'une bande", () => {
     expect(bandsTop(ctx.store.db).boite).toEqual([]);
   });
 
-  it("l'accueil (§18.91) : cinq lignes par ligue, le tableau puis les bandes en formation, les plus étoilées d'abord ; la sienne en plus si elle est plus bas", () => {
+  it("l'accueil (§18.92) : cinq lignes par ligue, le tableau puis les bandes en formation, les plus étoilées d'abord ; la sienne en plus si elle est plus bas", () => {
     const ctx = setup();
     const t = 1_800_000_000_000;
     const add = (ref: BandRef, stars: (1 | 2 | 3 | 4 | 5 | 6)[], at: number) => stars.forEach((s, i) => put(ctx.store, insert(ctx.store, { stars: s }), ref, at + i));

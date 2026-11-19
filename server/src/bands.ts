@@ -267,7 +267,7 @@ export function bandBoard(db: Database.Database, type: BandType, withId?: string
 }
 
 /**
- * L'ordre de l'accueil (§18.91) : les bandes au tableau, puis les bandes en formation qui
+ * L'ordre de l'accueil (§18.92) : les bandes au tableau, puis les bandes en formation qui
  * ont leur page publique (une boîte au nom libre reste cachée avant trois dossiers), le
  * plus d'étoiles d'abord, puis le plus de dossiers, puis la plus ancienne.
  */

@@ -79,7 +79,7 @@ export interface BandBoard {
 }
 
 /**
- * GET /api/bands/top : le classement de chaque ligue pour l'accueil (§18.91), cinq lignes
+ * GET /api/bands/top : le classement de chaque ligue pour l'accueil (§18.92), cinq lignes
  * au plus. Les bandes au tableau d'abord, dans leur ordre ; s'il reste des places, les
  * bandes en formation qui ont leur page publique (`rank` null), les plus étoilées
  * d'abord. La place d'une ligne est sa position dans la liste.

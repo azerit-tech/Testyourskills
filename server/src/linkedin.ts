@@ -20,6 +20,7 @@ import { join } from "node:path";
 import type { Context, Hono } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import type { CardData, ComparisonData } from "../../shared/types";
+import { linkedinKey, type AccountKit } from "./account";
 import { ownerFromRequest, safeReturnPath, sign, unsign } from "./auth";
 import type { CardRow, Store } from "./db";
 import { ID_RE } from "./pipeline";
@@ -81,22 +82,22 @@ export async function inlineAvatar(card: CardData, baseUrl: string, avatarDir: s
 
 // --- États OAuth : 10 min, usage unique, liés à une carte --------------------
 
-export class StateStore {
-  private states = new Map<string, { cardId: string; exp: number }>();
+export class StateStore<T = string> {
+  private states = new Map<string, { value: T; exp: number }>();
 
-  create(cardId: string, now = Date.now()): string {
+  create(value: T, now = Date.now()): string {
     for (const [k, v] of this.states) if (v.exp < now) this.states.delete(k);
     const state = randomBytes(24).toString("base64url");
-    this.states.set(state, { cardId, exp: now + STATE_TTL_MS });
+    this.states.set(state, { value, exp: now + STATE_TTL_MS });
     return state;
   }
 
   /** Consomme l'état : un second appel avec le même state échoue. */
-  take(state: string | undefined, now = Date.now()): string | null {
+  take(state: string | undefined, now = Date.now()): T | null {
     if (!state) return null;
     const v = this.states.get(state);
     this.states.delete(state);
-    return v && v.exp >= now ? v.cardId : null;
+    return v && v.exp >= now ? v.value : null;
   }
 }
 
@@ -174,10 +175,13 @@ export async function fetchProfile(
     signal: AbortSignal.timeout(API_TIMEOUT_MS),
   });
   if (!infoRes.ok) throw new PhotoError(`userinfo : HTTP ${infoRes.status}`);
-  const info = (await infoRes.json()) as { picture?: unknown; name?: unknown; given_name?: unknown; family_name?: unknown; email?: unknown; email_verified?: unknown };
+  const info = (await infoRes.json()) as { sub?: unknown; picture?: unknown; name?: unknown; given_name?: unknown; family_name?: unknown; email?: unknown; email_verified?: unknown };
   const text = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 80) : undefined);
   const email = typeof info.email === "string" && /^[^\s@]{1,64}@[^\s@]{1,190}$/.test(info.email.trim()) ? info.email.trim().toLowerCase() : undefined;
+  // L'identifiant OpenID de la personne : seule son empreinte est gardée, pour retrouver son compte (account.ts).
+  const sub = typeof info.sub === "string" && info.sub.trim() && info.sub.length <= 200 ? info.sub.trim() : undefined;
   return {
+    ...(sub ? { sub } : {}),
     picture: typeof info.picture === "string" ? info.picture : undefined,
     name: text(info.name) ?? text([text(info.given_name), text(info.family_name)].filter(Boolean).join(" ")),
     // L'adresse n'est rendue que si LinkedIn la dit vérifiée (scope email, demandé par l'entrée seulement).
@@ -187,6 +191,8 @@ export async function fetchProfile(
 
 /** Ce que « Sign in with LinkedIn » rend de la personne. Jamais l'adresse de son profil. */
 export interface OidcProfile {
+  /** L'identifiant OpenID, stable pour une personne et cette application. Jamais rangé tel quel. */
+  sub?: string;
   picture?: string;
   name?: string;
   /** Adresse vérifiée par LinkedIn. */
@@ -200,8 +206,8 @@ export interface OidcProfile {
 export interface LinkedinEnterHook {
   /** Peut-on lancer une connexion depuis cette adresse (limite par IP) ? */
   allow(c: Context): boolean;
-  /** Le retour de LinkedIn : ce qu'il rend de la personne, puis la page où revenir. */
-  finish(c: Context, returnPath: string, profile: OidcProfile): Response | Promise<Response>;
+  /** Le retour de LinkedIn : ce qu'il rend de la personne, puis la page où revenir. `accountId` : son compte (§18.91). */
+  finish(c: Context, returnPath: string, profile: OidcProfile, accountId?: string): Response | Promise<Response>;
 }
 
 // --- Mise à jour des cartes -------------------------------------------------
@@ -258,12 +264,14 @@ export interface LinkedinRoutesOptions {
   stateSecret?: string;
   /** « Se connecter avec LinkedIn » (§18.80). Absent : /auth/linkedin/enter n'existe pas. */
   enter?: LinkedinEnterHook;
+  /** Le compte léger (§18.91) : la connexion par l'entrée le trouve ou le crée. Absent : pas de compte. */
+  account?: AccountKit | null;
 }
 
 export function mountLinkedin(app: Hono, o: LinkedinRoutesOptions) {
   const states = new StateStore();
-  /** Les états d'une entrée : ce qu'ils gardent est la page où revenir, pas une fiche. */
-  const enterStates = new StateStore();
+  /** Les états d'une entrée : ce qu'ils gardent est la page où revenir, pas une fiche ; `redo` : « Refaire ma fiche ». */
+  const enterStates = new StateStore<{ path: string; redo: boolean }>();
   // Les états ne survivent pas non plus à un redémarrage : un secret du processus suffit.
   const secret = o.stateSecret ?? randomBytes(32).toString("base64url");
   const cookieBase = { httpOnly: true, secure: o.secure ?? o.baseUrl.startsWith("https://"), sameSite: "Lax" as const, path: STATE_PATH };
@@ -301,7 +309,8 @@ export function mountLinkedin(app: Hono, o: LinkedinRoutesOptions) {
           403,
         );
       }
-    } else if (!o.tokenMatches(c.req.query("token"), row.deleteToken)) {
+    } else if (!o.tokenMatches(c.req.query("token"), row.deleteToken) && !o.account?.owns(c, row)) {
+      // Ni le jeton de la fiche, ni le compte dont c'est la fiche (§18.91).
       return c.json({ ok: false, message: { fr: "Changer la photo est réservé à qui a créé la fiche.", en: "Only the sheet's creator can change its photo." } }, 403);
     }
     const state = states.create(id);
@@ -326,7 +335,7 @@ export function mountLinkedin(app: Hono, o: LinkedinRoutesOptions) {
       u.searchParams.set("li", "error");
       return c.redirect(`${o.baseUrl}${u.pathname}${u.search}`, 302);
     }
-    const state = enterStates.create(returnPath);
+    const state = enterStates.create({ path: returnPath, redo: c.req.query("redo") === "1" });
     setCookie(c, LI_STATE_COOKIE, sign(secret, "linkedin", { s: state, e: Date.now() + STATE_TTL_MS }), { ...cookieBase, maxAge: STATE_TTL_MS / 1000 });
     const url = new URL(AUTHORIZE_URL);
     url.searchParams.set("response_type", "code");
@@ -344,7 +353,8 @@ export function mountLinkedin(app: Hono, o: LinkedinRoutesOptions) {
     // Usage unique : le cookie d'état et l'état partent quoi qu'il arrive.
     deleteCookie(c, LI_STATE_COOKIE, cookieBase);
     const id = states.take(given);
-    const enterPath = enterStates.take(given);
+    const entering = enterStates.take(given);
+    const enterPath = entering?.path ?? null;
     // L'état de l'URL doit être celui que ce navigateur a reçu au départ, comparé en temps constant.
     const sameBrowser =
       typeof bound?.s === "string" && typeof bound.e === "number" && bound.e > Date.now() && o.tokenMatches(given, bound.s);
@@ -361,7 +371,13 @@ export function mountLinkedin(app: Hono, o: LinkedinRoutesOptions) {
       try {
         const profile = await fetchProfile(code, o.config, redirectUri, o.fetchImpl);
         if (!profile.name) throw new PhotoError("pas de nom");
-        const done = await o.enter.finish(c, enterPath, profile);
+        // Connexion = compte (§18.91) : trouvé ou créé d'après l'empreinte du sub.
+        const kit = o.account;
+        const account = kit && profile.sub ? kit.signIn(c, { linkedinKey: linkedinKey(kit.secret, profile.sub) }) : null;
+        // Sa fiche est en ligne : droit dessus, sans recherche ni calcul. « Refaire ma fiche » passe outre.
+        const mine = account && !entering?.redo ? kit!.cardOf(account) : null;
+        if (mine) return c.redirect(`${o.baseUrl}/c/${mine.id}`, 302);
+        const done = await o.enter.finish(c, enterPath, profile, account?.id);
         return done;
       } catch (err) {
         console.warn("[linkedin] entrée non aboutie :", (err as Error).message);

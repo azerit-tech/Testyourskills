@@ -132,8 +132,9 @@ describe("l'accueil de qui a déjà sa fiche (§18.89)", () => {
     const order = ["<MineCard ", "<WeekBoard ", "<PrimesStrip />", "<BandsTop onPlay={play} cardId={mem.mine.id} />", "h.back.another"].map((x) => page.indexOf(x));
     expect(order.every((i) => i > 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
-    // le formulaire ne s'ouvre qu'à la demande, à la place du lien
-    expect(page).toMatch(/\{open \? \(\s*<EntryForm inputRef=\{inputRef\} \/>\s*\) : \(\s*<button type="button" className="link-alt home-another"/);
+    // le formulaire ne s'ouvre qu'à la demande, à la place du lien ; connecté (§18.91), « Se déconnecter » à côté
+    expect(page).toMatch(/\{open \? \(\s*<EntryForm inputRef=\{inputRef\} another \/>\s*\) : acct \? \([\s\S]*?h\.account\.out[\s\S]*?\) : \(\s*<button type="button" className="link-alt home-another"/);
+    // les bandes : les deux classements du §18.92 (BandsTop), et non le bloc d'avant (HomeBands)
     for (const gone of ["hero-title", "hero-hook", "<ExampleCard", "<Spin", "<ProfileWall", "<HomeBands", "home-last", "<BackLine"]) expect(page).not.toContain(gone);
     // un préremplissage (« Réessayer », /<pseudo>), une dénonciation, un film à voir ou un dossier en cours gardent l'accueil du formulaire
     expect(home).toMatch(/const returning = !!mem\.mine && !owed && !mem\.pending;/);

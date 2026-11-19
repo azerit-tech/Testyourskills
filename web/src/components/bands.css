@@ -518,7 +518,7 @@
 
 /* ---------- le top de l'accueil ---------- */
 
-/* un classement par ligue (§18.91), fait comme le top de la semaine : les écoles, puis les
+/* un classement par ligue (§18.92), fait comme le top de la semaine : les écoles, puis les
    boîtes, puis le lien vers /bandes */
 .leagues {
   display: grid;

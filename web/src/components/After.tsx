@@ -11,6 +11,7 @@ import { recruiterRead, weakestCriterion } from "../../../shared/recruiterLine";
 import { t as cardT } from "../../../shared/card/i18n";
 import { pick, useT } from "../i18n";
 import { api, hasGithub, images, isMine, isMock, tokens, weekOf } from "../lib/api";
+import { loadAccount, signOut } from "../lib/account";
 import { navigate } from "../lib/router";
 import { getPlea } from "../lib/plea";
 import { useAppConfig } from "../lib/season";
@@ -598,7 +599,7 @@ export function LinkedInPhoto({ cardId, hasAvatar }: { cardId: string; hasAvatar
     };
   }, []);
   if (!cfg?.linkedin) return null;
-  if (cfg.claim && hasGithub(cardId) ? !isMine(cardId) : !token) return null;
+  if (cfg.claim && hasGithub(cardId) ? !isMine(cardId) : !token && !isMine(cardId)) return null;
   return (
     <Fold name="personalize" title={t.result.rest.photo}>
       {!hasAvatar && <p>{l.noPhoto}</p>}
@@ -768,7 +769,7 @@ export function Claim({ cardId, login, lawyer, me, onMe, toast }: ClaimProps) {
           >
             {me.hidden ? c.unhide : c.hide}
           </button>
-          <button type="button" className="link-alt" disabled={busy} onClick={() => run(() => api.logout().then(() => null), c.loggedOut)}>
+          <button type="button" className="link-alt" disabled={busy} onClick={() => run(() => signOut().then(() => null), c.loggedOut)}>
             {c.logout}
           </button>
         </div>
@@ -891,6 +892,8 @@ export function DeleteCard({ cardId, onDeleted }: { cardId: string; onDeleted: (
     try {
       await api.deleteCard(cardId, token);
       tokens.remove(cardId);
+      // Supprimée par le compte : il part avec (§18.91) ; la barre et l'entrée le relisent.
+      void loadAccount(true);
       onDeleted();
     } catch {
       setStep("error");

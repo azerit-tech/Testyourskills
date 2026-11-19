@@ -1,4 +1,4 @@
-// Les tableaux de l'accueil (§18.48, §18.91) : le top de la semaine et ceux des bandes,
+// Les tableaux de l'accueil (§18.48, §18.92) : le top de la semaine et ceux des bandes,
 // et la ligne de mémoire, rendus en chaîne, sans navigateur ni serveur.
 import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -127,7 +127,7 @@ describe("la ligne de mémoire au-dessus du formulaire", () => {
   });
 });
 
-describe("les bandes sur l'accueil : un classement par ligue (§18.91)", () => {
+describe("les bandes sur l'accueil : un classement par ligue (§18.92)", () => {
   const band = (type: "ecole" | "boite", id: string, label: string, score: number, members: number, rank: number | null = null) =>
     ({ type, id, label, score, members, rank, missing: Math.max(0, 3 - members), gap: null, ahead: null, hasPage: true }) as BandStanding;
   const view = (top: BandsTop, mine: Partial<Record<"ecole" | "boite", string | null>> = {}, language?: string) => render(createElement(BandsTopView, { top, mine, onPlay: () => undefined }), language);

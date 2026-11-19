@@ -3,13 +3,13 @@
 // Jacques (le produit) debout sur son crépuscule : à droite au bureau, juste
 // sous le formulaire sur téléphone, où son haut dépasse du premier écran.
 // Ensuite, dans l'ordre de l'envie : la berline (§18.79), le top de la semaine
-// (§18.22), les primes si elles sont ouvertes (§18.4), un classement des écoles et un des boîtes (§18.91), le
+// (§18.22), les primes si elles sont ouvertes (§18.4), un classement des écoles et un des boîtes (§18.92), le
 // mur des 13 profils (§18.28), et un dernier formulaire avant le pied de page.
 // Rien d'autre. La couverture en mosaïque du §18.31 a disparu (§18.81).
 // L'accueil se souvient : le dossier encore en cours tient en une ligne au-dessus du
 // formulaire, à la place de la promesse.
 // Qui a déjà sa fiche a un autre accueil (§18.89) : sa fiche en haut, les classements
-// dessous (le top de la semaine, les primes ouvertes, les écoles, les boîtes, §18.91), et rien d'autre.
+// dessous (le top de la semaine, les primes ouvertes, les écoles, les boîtes, §18.92), et rien d'autre.
 // L'exemple est la vraie fiche de Jacques (fondateur d'Azerit) : la maquette
 // s'affiche d'abord, la fiche calculée par le serveur la remplace dès qu'elle existe.
 // Aucun dégradé dans la page : seul celui de la fiche.
@@ -34,6 +34,7 @@ import { homeHook, useAppConfig } from "../lib/season";
 import { returnPending } from "../lib/entryApi";
 import { MINE_EVENT, clearPending, dropPrefill, filmOwed, myCard, peekPrefill, pendingFile, type MyCard } from "../lib/session";
 import { ReturnCall } from "../components/ReturnCall";
+import { signOut, useAccount } from "../lib/account";
 
 export { ReturnCall };
 
@@ -351,6 +352,10 @@ export function Home() {
   // Qui a déjà sa fiche (§18.89) : sa fiche, les classements, et le formulaire replié tout en bas
   // sous « Faire une autre fiche ».
   const mineHome = returning && !denounce && !fromPrefill && !returnBack;
+  // Connecté (§18.91) : « Se déconnecter » à côté de « Faire une autre fiche ». Une fiche déjà là :
+  // les formulaires de l'accueil gardent leurs boutons, la ligne de sa fiche dit déjà où elle est.
+  const acct = useAccount();
+  const another = !!mem.mine || !!mem.pending;
   const showcase = useShowcase(!mineHome);
   const toast = useMiniToast();
 
@@ -392,7 +397,17 @@ export function Home() {
         </div>
         <div className="home-more" ref={moreRef}>
           {open ? (
-            <EntryForm inputRef={inputRef} />
+            <EntryForm inputRef={inputRef} another />
+          ) : acct ? (
+            <div className="entry-foot entry-or home-another">
+              <button type="button" className="link-alt" aria-expanded={false} onClick={openForm}>
+                {h.back.another}
+              </button>
+              <span aria-hidden>·</span>
+              <button type="button" className="link-alt" onClick={() => void signOut()}>
+                {h.account.out}
+              </button>
+            </div>
           ) : (
             <button type="button" className="link-alt home-another" aria-expanded={false} onClick={openForm}>
               {h.back.another}
@@ -428,7 +443,7 @@ export function Home() {
           ) : (
             <>
               {mem.mine || mem.pending ? <BackLine mine={mem.mine} pending={mem.pending} owed={owed} /> : <p className="hero-hook">{hook}</p>}
-              <EntryForm inputRef={inputRef} />
+              <EntryForm inputRef={inputRef} another={another} />
             </>
           )}
         </section>
@@ -459,7 +474,7 @@ export function Home() {
           </h2>
           <p>{hook}</p>
         </div>
-        <EntryForm secondary />
+        <EntryForm secondary another={another} />
       </section>
     </main>
   );

@@ -15,10 +15,11 @@ import { createPortal } from "react-dom";
 import { detectEntry, normalizeLinkedinUrl, parseGithubLogin, resolveDoor } from "../../../shared/entry";
 import type { Door } from "../../../shared/entry";
 import { pick, useT } from "../i18n";
-import { api, ApiError, tokens } from "../lib/api";
+import { api, ApiError, isMock, tokens } from "../lib/api";
+import { loadAccount, mockLinkCard, signOut, useAccount } from "../lib/account";
 import { doneReturn, findPct, getReturn, leadReturn, releaseReturn, startGithubLogin, startLinkedinLogin, subscribeReturn } from "../lib/entryApi";
 import { errorFact } from "../lib/errors";
-import { navigate } from "../lib/router";
+import { navigate, onLinkClick } from "../lib/router";
 import { loadCardPage } from "../pages/cardPageLoader";
 import { unlockAudio } from "../lib/audio";
 import { unlockFilm } from "../film/unlock";
@@ -43,6 +44,8 @@ interface Props {
   secondary?: boolean;
   /** La fiche vient d'être créée, avant de partir vers elle (la page d'une bande y accroche sa bande). */
   onCreated?: (id: string) => void;
+  /** Ouvert par « Faire une autre fiche » : les boutons d'aujourd'hui, jamais « Voir ma fiche » (§18.91). */
+  another?: boolean;
 }
 
 /** Le champ ouvert : sur LinkedIn ou GitHub (le bouton sans connexion), ou sur tout (« colle un lien »). */
@@ -140,7 +143,7 @@ function intoView(el: HTMLElement | null) {
   el.scrollIntoView({ block: "center", behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
 }
 
-export function EntryForm({ inputRef, variant = "full", note, secondary = false, onCreated }: Props) {
+export function EntryForm({ inputRef, variant = "full", note, secondary = false, onCreated, another = false }: Props) {
   const inline = variant === "inline";
   const { t, lang } = useT();
   const h = t.home;
@@ -227,6 +230,9 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
   /** Les deux boutons de connexion à l'écran, le champ fermé. */
   const buttonsOn = simple && open === null && !hold;
   const fieldOn = showGithub && !buttonsOn && !hold;
+  // Le compte léger (§18.91), ou le repli de `tys_who` (§18.90) : connecté avec une fiche, l'entrée y
+  // ramène d'abord. Pas tant qu'un retour de connexion est en cours : ce parcours-là va jusqu'au bout.
+  const acct = useAccount();
   /** Ce que le champ lit d'abord : LinkedIn s'il s'est ouvert sur LinkedIn, GitHub sinon. */
   const fieldDoor: Door = doorsOn && simple && open === "linkedin" ? "linkedin" : "github";
   /** « colle un lien » : le champ prend tout, ses suggestions mêlent les deux sources. */
@@ -262,7 +268,8 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
     check.reason === "not_pdf" ? h.errNotPdf : check.reason === "too_large" ? h.errTooLarge(check.mb) : h.errTooManyPages(check.pages);
 
   /** Lance la carte : un pseudo validé et/ou un PDF validé, ou un lien LinkedIn normalisé. */
-  const start = async (input: { login?: string; file?: File | null; linkedin?: string }) => {
+  /** `viaLogin` : lancée par l'entrée connectée (le retour de LinkedIn ou de GitHub) ; elle va au compte (§18.91). */
+  const start = async (input: { login?: string; file?: File | null; linkedin?: string; viaLogin?: boolean }) => {
     if (busyRef.current) return;
     busyRef.current = true;
     // Le geste qui lance la fiche débloque le son de la révélation (§18.27) et,
@@ -280,6 +287,11 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
       // « Réessayer » remet le lien LinkedIn dans le champ unique.
       rememberInput({ login: input.login ?? input.linkedin, file: input.file ?? null });
       markFresh(res.id, input.login, input.linkedin, !!input.file);
+      // Le serveur l'a liée au compte ; la démo fait de même. La barre gagne « Ma fiche ».
+      if (input.viaLogin) {
+        if (isMock()) mockLinkCard(res.id);
+        void loadAccount(true);
+      }
       onCreated?.(res.id);
       navigate(`/c/${res.id}`);
     } catch (err) {
@@ -448,11 +460,11 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
     doneReturn();
     if (back.s === "auto") {
       setLogin(back.name);
-      void startRef.current({ linkedin: back.url });
+      void startRef.current({ linkedin: back.url, viaLogin: true });
     } else if (back.s === "github") {
       setVia("github");
       setLogin(back.login);
-      void startRef.current({ login: back.login });
+      void startRef.current({ login: back.login, viaLogin: true });
     } else {
       setVia(back.via);
       setLost(back.via);
@@ -693,8 +705,10 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
           if (!(d === "linkedin" ? can.liLogin : can.ghLogin)) return openField(d);
           setVia(d);
           setSigning(d);
-          if (d === "linkedin") startLinkedinLogin();
-          else startGithubLogin();
+          // Une fiche déjà là : se connecter sert à en faire une autre, pas à revenir sur la sienne (§18.91).
+          const redo = !!acct?.cardId;
+          if (d === "linkedin") startLinkedinLogin({ redo });
+          else startGithubLogin({ redo });
         }}
       >
         {waits ? (
@@ -712,7 +726,36 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
     );
   };
   /** Les deux boutons empilés, LinkedIn d'abord (le rose) ; sans LinkedIn lisible, GitHub seul, en rose. */
-  const loginBtns = buttonsOn && (
+  /** Connecté, une fiche au compte : « Voir ma fiche », et dessous « Refaire ma fiche · Se déconnecter ». */
+  const connected = buttonsOn && !!acct?.cardId && !another && !working && !picking && !returned;
+  const mineHref = acct?.cardId ? `/c/${acct.cardId}` : "/";
+  /** « Refaire » : le parcours de la source connectée, sans le raccourci vers la fiche ; sans connexion réglée, le champ. */
+  const redo = () => {
+    const src = acct?.sources ?? [];
+    const d: Door | null = (src.includes("linkedin") || !!acct?.known) && liOn && can.liLogin ? "linkedin" : src.includes("github") && can.ghLogin ? "github" : null;
+    if (!d) return openField("link");
+    setVia(d);
+    setSigning(d);
+    if (d === "linkedin") startLinkedinLogin({ redo: true });
+    else startGithubLogin({ redo: true });
+  };
+  const connectedBlock = connected && (
+    <>
+      <a className="pill pill-big entry-mine" href={mineHref} onClick={(e) => onLinkClick(e, mineHref)}>
+        {h.account.see}
+      </a>
+      <div className="entry-foot entry-or" id={`${uid}-hint`}>
+        <button type="button" className="link-alt" onClick={redo}>
+          {h.account.redo}
+        </button>
+        <span aria-hidden>·</span>
+        <button type="button" className="link-alt" onClick={() => void signOut()}>
+          {h.account.out}
+        </button>
+      </div>
+    </>
+  );
+  const loginBtns = buttonsOn && !connected && (
     <>
       {liOn && loginBtn("linkedin", true)}
       {loginBtn("github", !liOn)}
@@ -725,7 +768,7 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
     navigate("/");
   };
   /** La petite ligne sous les deux boutons : « ou avec ton CV · ou colle un lien ». */
-  const orLine = buttonsOn && (
+  const orLine = buttonsOn && !connected && (
     <div className="entry-foot entry-or" id={`${uid}-hint`}>
       <button type="button" className="link-alt" onClick={toCv}>
         {h.orCv}
@@ -778,7 +821,7 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
                   onClick={() => {
                     doneReturn();
                     setLogin(p.name);
-                    void start({ linkedin: p.url });
+                    void start({ linkedin: p.url, viaLogin: true });
                   }}
                 >
                   <SuggestRow item={fromLinkedin(p)} />
@@ -805,6 +848,7 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
     return (
       <form ref={formRef} className="entry entry-inline is-stack" onSubmit={submit} onInput={prefetchReveal} onPointerDown={prefetchReveal} onFocus={onFocus} noValidate>
         {hold && finding && <FindWait since={finding.since} />}
+        {connectedBlock}
         {loginBtns}
         {fieldOn && loginField}
         {errorLine}
@@ -830,6 +874,7 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
       {mode === "both" && <p className="entry-both-head">{h.bothActive}</p>}
 
       {hold && finding && <FindWait since={finding.since} />}
+      {connectedBlock}
       {loginBtns}
       {fieldOn && loginField}
 

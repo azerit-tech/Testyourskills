@@ -7,6 +7,7 @@ import { onLinkClick, usePath } from "../lib/router";
 import { seasonLine, useAppConfig } from "../lib/season";
 import { syncMine } from "../lib/entryApi";
 import { MINE_EVENT, myCard } from "../lib/session";
+import { useAccount } from "../lib/account";
 import { AzeritMark, Brand } from "./Brand";
 
 /** La langue en deux mots, « FR · EN » : l'active soulignée, chacune sur 44 px de zone tactile. */
@@ -94,8 +95,12 @@ export function TopBar() {
     void syncMine();
     return () => window.removeEventListener(MINE_EVENT, on);
   }, []);
+  // Connecté avec une fiche au compte (§18.91) : « Ma fiche » en pastille, avec son visage. Le repli
+  // sans compte (§18.90) garde le lien texte, vers la fiche que le navigateur retient.
+  const got = useAccount();
+  const acct = got && !got.known ? got : null;
   const mine = myCard();
-  const mineHref = mine ? `/c/${mine.id}` : null;
+  const mineHref = acct?.cardId ? `/c/${acct.cardId}` : mine ? `/c/${mine.id}` : got?.cardId ? `/c/${got.cardId}` : null;
   const onBands = /^\/bandes(\/|$)/.test(path);
   return (
     <header className="topbar">
@@ -106,10 +111,19 @@ export function TopBar() {
         <a className="topbar-link" href="/bandes" onClick={(e) => onLinkClick(e, "/bandes")} aria-current={onBands ? "page" : undefined}>
           {t.chrome.bands}
         </a>
-        {mineHref && (
-          <a className="topbar-link" href={mineHref} onClick={(e) => onLinkClick(e, mineHref)} aria-current={path === mineHref ? "page" : undefined}>
+        {mineHref && acct?.cardId ? (
+          <a className="topbar-link topbar-mine" href={mineHref} onClick={(e) => onLinkClick(e, mineHref)} aria-current={path === mineHref ? "page" : undefined}>
+            <span className="topbar-face" aria-hidden>
+              {acct.avatarUrl ? <img src={acct.avatarUrl} alt="" width={24} height={24} referrerPolicy="no-referrer" /> : (acct.initial ?? "★")}
+            </span>
             {t.chrome.mine}
           </a>
+        ) : (
+          mineHref && (
+            <a className="topbar-link" href={mineHref} onClick={(e) => onLinkClick(e, mineHref)} aria-current={path === mineHref ? "page" : undefined}>
+              {t.chrome.mine}
+            </a>
+          )
         )}
       </nav>
       <div className="topbar-right">

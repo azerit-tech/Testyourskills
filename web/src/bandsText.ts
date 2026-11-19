@@ -110,7 +110,7 @@ const fr = {
     /** La phrase des bandes. */
     hook: "Fais ta fiche. Fais gagner ta bande.",
     all: "Toutes les bandes",
-    /** Sous le nom d'une bande en formation, au classement de l'accueil (§18.91) : la règle des trois fiches, sans phrase. */
+    /** Sous le nom d'une bande en formation, au classement de l'accueil (§18.92) : la règle des trois fiches, sans phrase. */
     forming: (k: number) => `${n(k, "fiche", "fiches")}, en formation`,
     /** Une ligne du classement pour un lecteur d'écran : sa place, son nom, ses étoiles, ses fiches. */
     rowLabel: (place: number, label: string, score: number, dossiers: number, forming: boolean) =>
