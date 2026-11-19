@@ -13,6 +13,7 @@ import { ensureLinkedinTables, purgeLinkedin } from "./linkedinProfile/store";
 import { forgetWeekRanks } from "./top";
 import { ensureBandTables, forgetBands, removeBandMembers } from "./bands";
 import { ensurePrimeTables, removeEntriesForCards, removeEntriesForLogin } from "./primes";
+import { ensureAccountTables } from "./account";
 
 export const RETENTION_MS = 90 * 24 * 3600 * 1000;
 export const CACHE_MS = 24 * 3600 * 1000;
@@ -276,6 +277,8 @@ export function migrate(db: Database.Database) {
   ensureBandTables(db);
   // Les primes (§18.4) : une inscription par login et par prime, posée par « Concourir ».
   ensurePrimeTables(db);
+  // Le compte léger (§18.85) : une ligne par personne connectée, rien qui la nomme.
+  ensureAccountTables(db);
 }
 
 export class Store {

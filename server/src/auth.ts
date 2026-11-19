@@ -32,9 +32,10 @@
 // - Une route POST qui agit pour le propriétaire vérifie aussi l'origine
 //   (`sameOrigin`) : SameSite=Lax couvre déjà les navigateurs récents.
 
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import type { Context, Hono } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
+import { sameString, sign, unsign } from "./signing";
 import { autoJoinBands } from "./bands";
 import type { Store } from "./db";
 import { ID_RE } from "./pipeline";
@@ -73,38 +74,10 @@ export function githubAuthFromEnv(env: NodeJS.ProcessEnv): GithubAuthConfig | un
   return clientId && clientSecret && sessionSecret ? { clientId, clientSecret, sessionSecret } : undefined;
 }
 
-// --- Signature HMAC ---------------------------------------------------------
+// --- Signature HMAC (signing.ts) ---------------------------------------------
 
-function mac(secret: string, purpose: string, body: string): string {
-  return createHmac("sha256", secret).update(`${purpose}.${body}`).digest("base64url");
-}
-
-function sameString(a: string, b: string): boolean {
-  const x = Buffer.from(a);
-  const y = Buffer.from(b);
-  return x.length === y.length && timingSafeEqual(x, y);
-}
-
-/** Valeur signée `{charge}.{signature}` ; `purpose` empêche qu'une valeur passe pour une autre (aussi pour linkedin.ts). */
-export function sign(secret: string, purpose: string, payload: object): string {
-  const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  return `${body}.${mac(secret, purpose, body)}`;
-}
-
-/** Charge d'une valeur signée, ou null si la signature ne correspond pas. Comparaison en temps constant. */
-export function unsign(secret: string, purpose: string, value: string | undefined): Record<string, unknown> | null {
-  if (!value || value.length > 2048) return null;
-  const dot = value.indexOf(".");
-  if (dot <= 0) return null;
-  const body = value.slice(0, dot);
-  if (!sameString(value.slice(dot + 1), mac(secret, purpose, body))) return null;
-  try {
-    const v: unknown = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
-    return v && typeof v === "object" ? (v as Record<string, unknown>) : null;
-  } catch {
-    return null;
-  }
-}
+/** Aussi pour linkedin.ts et les entrées : chaque valeur signée a son préfixe d'usage. */
+export { sign, unsign };
 
 export function signSession(secret: string, owner: Owner, now = Date.now()): string {
   return sign(secret, "session", { l: owner.login.toLowerCase(), i: owner.githubId, e: now + SESSION_TTL_MS });
