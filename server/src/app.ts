@@ -31,6 +31,7 @@ import { normalizeLinkedinUrl, PAID_CALLS_PER_IP, type LinkedinFinder } from "./
 import { forgetLinkedinOfCard, recentLinkedinCard } from "./linkedinProfile/cards";
 import type { LinkedinPeople } from "./linkedinProfile/search";
 import { mountLinkedinSearch } from "./entry/linkedinSearch";
+import { mountGithubSearch, type GithubSearchRoutesOptions } from "./entry/githubSearch";
 import { primePhase, primesOpen, seasonDates, type Season } from "../../shared/season";
 import { loadSeason } from "./season";
 import { mountRemoval } from "./removal";
@@ -96,6 +97,8 @@ export interface AppOptions {
   linkedinProfiles?: LinkedinFinder;
   /** La recherche d'un profil LinkedIn par nom (§18.80). Absent : le champ « Ton nom » reste un champ où l'on colle un lien. */
   linkedinPeople?: LinkedinPeople;
+  /** La recherche de comptes GitHub des suggestions (§18.80). Absent : la vraie (github/searchUsers.ts). */
+  githubUserSearch?: GithubSearchRoutesOptions["search"];
   /** La trace du film (FILM_TRACE=1, filmTrace.ts) : le fichier où l'écrire. Absent : pas de route. */
   filmTraceFile?: string;
 }
@@ -883,6 +886,8 @@ export function createApp(opts: AppOptions) {
 
   // Les deux portes sans rien coller (§18.80) : les suggestions du champ « Ton nom ».
   mountLinkedinSearch(app, { people: opts.linkedinProfiles ? opts.linkedinPeople : undefined, limiter });
+  // Et celles du champ « Ton nom ou pseudo » : les comptes GitHub, cherchés avec les jetons du serveur.
+  mountGithubSearch(app, { auth: opts.githubPool ?? opts.githubToken, limiter, search: opts.githubUserSearch });
 
   mountLinkedin(app, {
     store,
