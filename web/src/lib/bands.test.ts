@@ -163,7 +163,7 @@ describe("les trois états de la page d'une bande, en mots", () => {
     for (const d of [fr, en]) {
       const s = d.bands.states;
       const n = d.bands.none;
-      const texts = [s.follow, s.joinTitle, s.joinText, s.join, s.moving("X"), s.lost, s.seeCard, s.pickUnder, s.landed("X"), s.slots(1), s.anonymous(2), s.claimHint, s.spread([[4, 2]]), n.title, n.note, n.league.ecole, n.league.boite];
+      const texts = [s.follow, s.joinTitle, s.joinText, s.join, s.moving("X"), s.lost, s.seeCard, s.pickUnder, s.landed("X"), s.slots(1), s.anonymous(2), s.others(2), s.claimHint, s.spread([[4, 2]]), n.title, n.note, n.league.ecole, n.league.boite];
       for (const x of texts) expect(x, x).not.toMatch(/[—·]/);
       expect(s.follow).not.toMatch(/toucher dessous|tap below/);
     }

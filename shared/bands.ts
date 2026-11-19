@@ -15,7 +15,7 @@
 //   qu'à partir de trois dossiers (`hasPage`).
 
 import raw from "../data/bands.json";
-import type { Fact, Position } from "./types";
+import type { BoardPerson, Fact, Position } from "./types";
 
 /** Les deux ligues, telles qu'elles s'écrivent dans les adresses (/bandes/ecole/:id). */
 export type BandType = "ecole" | "boite";
@@ -84,17 +84,17 @@ export interface BandsTop {
   boite: BandStanding[];
 }
 
-/** Un membre sur la page d'une bande : jamais un nom ; le @pseudo seulement si la fiche est revendiquée. */
-export interface BandMember {
+/**
+ * Un membre sur la page d'une bande (§18.88) : la personne de la fiche, son nom, son
+ * visage et l'adresse de sa fiche (BoardPerson). Sans `cardId` : une fiche née d'une
+ * dénonciation et pas encore revendiquée, comptée sans être montrée.
+ */
+export interface BandMember extends Partial<BoardPerson> {
   stars: number;
   /** Nom du profil criminel, si la fiche en a un. */
   profile: Fact | null;
   /** Le poste de la fiche (backend, front, data…), déjà public sur la fiche : distingue deux dossiers du même profil. */
   position?: Position;
-  /** Pseudo GitHub, seulement pour une fiche revendiquée. */
-  login?: string;
-  /** Adresse de la fiche, seulement pour une fiche revendiquée. */
-  cardId?: string;
 }
 
 /** GET /api/bands/:type/:id. */

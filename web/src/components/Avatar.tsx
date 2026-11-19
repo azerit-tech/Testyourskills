@@ -1,7 +1,8 @@
-// Le visage d'une ligne de tableau (top de la semaine, bande, prime) : l'avatar public
-// d'un pseudo GitHub, en petit. Sans photo, l'initiale : jamais l'icône d'image cassée,
+// Le visage d'une ligne de tableau (top de la semaine, bande, prime), en petit : la
+// photo de la fiche, ou l'avatar public d'un pseudo GitHub. Sans photo, les initiales
+// de la fiche (l'initiale du pseudo si on n'a que lui) : jamais l'icône d'image cassée,
 // jamais le damier que GitHub génère pour un compte sans photo (card/avatar.ts).
-// La photo ne paraît qu'une fois sûre ; d'ici là, l'initiale tient la place.
+// La photo ne paraît qu'une fois sûre ; d'ici là, les initiales tiennent la place.
 // Le dessin est dans styles.css (.board-avatar).
 import { useAvatar } from "../card/avatar";
 
@@ -10,9 +11,13 @@ export function avatarUrl(login: string): string {
   return `https://github.com/${encodeURIComponent(login)}.png?size=64`;
 }
 
-/** `src` : la photo déjà connue de la fiche (vide : pas de photo) ; sans `src`, l'avatar public du pseudo. */
-export function Avatar({ login, src }: { login: string; src?: string }) {
-  const url = src === undefined ? avatarUrl(login) : src || null;
+/**
+ * `src` : la photo déjà connue de la fiche (vide : pas de photo) ; sans `src`, l'avatar public du pseudo.
+ * `initials` : celles de la fiche, pour une personne sans photo (§18.88).
+ */
+export function Avatar({ login, src, initials }: { login?: string; src?: string; initials?: string }) {
+  const url = src === undefined ? (login ? avatarUrl(login) : null) : src || null;
   const state = useAvatar(url);
-  return <span className="board-avatar">{state === "photo" && url ? <img src={url} alt="" width={32} height={32} /> : login.slice(0, 1).toUpperCase()}</span>;
+  const letters = (initials || (login ?? "").slice(0, 1)).toUpperCase();
+  return <span className="board-avatar">{state === "photo" && url ? <img src={url} alt="" width={32} height={32} /> : letters}</span>;
 }

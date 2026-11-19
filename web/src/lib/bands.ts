@@ -1,6 +1,7 @@
 // Les bandes côté navigateur (§18.38) : l'API, sa démo (?mock=1), et deux
 // souvenirs locaux, la bande de la dernière page vue (sa pastille passe en
 // premier sous la fiche) et les bandes choisies ici (« Ta bande » sur /bandes).
+import { boardPerson } from "../../../shared/boardPerson";
 import type { BandBoard, BandPage, BandRef, BandsTop, BandStanding, BandType, MyBands } from "../../../shared/bands";
 import { BAND_MIN_MEMBERS, bandHasPage, companyCheck, schoolById } from "../../../shared/bands";
 import { isMock, tokens } from "./api";
@@ -213,6 +214,21 @@ const MOCK_BANDS: Record<BandType, Omit<BandStanding, "rank" | "gap" | "ahead">[
 
 const mockJoined = new Map<string, Partial<Record<BandType, { id: string; label: string }>>>();
 
+/**
+ * Les personnes de démo d'une bande, comme leurs fiches les portent : une fiche GitHub
+ * avec son nom et sa photo, des fiches LinkedIn seules (un nom, pas de pseudo, avec ou
+ * sans photo), une fiche GitHub sans nom (son @pseudo), un nom très long.
+ */
+const MOCK_PEOPLE: { name?: string; login?: string; avatarUrl?: string }[] = [
+  { name: "Léa Martin-Dubois", login: "leamd", avatarUrl: "https://avatars.githubusercontent.com/u/583231?v=4" },
+  { name: "Inès Carpentier" },
+  { name: "Yanis Belkacem", avatarUrl: "/mock-linkedin.svg" },
+  { login: "nour-rs" },
+  { name: "Théo Dubois" },
+  { name: "Marie-Charlotte Vandenberghe-Lefebvre de Montmorency" },
+  { name: "Camille Roux", login: "camroux" },
+];
+
 function mockStandings(type: BandType): BandStanding[] {
   const list = MOCK_BANDS[type].map((b) => ({ ...b }));
   // Les choix faits en démo s'ajoutent à leur bande (un dossier de 4 étoiles).
@@ -262,13 +278,26 @@ const mock = {
       null,
     ];
     const positions = ["BE", "FE", "DATA", "FS", "OPS"] as const;
-    // Comme le serveur : toutes les fiches jusqu'à 50 (BAND_PAGE_MEMBERS), les anonymes comprises.
-    const members = Array.from({ length: Math.min(band.members, 50) }, (_, i) => ({
-      stars: Math.max(1, 6 - Math.floor(i / 3)),
-      profile: profiles[i % profiles.length],
-      position: positions[i % positions.length],
-      ...(i === 0 ? { login: "leamd", cardId: "m-gold-abcd" } : {}),
-    }));
+    // Comme le serveur (§18.88) : toutes les fiches jusqu'à 50 (BAND_PAGE_MEMBERS), chacune avec sa
+    // personne ; `?anon=2` laisse les deux dernières anonymes (nées d'une dénonciation, pas revendiquées).
+    let anon = 0;
+    try {
+      anon = Math.max(0, Number(new URLSearchParams(window.location.search).get("anon")) || 0);
+    } catch {
+      /* hors navigateur : aucune */
+    }
+    const count = Math.min(band.members, 50);
+    const members = Array.from({ length: count }, (_, i) => {
+      const p = MOCK_PEOPLE[i % MOCK_PEOPLE.length]!;
+      // Une fiche de démo qui s'ouvre vraiment (mock.ts lit le type dans l'id) : GitHub, ou LinkedIn seule.
+      const cardId = `m-${p.login ? "gold" : "li"}-bande${i + 1}`;
+      return {
+        stars: Math.max(1, 6 - Math.floor(i / 3)),
+        profile: profiles[i % profiles.length]!,
+        position: positions[i % positions.length],
+        ...(i >= count - anon ? {} : boardPerson(p, cardId)),
+      };
+    });
     return { band, members };
   },
   mine(cardId: string): MyBands {
