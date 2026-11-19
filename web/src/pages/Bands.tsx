@@ -1,6 +1,7 @@
-// Les bandes (§18.38) : /bandes, le tableau des écoles et celui des boîtes ;
-// /bandes/ecole/:id et /bandes/boite/:id, la page d'une bande. Même système que
-// le top de la semaine (WeekBoard) : lignes sur aplat marine, titres crème.
+// Les bandes (§18.38) : /bandes, le tableau des écoles et celui des boîtes, puis
+// les bandes en formation (§18.85) ; /bandes/ecole/:id et /bandes/boite/:id, la
+// page d'une bande. Même système que le top de la semaine (WeekBoard) : lignes
+// sur aplat marine, titres crème.
 // Jamais un nom de personne, jamais un rang d'école du barème.
 //
 // La page d'une bande a trois états (SPEC §18.48) : sans fiche (le formulaire,
@@ -10,10 +11,11 @@
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { BandBoard, BandMember, BandPage as BandPageData, BandStanding, BandType, MyBands } from "../../../shared/bands";
-import { BAND_MIN_MEMBERS, BAND_TYPES, bandPath } from "../../../shared/bands";
+import { BAND_TYPES, bandPath } from "../../../shared/bands";
 import { Avatar } from "../components/Avatar";
 import { useBandShare } from "../components/BandPick";
 import { BandRow } from "../components/BandRow";
+import { BandSlots } from "../components/BandSlots";
 import { BusyDots } from "../components/Busy";
 import { BandNotFound, Unreachable } from "../components/ErrorPage";
 import { StarMark, Stars } from "../components/Stars";
@@ -31,40 +33,86 @@ import "../components/bands.css";
 
 /* ---------- /bandes ---------- */
 
-/** Le tableau d'une ligue : ses lignes, ou une phrase si elle est vide ; puis sa propre bande, plus bas. */
-function BoardPanel({ board, type, on }: { board: BandBoard; type: BandType; on: boolean }) {
+/** Sa propre bande en formation : son nom, ses trois emplacements, ce qu'il lui manque, et le partage. Pas d'étoiles avant le tableau. */
+function MineForming({ band, onShare, native }: { band: BandStanding; onShare: (band: BandStanding) => void; native: boolean }) {
+  const { t } = useT();
+  const href = bandPath(band);
+  return (
+    <div className="block bands-mine">
+      <p className="label">{t.bands.board.yours}</p>
+      <h3 className="t-block">
+        <a href={href} onClick={(e) => onLinkClick(e, href)}>
+          {band.label}
+        </a>
+      </h3>
+      <BandSlots members={band.members} />
+      <p className="band-rank">{t.bands.board.toBoard(band.missing)}</p>
+      <button type="button" className="pill band-share" onClick={() => onShare(band)}>
+        {native ? <IconShare /> : <IconLinkedIn />}
+        {t.bands.page.share}
+      </button>
+    </div>
+  );
+}
+
+interface PanelProps {
+  board: BandBoard;
+  type: BandType;
+  on: boolean;
+  onShare: (band: BandStanding) => void;
+  native: boolean;
+}
+
+/**
+ * Une ligue (§18.85) : sa propre bande en formation d'abord ; les bandes au tableau ;
+ * sa propre bande classée plus bas ; puis les bandes en formation, sans étoiles.
+ * La phrase « aucune … au tableau » ne sort que si la ligue n'a rien à montrer.
+ */
+export function BoardPanel({ board, type, on, onShare, native }: PanelProps) {
   const { t } = useT();
   const tb = t.bands.board;
+  const mine = board.extra;
+  const nothing = board.entries.length === 0 && board.forming.length === 0 && !mine;
   return (
     <section className={`bands-panel${on ? " is-on" : ""}`} id={`bands-panel-${type}`} role="tabpanel" aria-labelledby={`bands-tab-${type}`}>
-      <div className="board-top">
-        <p className="board-tag bands-panel-tag">{t.bands.league[type]}</p>
-        {board.entries.length > 0 && (
+      {/* au bureau, le titre de la colonne ; au téléphone, l'onglet le dit déjà */}
+      <h2 className="bands-league">{t.bands.league[type]}</h2>
+      {mine && mine.rank === null && <MineForming band={mine} onShare={onShare} native={native} />}
+      {board.entries.length > 0 && (
+        <div className="board-top">
+          <p className="board-tag">{tb.ranked}</p>
           <span className="board-scale" aria-hidden>
             {tb.scale}
           </span>
-        )}
-        {board.entries.length === 0 ? (
-          <p className="bands-empty">{t.bands.none.league[type]}</p>
-        ) : (
           <ol className="board-list is-top">
             {board.entries.map((b) => (
               <BandRow key={b.id} b={b} />
             ))}
           </ol>
-        )}
-      </div>
-      {board.extra && (
+        </div>
+      )}
+      {mine && mine.rank !== null && (
         <div className="board-top bands-yours">
           <p className="board-tag">{tb.yours}</p>
           <span className="board-scale" aria-hidden>
             {tb.scale}
           </span>
           <ol className="board-list is-top">
-            <BandRow b={board.extra} />
+            <BandRow b={mine} />
           </ol>
         </div>
       )}
+      {board.forming.length > 0 && (
+        <div className="board-top bands-forming">
+          <p className="board-tag">{t.bands.forming}</p>
+          <ul className="board-list is-top">
+            {board.forming.map((b) => (
+              <BandRow key={b.id} b={b} />
+            ))}
+          </ul>
+        </div>
+      )}
+      {nothing && <p className="bands-empty">{t.bands.none.league[type]}</p>}
     </section>
   );
 }
@@ -75,6 +123,8 @@ export function Bands() {
   const [type, setType] = useState<BandType>(() => (new URLSearchParams(window.location.search).get("t") === "boite" ? "boite" : "ecole"));
   const [mine] = useState<MyCard | null>(() => myCard());
   const tabs = useRef<(HTMLButtonElement | null)[]>([]);
+  const toast = useToast();
+  const { share, native } = useBandShare(toast.show);
 
   useEffect(() => {
     document.title = t.meta.titlePage(tb.title);
@@ -91,7 +141,10 @@ export function Bands() {
   if (boards.s === "wait") return <main className="page page-bands" id="main" aria-busy />;
 
   const data = boards.data;
-  const empty = BAND_TYPES.every((k) => data[k].entries.length === 0 && !data[k].extra);
+  // Rien à montrer : ni bande au tableau, ni bande en formation, ni la sienne.
+  const empty = BAND_TYPES.every((k) => data[k].entries.length === 0 && data[k].forming.length === 0 && !data[k].extra);
+  // Le partage de sa bande en formation : le même que sur sa page.
+  const shareBand = (band: BandStanding) => void share(band, t.bands.page.shareText(band.label, t.bands.rank(band)), mine?.id ?? null);
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
     const next = type === "ecole" ? "boite" : "ecole";
@@ -129,7 +182,7 @@ export function Bands() {
             </div>
             <div className="bands-cols">
               {BAND_TYPES.map((k) => (
-                <BoardPanel key={k} board={data[k]} type={k} on={type === k} />
+                <BoardPanel key={k} board={data[k]} type={k} on={type === k} onShare={shareBand} native={native} />
               ))}
             </div>
           </>
@@ -148,6 +201,7 @@ export function Bands() {
           <EntryForm />
         )}
       </section>
+      {toast.node}
     </main>
   );
 }
@@ -221,20 +275,6 @@ function Anonymous({ count, spread }: { count: number; spread: [number, number][
         )}
       </span>
     </li>
-  );
-}
-
-/** Moins de trois fiches : trois emplacements à remplir, pas un « ★ 0 ». */
-function Slots({ members }: { members: number }) {
-  const { t } = useT();
-  return (
-    <p className="band-slots" role="img" aria-label={t.bands.states.slots(members)}>
-      {Array.from({ length: BAND_MIN_MEMBERS }, (_, i) => (
-        <span key={i} className={`band-slot${i < members ? " is-on" : ""}`}>
-          {i < members && <StarMark />}
-        </span>
-      ))}
-    </p>
   );
 }
 
@@ -404,7 +444,7 @@ export function BandPage({ type, id }: { type: BandType; id: string }) {
               <span className="band-total-count">{t.bands.dossiers(band.members)}</span>
             </p>
           ) : (
-            <Slots members={band.members} />
+            <BandSlots members={band.members} />
           )}
           <p className="band-rank">{withSup(rank)}</p>
           {band.ahead && aheadHref && (

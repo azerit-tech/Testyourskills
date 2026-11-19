@@ -1,6 +1,7 @@
 // Les textes des bandes (§18.38), rangés sous `t.bands` dans i18n.ts. Épicène,
 // sans accord en « é·e » ; ton polar, sec. Ni tiret long ni point médian.
 import type { BandStanding, BandType } from "../../shared/bands";
+import { BAND_MIN_MEMBERS } from "../../shared/bands";
 
 type Rank = Pick<BandStanding, "type" | "rank" | "missing" | "gap" | "ahead">;
 
@@ -58,10 +59,17 @@ const fr = {
     intro: "Chaque fiche peut rapporter ses étoiles à une école et à une boîte, au choix de la personne. Les vingt meilleures fiches d'une bande comptent ; trois suffisent pour entrer au tableau.",
     tabs: "Tableau",
     yours: "Ta bande",
+    /** L'onglet des bandes classées ; celui des bandes en formation est `forming`. */
+    ranked: "Au tableau",
     /** L'unité des notes de bande, une fois en tête du tableau. */
     scale: "Étoiles",
-    rowLabel: (rank: number | null, label: string, score: number, dossiers: number) =>
-      `${rank ? (rank === 1 ? "n° 1" : `${rank}e`) : "En formation"}, ${label}, ${n(score, "étoile", "étoiles")}, ${n(dossiers, "fiche", "fiches")}`,
+    rowLabel: (rank: number, label: string, score: number, dossiers: number) => `${rank === 1 ? "n° 1" : `${rank}e`}, ${label}, ${n(score, "étoile", "étoiles")}, ${n(dossiers, "fiche", "fiches")}`,
+    /** Une bande en formation, pour un lecteur d'écran : pas d'étoiles, elles ne disent rien avant le tableau. */
+    formingLabel: (label: string, dossiers: number) => `${label}, en formation, ${n(dossiers, "fiche", "fiches")} sur ${BAND_MIN_MEMBERS}`,
+    /** Sous le nom d'une bande en formation : « Encore 2 fiches ». */
+    missing: (k: number) => `Encore ${n(k, "fiche", "fiches")}`,
+    /** Sa propre bande en formation : ce qu'il lui manque, en une phrase. */
+    toBoard: (k: number) => `Encore ${n(k, "fiche", "fiches")} pour entrer au tableau.`,
     makeTitle: "Fais gagner ta bande",
     make: "Fais ta fiche : ses étoiles comptent pour ton école et ta boîte. Tu peux changer juste sous elle.",
   },
@@ -107,7 +115,7 @@ const fr = {
     /** La fiche vient de se poser, sa bande l'attendait (message éphémère sous la fiche). */
     landed: (label: string) => `Tu roules pour ${label}.`,
     /** Les trois emplacements d'une bande en formation, pour un lecteur d'écran. */
-    slots: (k: number) => `${k} sur 3`,
+    slots: (k: number) => `${n(k, "fiche", "fiches")} sur ${BAND_MIN_MEMBERS}`,
     /** Les fiches sans pseudo, en dernière ligne de la liste, derrière une pile de silhouettes. */
     anonymous: (k: number) => n(k, "fiche anonyme", "fiches anonymes"),
     /** Sous la liste, quand aucune fiche n'a de pseudo. */
@@ -168,9 +176,12 @@ const en: BandsDict = {
     intro: "Every sheet can bring its stars to one school and one company, its owner's choice. A crew's top 20 sheets count; three are enough to make the board.",
     tabs: "Board",
     yours: "Your crew",
+    ranked: "On the board",
     scale: "Stars",
-    rowLabel: (rank: number | null, label: string, score: number, dossiers: number) =>
-      `${rank ? `#${rank}` : "Forming"}, ${label}, ${nEn(score, "star", "stars")}, ${nEn(dossiers, "sheet", "sheets")}`,
+    rowLabel: (rank: number, label: string, score: number, dossiers: number) => `#${rank}, ${label}, ${nEn(score, "star", "stars")}, ${nEn(dossiers, "sheet", "sheets")}`,
+    formingLabel: (label: string, dossiers: number) => `${label}, forming, ${dossiers} of ${BAND_MIN_MEMBERS} sheets`,
+    missing: (k: number) => nEn(k, "more sheet", "more sheets"),
+    toBoard: (k: number) => `${nEn(k, "more sheet", "more sheets")} to make the board.`,
     makeTitle: "Put your crew on top",
     make: "Get your rap sheet: its stars count for your school and your company. You can switch right under it.",
   },
@@ -206,7 +217,7 @@ const en: BandsDict = {
     seeCard: "See my sheet",
     pickUnder: "You already have your sheet: open it, your school and your company are picked right under it.",
     landed: (label: string) => `You ride for ${label}.`,
-    slots: (k: number) => `${k} of 3`,
+    slots: (k: number) => `${k} of ${BAND_MIN_MEMBERS} sheets`,
     anonymous: (k: number) => nEn(k, "anonymous sheet", "anonymous sheets"),
     claimHint: "A sheet claimed with “That's me” shows here with its username.",
     spread: (parts: [number, number][]) => parts.map(([s, k]) => `${nEn(k, "sheet", "sheets")} at ${nEn(s, "star", "stars")}`).join(", "),
