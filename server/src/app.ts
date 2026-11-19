@@ -32,6 +32,7 @@ import { forgetLinkedinOfCard, recentLinkedinCard } from "./linkedinProfile/card
 import type { LinkedinPeople } from "./linkedinProfile/search";
 import { mountLinkedinSearch } from "./entry/linkedinSearch";
 import { mountGithubSearch, type GithubSearchRoutesOptions } from "./entry/githubSearch";
+import { createLinkedinEnter, type LinkedinEnterOptions } from "./entry/linkedinLogin";
 import { primePhase, primesOpen, seasonDates, type Season } from "../../shared/season";
 import { loadSeason } from "./season";
 import { mountRemoval } from "./removal";
@@ -99,6 +100,9 @@ export interface AppOptions {
   linkedinPeople?: LinkedinPeople;
   /** La recherche de comptes GitHub des suggestions (§18.80). Absent : la vraie (github/searchUsers.ts). */
   githubUserSearch?: GithubSearchRoutesOptions["search"];
+  /** Le GitHub d'après l'identité LinkedIn, et « même photo ? » (§18.80). Absents : les vrais (github/identity.ts, entry/photoHash.ts). */
+  githubIdentity?: LinkedinEnterOptions["resolveGithub"];
+  samePhoto?: LinkedinEnterOptions["samePhoto"];
   /** La trace du film (FILM_TRACE=1, filmTrace.ts) : le fichier où l'écrire. Absent : pas de route. */
   filmTraceFile?: string;
 }
@@ -316,6 +320,22 @@ export function createApp(opts: AppOptions) {
     removeImages: (ids) => removeImages(ogDir, ids),
   });
 
+  // « Continuer avec LinkedIn » (§18.80) : il faut la connexion, la lecture des profils et leur recherche par nom.
+  const linkedinEnter =
+    opts.linkedin && opts.linkedinProfiles && opts.linkedinPeople
+      ? createLinkedinEnter(app, {
+          people: opts.linkedinPeople,
+          limiter,
+          baseUrl,
+          secure: opts.secureCookies ?? baseUrl.startsWith("https://"),
+          secret: opts.githubAuth?.sessionSecret,
+          fetchImpl,
+          github: opts.githubPool ?? opts.githubToken,
+          resolveGithub: opts.githubIdentity,
+          samePhoto: opts.samePhoto,
+        })
+      : null;
+
   /** Le index.html du front, s'il est là. */
   const siteTemplate = async (): Promise<string | null> => (opts.indexHtml ? await opts.indexHtml().catch(() => null) : null);
 
@@ -399,6 +419,8 @@ export function createApp(opts: AppOptions) {
       linkedinEntry: !!opts.linkedinProfiles,
       // linkedinSearch : le champ « Ton nom » propose des profils (§18.80) ; sinon on y colle un lien.
       linkedinSearch: !!opts.linkedinProfiles && !!opts.linkedinPeople,
+      // linkedinLogin : le bouton « Continuer avec LinkedIn » (§18.80).
+      linkedinLogin: !!linkedinEnter,
       primesOpen: primesOpen(season, now),
       // primesListed : la saison porte au moins une prime (ouverte, à venir ou close) : /primes existe.
       primesListed: !!season && season.primes.length > 0,
@@ -602,11 +624,34 @@ export function createApp(opts: AppOptions) {
         else void pipeline.wait(id).then(mark);
       };
 
+      // « Continuer avec LinkedIn » (§18.80) : le profil lancé est celui de la personne
+      // connectée (le profil sûr, ou l'un des homonymes proposés). Sa fiche reçoit le
+      // GitHub retrouvé d'après son identité, et son email vérifié comme contact.
+      const who = linkedinUrl && !login && !pdf && !denounce ? (linkedinEnter?.identityFor(c, linkedinUrl) ?? null) : null;
+      /** L'email de la personne connectée, posé sur sa fiche dès qu'elle existe ; jamais sur une fiche qui en porte déjà un. */
+      const lead = (id: string) => {
+        who?.used();
+        const email = who?.email;
+        if (!email) return;
+        const tie = () => {
+          const row = store.getCard(id);
+          if (!row || row.email) return;
+          store.setEmail(id, email);
+          store.recordEvent("card_email", id, { via: "linkedin" });
+          void sendLead(opts.leadsEndpoint, buildLead(email, id, baseUrl), fetchImpl);
+        };
+        if (store.getCard(id)) tie();
+        else void pipeline.wait(id).then(tie);
+      };
+
       // Fiche LinkedIn récente du même profil : resservie, et dite dénoncée s'il y a lieu.
       if (linkedinUrl && !login) {
         const cached = recentLinkedinCard(store.db, { url: linkedinUrl });
-        if (cached) {
+        // Sortie sans GitHub alors que l'identité en apporte un : on la refait, en comparaison.
+        const refait = !!cached && !!who?.github && !store.isHidden(who.github.login) && store.getCard(cached)?.kind !== "comparison";
+        if (cached && !refait) {
           denounced(cached);
+          lead(cached);
           return c.json({ id: cached, cached: true }, 200);
         }
       }
@@ -662,8 +707,10 @@ export function createApp(opts: AppOptions) {
         linkedinUrl,
         // Lectures payantes de profils LinkedIn : une limite par IP en plus du budget du jour (§18.24).
         linkedinSpend: () => limiter.take("linkedin", ip, PAID_CALLS_PER_IP),
+        ...(who?.github ? { identity: { githubLogin: who.github.login, how: who.github.how, sureProfile: who.sureProfile } } : {}),
       });
       denounced(id, true);
+      lead(id);
       // L'insertion arrive toujours après ce retour (le pipeline attend au moins
       // une fois) : la ref est écrite dans la ligne, puis oubliée en fin de job.
       if (ref) {
@@ -900,6 +947,7 @@ export function createApp(opts: AppOptions) {
     claim: !!opts.githubAuth,
     secure: opts.secureCookies ?? baseUrl.startsWith("https://"),
     stateSecret: opts.githubAuth?.sessionSecret,
+    enter: linkedinEnter?.hook,
   });
 
   // Pages à venir (/primes, /vs, /u…, §18.27) : jamais un pseudo, retour à l'accueil, query gardée (?mock=1).
