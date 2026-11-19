@@ -318,9 +318,9 @@ const fr = frTypoDeep({
     leadDenounced: (who: string, by: string | null) => (by ? `@${by} a dénoncé ${who}.` : `Quelqu'un a dénoncé ${who}.`),
     /** Sans bloc des critères au-dessus (fiche dénoncée sans grille) : la même question, sans « ces huit critères ». */
     yourTurnBare: "Et toi, tu vaux combien d'étoiles\u00a0? Ton LinkedIn ou ton GitHub suffit.",
-    /** Sous la fiche d'un dossier à deux sources (§18.36) : d'où vient la preuve, une seule note. */
+    /** Sous la fiche d'un dossier à deux sources (§18.36, §18.89) : une fiche, une note, lue « d'après LinkedIn et GitHub ». */
     pieces: {
-      line: (labels: string) => `Sources au dossier\u00a0: ${labels}`,
+      line: (labels: string) => `D'après ${labels.replace(/^CV\b/, "le CV")}`,
       /* « LinkedIn et GitHub » : une phrase, pas un point médian. */
       pair: (a: string, b: string) => `${a} et ${b}`,
       unproven: "Code à prouver",
@@ -1123,7 +1123,7 @@ const en: Dict = {
     leadDenounced: (who, by) => (by ? `@${by} turned in ${who}.` : `Someone turned in ${who}.`),
     yourTurnBare: "What about you, how many stars? Your LinkedIn or your GitHub is all it takes.",
     pieces: {
-      line: (labels) => `Sources on file: ${labels}`,
+      line: (labels) => `Based on ${labels.replace(/^Résumé\b/, "the résumé")}`,
       pair: (a, b) => `${a} and ${b}`,
       unproven: "Code still unproven",
       link: "Link between the two sources: to be confirmed",

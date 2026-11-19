@@ -1,5 +1,5 @@
-// Sous la fiche d'un dossier à deux pièces (SPEC §18.36) : « Pièces au dossier :
-// LinkedIn · GitHub ». Une seule note, celle de la fiche ; les pièces disent d'où
+// Sous la fiche d'un dossier à deux pièces (SPEC §18.36, §18.89) : « D'après
+// LinkedIn et GitHub ». Une seule note, celle de la fiche ; les pièces disent d'où
 // vient la preuve, jamais l'une contre l'autre. Le code pas encore prouvé (GitHub
 // « dossier vide ») et un lien entre les deux pièces que rien ne prouve encore se
 // disent sur leur propre ligne.
