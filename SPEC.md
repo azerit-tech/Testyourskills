@@ -941,6 +941,8 @@ Après chaque fusion, on vérifie la grille suivante. On corrige ce qui manque, 
 
 ### 18.22 Le top de la semaine (9 novembre 2026)
 
+*Depuis le 19 novembre 2026 (§18.84) le top classe des personnes sur la note de leur dossier, plus des fiches GitHub.*
+
 *Décidé par Jacques, construit par Claude. Il fait revenir : on voit le haut du tableau, on veut y grimper.*
 
 - **La semaine** va du lundi 00:00 UTC au dimanche 23:59 UTC.
@@ -1323,6 +1325,8 @@ La poursuite 2D du §18.33 n'a pas passé : Jacques veut « un effet film », «
 - **Construit le 10 novembre** : le montage (`scripts/film-assemble.ts`, une prise absente devient son carton) et le lecteur (`shared/film/`, `web/src/film/`, `web/src/components/Film.tsx`), joué par `?scene=film` ; l'ascenseur reste le défaut, le film est muet. Décisions du lecteur : les deux images d'encre de la coupe sont la dernière du plan et la première du suivant (la balise vidéo garde une image d'avance) ; le titre de l'arrêt sur image entre de 1,2 à 1 et passe sur deux lignes à 360 px ; la fiche est en place au sommet du flash ; 540p en économie de données ou en 3G ; essais par `?film=gesture|missing|nocodec` ; en démo, `@x` donne une étoile. Reste : le son, les vrais téléphones, le passage par défaut.
 
 ### 18.37 Le barème de recrutement (10 novembre 2026)
+
+*Barème 0.5.0 depuis le 19 novembre 2026 (§18.84) : l'expérience donne le niveau et sort de la moyenne, les coefficients changent, un dossier n'a plus qu'un calcul.*
 
 Jacques : « c'est ça tout le jeu, avoir quelque chose qui se rapproche d'un vrai recrutement avec les vrais critères », et le jeu doit montrer la méthode d'Azerit : « qu'ils soient bluffés par leur façon de noter les gens, leur façon de trouver les infos ». La grille, ses niveaux, ses exemples et sa construction sont dans `docs/bareme-recrutement.md`.
 
@@ -2266,3 +2270,50 @@ Jacques : « une fois que mon passage est fini, que dénoncer un complice vienne
 - **Rien à coller** : le champ (« Son nom, son pseudo ou un lien ») cherche comme l'entrée (§18.80, mêmes plafonds) : comptes GitHub et profils LinkedIn dans une seule liste, trois de chaque, GitHub d'abord, chaque ligne avec sa photo et sa source. Un toucher sur une personne envoie la dénonciation. Son propre compte ne sort pas dans la liste. Un lien LinkedIn collé ou un pseudo GitHub tapé en entier partent tels quels ; un nom envoyé sans ligne choisie prend la seule personne proposée, sinon rouvre la liste, sinon dit « Choisis quelqu'un dans la liste… ». Si le serveur ne cherche pas de profils LinkedIn, la liste ne porte que des comptes GitHub. Les complices connus (co-auteurs sur GitHub) restent en pilules sous le champ, à un toucher. Sous le titre, une ligne : « On dresse sa fiche, tu la lui envoies. »
 - **Le résultat, sur place** : au toucher, la fiche du complice part au calcul et le bloc dit aussitôt « @x est dans le viseur » (ou le nom de la personne), avec « Interrogatoire en cours… » et une barre qui avance sur la durée attendue (20 s, puis elle ralentit sans toucher le bout, comme l'attente). La fiche prête remplace l'attente dans le même bloc : étoiles, niveau, chef d'accusation, « Envoyer à @x » d'abord, seul rose de l'écran (le bouton de partage, juste dessous, passe en contour tant qu'elle est là). Si son titre est passé au-dessus de l'écran, il y revient ; qui est parti lire plus bas n'est pas ramené.
 - **Vérifié** : en démo, Chrome sans tête et muet. À 390 × 700, une seconde après la fin de la révélation (film passé) : la barre à deux rangs est à l'écran, à cinq et à deux étoiles ; un toucher donne le focus au champ ; « Léa Martin » fait sortir cinq personnes ; un toucher affiche « Léa Martin est dans le viseur » avec sa barre, puis la fiche prête et « Envoyer à @… ». À 1280 × 800 : les deux blocs dans le premier écran, la liste, le choix au clavier (flèche, Entrée). `tsc -b`, `vitest run` (1 948 tests) et `vite build` verts. **Pas vérifié** : un vrai iPhone (le clavier qui s'ouvre au toucher de la barre, la liste au-dessus du clavier), la fin du film sans le passer, une vraie dénonciation par un profil LinkedIn trouvé par la recherche (pas de jeton Apify sur le poste).
+
+### 18.84 Barème 0.5.0 : le niveau d'expérience, et une seule note par personne (19 novembre 2026, branche `bareme/niveau-dossier-unique`)
+
+Jacques, jour du lancement : « il faut juger les gens avec le même niveau d'exp, genre un gars qui a 1 an d'exp ou juste un stage il est classé super bas alors qu'il a un super stage », « les 3 derniers ont eu 38 », puis « c'est nimp pourquoi le scoring GitHub et LinkedIn est séparé » et, en ordre ferme : « je veux une seule note ». Ce paragraphe remplace les coefficients et la note d'expérience du §18.37, la règle de classement du §18.22, et tout ce qui donnait une note à une pièce d'un dossier. `docs/bareme-recrutement.md` porte les tables (section « Barème 0.5.0 »).
+
+**Le barème**
+
+- **Le défaut, mesuré.** Sous 0.4.0, moins d'un an compté valait 2/10 en expérience (coefficient 1,5) et un stage 4/10 en parcours, quel que soit le stage : cinq débuts de carrière différents sortaient tous à 38, deux étoiles. Les années étaient une pénalité, payée deux fois.
+- **Le niveau** (`seniority`, calculé en code, jamais par l'IA) : les mois comptés sur les postes datés, stage et alternance pour moitié. Début de carrière (moins de 12 mois), junior (12 à 36), confirmé (36 à 72), senior (72 à 120), expert (120 et plus). Sans postes datés : les années déclarées, dites « affirmé ». Fiche GitHub seule : les années actives × 12, dites « estimé ». Rien du tout : les tables du junior, et aucun niveau affiché. Au dossier à deux pièces, le niveau est celui des postes datés.
+- **L'expérience sort de la moyenne** (coefficient 1,5 → 0) : elle dit à quel niveau le reste se lit. Le parcours mesure déjà ce que vaut l'expérience. Coefficients : parcours 1,5 → 2,5, ownership 1 → 1,5 ; code 2, stack 1,5, activité 1, école 1, open source 0,5 inchangés.
+- **Lus au niveau** : le parcours (une table par niveau, `EMP.tables` : un stage de 4 mois chez un employeur très sélectif vaut 10 à un début de carrière, il faut 4 ans avec une progression et une équipe à un expert) ; la stack et l'ownership prouvés, pour le début de carrière et le junior (`STK.byLevel`, `OWN.byLevel`), la table commune à partir du confirmé. **Restent absolus** : le code, l'activité, l'école, l'open source. Un code propre est propre à tout âge, et une table de code par niveau aurait fait monter un senior médiocre.
+- **Ce qui n'est que déclaré ne fait jamais baisser la note** (stack et ownership lus sur LinkedIn sans preuve GitHub), comme l'école et l'open source.
+- **GitHub trop mince** : moins de 3 dépôts publics et aucun de 10 commits, ou (nouveau) moins de 50 commits publics en tout. Ses critères sont non prouvés : quelques commits de cours ne font plus baisser un bon dossier.
+- **Tenu** : une note sur 10 par critère lue dans une table, aucun « + n », le non prouvé hors moyenne, plafond 85 sans code prouvé, 20 pour un dossier vide.
+- **Les dossiers de référence** (`server/src/scoring/levels.test.ts`), note du dossier 0.4.0 → 0.5.0, l'avant mesuré en faisant tourner le moteur d'avant (commit 478ab52) sur les mêmes dossiers : (a) étudiant, 6 mois de stage chez un employeur très sélectif, GitHub correct : 38 (2★) → 69 (4★), et 85 (5★) avec son LinkedIn seul ; (b) le même stage dans une entreprise que rien ne distingue : 38 → 55 (3★) ; (c) douze ans dans le même poste sans progression, GitHub médiocre : 53 (3★) → 43 (2★), il ne passe plus devant (a) par ses années ; (d) élève d'une école d'ingénieurs, 6 mois en startup de produit et 2 mois ailleurs, 28 commits de cours : 32 (2★) → 70 (4★), 60 (3★) si rien ne distingue ses stages. Les cinq « 38 » : 60, 60, 70, 60, 85. Dix-huit mois de stage et d'alternance, LinkedIn seul : 38 → 70 (4★).
+- **Les fondateurs**, cibles déplacées : Jacques, LinkedIn seul 41 → 60, GitHub seul 61 → 77, dossier 57 → 72 ; Lumine, 45 / 20 / 45 → 66 / 20 / 66 (code non prouvé).
+- **Les centiles** : le rang se lit d'abord parmi les profils du même niveau, quand ce groupe compte 100 profils (`rank.group.kind = "seniority"`). La passe de référence est à refaire sous 0.5.0 ; le rang n'est affiché nulle part aujourd'hui.
+
+**Une personne, un dossier, un calcul, une note**
+
+- **Où vivait la séparation** (audit) : (1) le moteur calculait une grille GitHub et une grille déclarée, puis les recoupait (`caseGrid`) : trois notes pour une personne ; (2) en base, chaque pièce d'un dossier était une ligne avec sa note, ses étoiles, sa grille ; (3) le top de la semaine classait les fiches GitHub sur la note de la pièce GitHub : une personne LinkedIn seule n'y entrait jamais, un dossier y entrait sur une autre note que celle de sa page ; (4) `/c/<id d'une pièce>`, `/api/card/<id d'une pièce>` et son image `/og` servaient la pièce avec sa note ; (5) une fiche faite avant le dossier restait à côté de lui, avec sa note ; (6) la démo donnait 75 et 79 aux deux pièces de son dossier. Les bandes, les primes et la fiche de l'accueil lisaient déjà le dossier.
+- **Le moteur** : `dossierGrid({ declared?, github? })` est la seule entrée. Il lit le niveau une fois, note chaque critère une fois, sort une grille et une note. Une fiche à une source est un dossier à une pièce : même fonction, même chemin. `caseGrid`, `githubGridAt` et `compareCards` sont supprimés ; `scoreDossier` les remplace.
+- **En base** : les pièces d'un dossier gardent leurs données brutes (faits, lecture du code dans `ai_json`) et n'ont ni grille ni rang ; leur `overall` et leur `tier` sont une copie de la note du dossier, jamais une note à elles, pour qu'aucun lecteur ancien ne puisse en afficher une autre. La lecture brute du LinkedIn n'est pas rangée (vie privée) : c'est le job qui lit les deux sources qui recalcule.
+- **Une deuxième source arrive** : le dossier est recalculé, et la fiche d'avant lui cède la place (`superseded_by`). Deux cas : un dossier LinkedIn + GitHub au lien prouvé remplace la fiche GitHub du même pseudo, les dossiers prouvés plus anciens, la fiche LinkedIn de la même adresse ; « Ajoute ton GitHub » ou « Ajoute ton LinkedIn » par la personne qui tient le jeton de sa fiche remplace cette fiche. Un dossier au lien non prouvé ne remplace rien.
+- **Les adresses** : `/c/<pièce ou fiche remplacée>` redirige (302) vers le dossier ; `/api/card/` et `/og/` servent le dossier. Un dossier né d'une dénonciation ne prend pas l'adresse d'une fiche faite par sa personne.
+- **Le top de la semaine classe des personnes**, une ligne chacune : la note du dossier quand le lien est prouvé, sinon celle de la fiche seule, LinkedIn comprise. Une fiche LinkedIn seule y est une ligne sans nom, sans photo et sans lien (« Fiche LinkedIn »), comme dans les bandes. Tenu : dénonciation seulement après revendication, pseudo masqué, plafond de 5 000 abonnés. Un dossier CV + pseudo et un dossier au lien non prouvé ne classent personne : rien n'y relie le papier au pseudo.
+- **Les anciennes lignes** : aucune migration. Un dossier d'avant est lu avec la note de sa grille, ses pièces rendues sans la leur (`oneNote`, `shared/caseFile.ts`).
+- **Garde-fous** : `server/src/scoring/compare.test.ts` (une seule grille dans l'objet rangé, tout `overall` égal à celui du dossier) et `server/src/pipeline.grid.test.ts`, « une personne, un dossier, une note, partout » : la base, l'API par l'id du dossier, d'une pièce ou d'une fiche remplacée, la redirection, l'image, le top et son rang, les étoiles des bandes, les primes donnent le même chiffre. Ils échouent si une pièce expose une note à elle.
+- **Le contrat de `POST /api/card`** (`login`, `linkedin`) ne change pas. `GET /api/top` : `cardId` et `login` deviennent facultatifs (ligne sans nom).
+
+**L'affichage**
+
+- Sous la ligne du recruteur, une ligne courte : « Jugé au niveau Junior · 1,1 an » (« (estimé) » pour GitHub seul, « (affirmé) » sans postes datés). La tuile « Expérience n/10 » disparaît : sept tuiles. Dans « Le détail, critère par critère », la ligne de l'expérience dit le niveau, sans note ni coefficient ; les autres montrent la table lue à ce niveau et les coefficients de la grille. Aucun paragraphe ajouté.
+- Vérifié à 390 px en démo (Chrome sans tête, muet) : dossier LinkedIn + GitHub et fiche GitHub seule, la ligne tient sur une ligne.
+
+**L'école**
+
+- La fiche de référence d'un élève de Centrale passe à 4★ sans toucher aux rangs. Décision à part : les Écoles Centrale (Lyon, Nantes, Lille, Méditerranée), IMT Atlantique et « Mines (autres) » passent du rang B au rang A. Effet mesuré : 70 → 73, 60 → 66, Jacques 72 → 73. **Pas appliqué ici** : la liste vit hors du dépôt (§18.50), à changer sur le poste et sur le serveur ; les dossiers de test gardent le rang B.
+
+**Laissé de côté, pas vérifié**
+
+- Une fiche GitHub refaite seule après un dossier prouvé reste une deuxième fiche racine quand la recherche du profil échoue ; le top garde le dossier.
+- Dans le top, la ligne sans nom d'une fiche LinkedIn n'est pas marquée comme « la mienne ».
+- La table des centiles par niveau n'existe pas tant que la passe de référence n'a pas tourné sous 0.5.0.
+- Les notes d'avant sont celles du moteur 0.4.0 sur des dossiers de test, pas celles de la base de production, qui n'a pas été lue ni touchée ; les fiches déjà faites gardent leur note 0.4.0 jusqu'à ce qu'elles soient refaites.
+- Pas vérifié : un vrai profil LinkedIn, un vrai téléphone.
+- `tsc -b` et `vitest run` verts : 1 966 tests.
