@@ -22,7 +22,7 @@ import { inlineAvatar, mountLinkedin, removeAvatars, type LinkedinConfig } from 
 import { mountAuth, ownerFromRequest, sameOrigin, type GithubAuthConfig } from "./auth";
 import { DENOUNCE_LIMITED, DENOUNCE_PER_DAY, mountDenounce, parseDenunciation } from "./denounce";
 import { mountJury } from "./jury";
-import { mountBands } from "./bands";
+import { autoJoinBands, mountBands, rootOf } from "./bands";
 import { mountBandPages } from "./bandPages";
 import { aiStatus as budgetAiStatus, type AiStatus } from "./ai/budget";
 import type { TokenPool } from "./github/tokens";
@@ -569,6 +569,8 @@ export function createApp(opts: AppOptions) {
       let ref: string | undefined;
       // Fiche du dénonciateur (§18.6, denounce.ts) : JSON seulement, on dénonce un pseudo, pas un CV.
       let denouncedBy: unknown;
+      // La fiche que celle-ci complète (« Ajoute ton GitHub », « Ajoute ton LinkedIn ») : ses bandes suivent (§18.82).
+      let from: unknown;
       let linkedinUrl: string | undefined;
 
       if (ct.startsWith("multipart/form-data")) {
@@ -602,6 +604,7 @@ export function createApp(opts: AppOptions) {
         lang = parsed.data.lang ?? "fr";
         ref = parseRef((raw as { ref?: unknown }).ref, store);
         denouncedBy = (raw as { denouncedBy?: unknown }).denouncedBy;
+        from = (raw as { from?: unknown }).from;
         // Entrée LinkedIn (§18.24) : une adresse de profil, rien d'autre.
         if (parsed.data.linkedin !== undefined) {
           linkedinUrl = normalizeLinkedinUrl(parsed.data.linkedin) ?? undefined;
@@ -728,6 +731,19 @@ export function createApp(opts: AppOptions) {
       });
       denounced(id, true);
       lead(id);
+      // L'entrée d'office dans les bandes (§18.82), dès que la fiche est posée : seulement pour une
+      // fiche que sa personne fait elle-même (elle reçoit le jeton), jamais pour une dénonciation,
+      // et sans rien prendre à la limite par IP des entrées à la main.
+      if (!denounce) {
+        // La fiche complétée, si ce navigateur en tient le jeton (ou sa personne est connectée).
+        const prev = typeof from === "string" && ID_RE.test(from) ? store.getCard(from) : null;
+        const prevRoot = prev ? rootOf(store, prev) : null;
+        const completed = prevRoot && personOf(c, prevRoot, ownedBy(c, prevRoot)) ? prevRoot : null;
+        void pipeline.wait(id).then(() => {
+          const row = store.getCard(id);
+          if (row) autoJoinBands(store, row, { from: completed });
+        });
+      }
       // L'insertion arrive toujours après ce retour (le pipeline attend au moins
       // une fois) : la ref est écrite dans la ligne, puis oubliée en fin de job.
       if (ref) {
