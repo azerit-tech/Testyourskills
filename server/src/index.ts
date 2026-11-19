@@ -13,6 +13,7 @@ import { useBudgetDb } from "./ai/budget";
 import { startCreditsWatch, stopCreditsWatch } from "./ai/credits";
 import { linkedinFromEnv } from "./linkedin";
 import { linkedinProfilesFromEnv, normalizeLinkedinUrl } from "./linkedinProfile/index";
+import { linkedinSearchFromEnv } from "./linkedinProfile/search";
 import { githubAuthFromEnv } from "./auth";
 import { Store } from "./db";
 import { CARDS_PER_BROWSER, CARDS_PER_DAY, limitFromEnv } from "./ratelimit";
@@ -107,8 +108,13 @@ startCreditsWatch();
 const linkedinProfiles = linkedinProfilesFromEnv(process.env, store.db) ?? undefined;
 if (linkedinProfiles) console.log(`LinkedIn : profils lus par ${linkedinProfiles.providerName}.`);
 else console.warn("Fournisseur LinkedIn sans jeton : LinkedIn contre GitHub et l'entrée LinkedIn désactivés.");
+// La recherche d'un profil par nom (§18.80) : le même jeton, un autre acteur.
+const linkedinPeople = (linkedinProfiles && linkedinSearchFromEnv(process.env, store.db)) || undefined;
+if (linkedinPeople) console.log(`LinkedIn : recherche par nom par ${linkedinPeople.providerName}.`);
+else if (linkedinProfiles) console.warn("Recherche LinkedIn par nom sans jeton : le champ « Ton nom » n'accepte qu'un lien collé.");
 const { app, pipeline, refreshShowcase } = createApp({
   linkedinProfiles,
+  linkedinPeople,
   store,
   deps: realDeps,
   githubToken,

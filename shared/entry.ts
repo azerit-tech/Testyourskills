@@ -116,3 +116,28 @@ export function resolveDoor(door: Door, raw: string): DoorResult {
   const login = parseGithubLogin(s);
   return login ? { kind: "github", login } : { kind: "error", error: "github" };
 }
+
+// --- Les suggestions des deux champs (§18.80) --------------------------------
+// « Ton nom » propose des profils LinkedIn, « Ton nom ou pseudo » des comptes
+// GitHub : on touche une ligne, la fiche part. Plus rien à coller.
+
+/** Un profil LinkedIn proposé : GET /api/search/linkedin, et « C'est toi ? ». */
+export interface LinkedinSuggestion {
+  /** Adresse normalisée (`normalizeLinkedinUrl`). */
+  url: string;
+  name: string;
+  headline: string;
+  /** Photo servie par LinkedIn (licdn.com), si le fournisseur la donne. */
+  photo?: string;
+}
+
+/** Un compte GitHub proposé : GET /api/search/github. */
+export interface GithubSuggestion {
+  login: string;
+  name: string | null;
+  avatarUrl: string;
+}
+
+/** Frappes minimales avant une recherche, et délai après la dernière frappe (ms). */
+export const SUGGEST_MIN_CHARS = 3;
+export const SUGGEST_DEBOUNCE_MS = 400;

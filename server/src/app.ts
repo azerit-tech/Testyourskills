@@ -29,6 +29,8 @@ import type { TokenPool } from "./github/tokens";
 import { weekTop, withWeekSpecial } from "./top";
 import { normalizeLinkedinUrl, PAID_CALLS_PER_IP, type LinkedinFinder } from "./linkedinProfile/index";
 import { forgetLinkedinOfCard, recentLinkedinCard } from "./linkedinProfile/cards";
+import type { LinkedinPeople } from "./linkedinProfile/search";
+import { mountLinkedinSearch } from "./entry/linkedinSearch";
 import { primePhase, primesOpen, seasonDates, type Season } from "../../shared/season";
 import { loadSeason } from "./season";
 import { mountRemoval } from "./removal";
@@ -92,6 +94,8 @@ export interface AppOptions {
   aiStatus?: () => AiStatus;
   /** LinkedIn contre GitHub, et l'entrée LinkedIn (§18.24). Absent : pas de jeton de fournisseur, fonctionnalité absente. */
   linkedinProfiles?: LinkedinFinder;
+  /** La recherche d'un profil LinkedIn par nom (§18.80). Absent : le champ « Ton nom » reste un champ où l'on colle un lien. */
+  linkedinPeople?: LinkedinPeople;
   /** La trace du film (FILM_TRACE=1, filmTrace.ts) : le fichier où l'écrire. Absent : pas de route. */
   filmTraceFile?: string;
 }
@@ -390,6 +394,8 @@ export function createApp(opts: AppOptions) {
       linkedin: !!opts.linkedin,
       claim: !!opts.githubAuth,
       linkedinEntry: !!opts.linkedinProfiles,
+      // linkedinSearch : le champ « Ton nom » propose des profils (§18.80) ; sinon on y colle un lien.
+      linkedinSearch: !!opts.linkedinProfiles && !!opts.linkedinPeople,
       primesOpen: primesOpen(season, now),
       // primesListed : la saison porte au moins une prime (ouverte, à venir ou close) : /primes existe.
       primesListed: !!season && season.primes.length > 0,
@@ -874,6 +880,9 @@ export function createApp(opts: AppOptions) {
   });
   // Leur partage : l'image 1200 × 630 d'une prime et les balises de /primes (primePages.ts).
   mountPrimePages(app, { store, season, baseUrl, ogDir, render: (input) => deps.renderImage(input), indexHtml: opts.indexHtml });
+
+  // Les deux portes sans rien coller (§18.80) : les suggestions du champ « Ton nom ».
+  mountLinkedinSearch(app, { people: opts.linkedinProfiles ? opts.linkedinPeople : undefined, limiter });
 
   mountLinkedin(app, {
     store,

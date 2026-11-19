@@ -105,6 +105,11 @@ export class CrustdataClient {
     this.timeoutMs = opts.timeoutMs ?? 10_000;
   }
 
+  /** Un appel brut, pour les lectures voisines (recherche par nom, §18.80). */
+  call(path: string, body: unknown, signal?: AbortSignal): Promise<{ res: Response; json: unknown }> {
+    return this.post(path, body, signal);
+  }
+
   private async post(path: string, body: unknown, signal?: AbortSignal): Promise<{ res: Response; json: unknown }> {
     const t = AbortSignal.timeout(this.timeoutMs);
     const res = await this.fetchImpl(`${this.base}${path}`, {
@@ -184,6 +189,65 @@ export class CrustdataClient {
     const unknown = profiles.filter((p) => !p.social_handles?.dev_platform_identifier?.profile_url);
     if (exact.length === 0 && name && profiles.length === 1 && unknown.length === 1) return { url: urlOf(unknown[0]!), credits };
     return { url: null, credits };
+  }
+}
+
+/** Une personne telle que la recherche par nom la rend (§18.80) : de quoi la reconnaître, rien d'autre. */
+export interface PersonHit {
+  url: string;
+  name: string;
+  headline: string;
+  photoUrl?: string;
+}
+
+/** Champs demandés à la recherche par nom : 0,03 crédit par résultat, sans groupe payant. */
+export const NAME_SEARCH_FIELDS = [
+  "basic_profile.name",
+  "basic_profile.headline",
+  "basic_profile.profile_picture_permalink",
+  "social_handles.professional_network_identifier.profile_url",
+] as const;
+export const NAME_SEARCH_LIMIT = 5;
+/** Recherche inverse par email professionnel : 1 crédit par personne trouvée. */
+export const EMAIL_LOOKUP_CREDITS = 1;
+
+function personHit(data: unknown): PersonHit | null {
+  const d = data as { basic_profile?: Record<string, unknown>; social_handles?: { professional_network_identifier?: { profile_url?: unknown } } } | null;
+  const url = normalizeLinkedinUrl(d?.social_handles?.professional_network_identifier?.profile_url);
+  const name = typeof d?.basic_profile?.name === "string" ? d.basic_profile.name.trim().slice(0, 120) : "";
+  if (!url || !name) return null;
+  const headline = typeof d?.basic_profile?.headline === "string" ? d.basic_profile.headline.trim().slice(0, 220) : "";
+  const photo = d?.basic_profile?.profile_picture_permalink;
+  return { url, name, headline, ...(typeof photo === "string" && photo ? { photoUrl: photo.slice(0, 600) } : {}) };
+}
+
+/** Recherche de personnes par nom et recherche inverse par email (§18.80), sur la base de Crustdata. */
+export class CrustdataPeople {
+  constructor(private readonly client: CrustdataClient) {}
+
+  /** Les personnes dont le nom porte tous ces mots (opérateur `(.)`), cinq au plus. */
+  async searchByName(full: string, signal?: AbortSignal): Promise<PersonHit[]> {
+    const { res, json } = await this.client.call(
+      "/person/search",
+      { filters: { field: "basic_profile.name", type: "(.)", value: full }, fields: [...NAME_SEARCH_FIELDS], limit: NAME_SEARCH_LIMIT },
+      signal,
+    );
+    if (!res.ok) throw new CrustdataError(res.status, `search ${res.status}`);
+    const profiles = Array.isArray((json as { profiles?: unknown })?.profiles) ? (json as { profiles: unknown[] }).profiles : [];
+    return profiles.flatMap((p) => personHit(p) ?? []);
+  }
+
+  /**
+   * Le profil dont c'est l'email professionnel (`business_emails`, API synchrone :
+   * une adresse personnelle ne rend rien). null : personne, ou plusieurs.
+   */
+  async findByEmail(email: string, signal?: AbortSignal): Promise<PersonHit | null> {
+    const { res, json } = await this.client.call("/person/enrich", { business_emails: [email], fields: ["basic_profile", "social_handles"] }, signal);
+    if (res.status === 404) return null;
+    if (!res.ok) throw new CrustdataError(res.status, `enrich ${res.status}`);
+    const entry = Array.isArray(json) ? (json[0] as { match_status?: string; matches?: { person_data?: unknown }[] } | undefined) : undefined;
+    if (entry?.match_status && entry.match_status !== "matched") return null;
+    return entry?.matches?.length === 1 ? personHit(entry.matches[0]!.person_data) : null;
   }
 }
 
