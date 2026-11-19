@@ -1,5 +1,5 @@
 // Le registre de l'App Azerit branché sur la lecture des profils (§18.91) : lu
-// avant tout appel payant. Base de l'App en mémoire,
+// avant tout appel payant, enrichi de ce qui est lu. Base de l'App en mémoire,
 // fournisseur factice, noms inventés.
 
 import Database from "better-sqlite3";
@@ -67,6 +67,29 @@ describe("entrée GitHub : le registre avant le README et la recherche payante",
     expect(t.signal).toHaveBeenCalled();
     expect(t.search!.searchByGithub).not.toHaveBeenCalled();
     expect(r).toMatchObject({ proven: false, profile: { url: URL_ } });
+    // Profil payé : son CV va au registre, au format de l'App.
+    await t.registry.flush();
+    expect(t.app.cvs).toHaveLength(1);
+  });
+
+  it("le LinkedIn que GitHub affiche est versé au registre, force 2, étape github_website", async () => {
+    const t = setup();
+    await t.finder.forGithub(facts({ blog: "https://www.linkedin.com/in/Camille-Ardent" }));
+    await t.registry.flush();
+    expect(t.app.written()).toEqual([{ login: "camardent", slug: "camille-ardent", strength: 2, step: "github_website" }]);
+    // Le CV porte le GitHub prouvé.
+    expect(t.app.cvs).toHaveLength(1);
+  });
+
+  it("README : force 2 ; recherche payante : force 1", async () => {
+    const a = setup(undefined, { readme: URL_ });
+    await a.finder.forGithub(facts());
+    await a.registry.flush();
+    expect(a.app.written()[0]).toMatchObject({ strength: 2, step: "profile_readme" });
+    const b = setup(undefined, { search: URL_ });
+    await b.finder.forGithub(facts());
+    await b.registry.flush();
+    expect(b.app.written()[0]).toMatchObject({ strength: 1, step: "crustdata_search" });
   });
 
   it("registre en panne : exactement comme avant", async () => {
@@ -86,6 +109,16 @@ describe("entrée LinkedIn : le GitHub et le CV du registre", () => {
     const r = await t.finder.forUrl(URL_);
     expect(r).toMatchObject({ status: "found", githubLogin: "CamArdent", githubProven: true, profile: { title: "Développeuse" } });
     expect(t.calls).toEqual([]);
+  });
+
+  it("le GitHub des liens du profil passe devant le registre, et y est versé (étape linkedin_profile)", async () => {
+    const t = setup((u) => ({ profile: profile(u), githubLogin: "camille-gh", githubChecked: true, raw: ITEM }));
+    t.app.seedLink("autre", "camille-ardent", 1, { source: "cv_search" });
+    const r = await t.finder.forUrl(URL_);
+    expect(r).toMatchObject({ status: "found", githubLogin: "camille-gh" });
+    expect(r.status === "found" && r.githubProven).toBeFalsy();
+    await t.registry.flush();
+    expect(t.app.written()).toEqual([{ login: "camille-gh", slug: "camille-ardent", strength: 2, step: "linkedin_profile" }]);
   });
 
   it("profil sans GitHub : celui du registre, « trouvé » seulement en force 1", async () => {

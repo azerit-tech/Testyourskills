@@ -109,6 +109,8 @@ export interface EntryIdentity {
   github: GithubIdentity | null;
   /** Le profil lancé est le profil sûr (email ou photo), pas un choix parmi des homonymes. */
   sureProfile: boolean;
+  /** Comment ce profil est le sien : l'email, la photo, le seul au nom et à l'employeur, ou choisi par elle dans « C'est toi ? ». */
+  profileHow: "email" | "photo" | "employer" | "picked";
 }
 
 export interface LinkedinEnterOptions {
@@ -384,6 +386,7 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
       github: r.github,
       // Le profil au seul nom et employeur fait partir la fiche, sans valoir la preuve d'un email ou d'une photo.
       sureProfile: sure && r.how !== "employer",
+      profileHow: sure && r.how ? r.how : "picked",
       used() {
         sessions.delete(found.id);
         deleteCookie(c, ENTER_COOKIE, cookieBase);

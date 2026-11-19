@@ -10,6 +10,7 @@ import { createApp } from "./app";
 import { GH_AUTHORIZE_URL, GH_TOKEN_URL, GH_USER_URL, SESSION_COOKIE, SESSION_TTL_MS, STATE_COOKIE, safeReturnPath, signSession, verifySession } from "./auth";
 import { Store } from "./db";
 import type { CardBody, Deps } from "./pipeline";
+import type { RegistryPort } from "./registry/index";
 
 const BASE = "https://skills.test";
 const SECRET = "s".repeat(40);
@@ -71,7 +72,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function setup(opts: { user?: () => GhUser | Response; token?: () => Response; configured?: boolean; indexHtml?: () => Promise<string | null> } = {}) {
+function setup(opts: { user?: () => GhUser | Response; token?: () => Response; configured?: boolean; indexHtml?: () => Promise<string | null>; registry?: RegistryPort } = {}) {
   const store = new Store(":memory:");
   stores.push(store);
   const ogDir = join(mkdtempSync(join(tmpdir(), "tys-auth-")), "og");
@@ -86,6 +87,7 @@ function setup(opts: { user?: () => GhUser | Response; token?: () => Response; c
     fetchImpl: fetchImpl as unknown as typeof fetch,
     indexHtml: opts.indexHtml,
     githubAuth: opts.configured === false ? undefined : { clientId: "gh-client", clientSecret: CLIENT_SECRET, sessionSecret: SECRET },
+    registry: opts.registry,
   });
   return { app, pipeline, store, ogDir, fetchImpl };
 }
@@ -276,6 +278,20 @@ describe("redirection ouverte", () => {
     ctx.store.markDenounced("CardAAAA01", "Denonce001", null);
     await claim(ctx);
     expect(ctx.store.listEvents("denounce_claimed")).toMatchObject([{ cardId: "CardAAAA01" }]);
+  });
+
+  it("« C'est moi » sur une comparaison LinkedIn : le lien va au registre de l'App, force 2 (§18.91)", async () => {
+    const links: unknown[] = [];
+    const registry = { recordLink: (l: unknown) => void links.push(l) } as unknown as RegistryPort;
+    const ctx = setup({ registry });
+    insertCard(ctx.store);
+    await claim(ctx);
+    // Une fiche GitHub seule : aucun LinkedIn, rien à lier.
+    expect(links).toEqual([]);
+    const cmp = insertComparison(ctx.store);
+    ctx.store.db.prepare(`UPDATE cards SET facts_json = ? WHERE id = ?`).run(JSON.stringify({ linkedinUrl: "https://www.linkedin.com/in/lea-md" }), cmp.id);
+    await claim(ctx, cmp.github.id);
+    expect(links).toEqual([{ login: "leamd", url: "https://www.linkedin.com/in/lea-md", strength: 2, step: "cest_moi" }]);
   });
 
   it("une fiche née d'une dénonciation entre dans ses bandes à la revendication, pas avant (§18.82)", async () => {

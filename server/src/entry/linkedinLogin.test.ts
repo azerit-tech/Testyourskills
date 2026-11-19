@@ -540,19 +540,47 @@ describe("qui s'est connecté : le navigateur s'en souvient (SPEC §18.90)", () 
 });
 
 describe("le registre de l'App Azerit (§18.91)", () => {
-  /** Un registre factice : une photo gardée par profil. */
+  /** Un registre factice : les liens et les comptes qu'on lui verse, une photo gardée par profil. */
   function fakeRegistry(photos: Record<string, Uint8Array> = {}) {
+    const links: { login: string; url: string; strength: number; step: string }[] = [];
+    const accounts: { github?: string | null; linkedin?: string | null }[] = [];
     const registry: RegistryPort = {
       linkedinOf: async () => null,
       githubOf: async () => null,
       profileOf: async () => null,
       photoOf: async (url) => (photos[url] ? { bytes: photos[url]!, ext: "jpg" } : null),
-      recordLink: () => {},
-      recordAccounts: () => {},
+      recordLink: (l) => void links.push(l),
+      recordAccounts: (a) => void accounts.push(a),
       recordProfile: () => {},
     };
-    return { registry };
+    return { registry, links, accounts };
   }
+
+  it("profil sûr par la photo, GitHub par l'email : lien déclaré (force 2), et les comptes de la fiche", async () => {
+    const r = fakeRegistry();
+    const { ctx } = setup({ app: { registry: r.registry } });
+    const { jar } = await signIn(ctx);
+    await entry(ctx, jar);
+    await postCard(ctx, { linkedin: CAMILLE_URL }, jar);
+    expect(r.links).toEqual([{ login: "camille-dev", url: CAMILLE_URL, strength: 2, step: "linkedin_signin:photo+github_email" }]);
+    expect(r.accounts).toEqual([{ github: "camille-dev", linkedin: CAMILLE_URL }]);
+    expect(JSON.stringify(r)).not.toContain(EMAIL);
+  });
+
+  it("profil choisi dans « C'est toi ? » : déclaré ; GitHub au nom seulement : trouvé (force 1)", async () => {
+    const picked = fakeRegistry();
+    const a = setup({ samePhoto: () => false, app: { registry: picked.registry } });
+    const ja = (await signIn(a.ctx)).jar;
+    await entry(a.ctx, ja);
+    await postCard(a.ctx, { linkedin: HOMONYM.url }, ja);
+    expect(picked.links).toEqual([{ login: "camille-dev", url: HOMONYM.url, strength: 2, step: "linkedin_signin:picked+github_email" }]);
+    const byName = fakeRegistry();
+    const b = setup({ github: { login: "camille-nom", how: "name" }, app: { registry: byName.registry } });
+    const jb = (await signIn(b.ctx)).jar;
+    await entry(b.ctx, jb);
+    await postCard(b.ctx, { linkedin: CAMILLE_URL }, jb);
+    expect(byName.links).toEqual([{ login: "camille-nom", url: CAMILLE_URL, strength: 1, step: "linkedin_signin:photo+github_name" }]);
+  });
 
   it("la photo que l'App garde désigne le profil sans en lire aucun", async () => {
     const bare = (n: number) => ({ url: `https://www.linkedin.com/in/camille-ardent-${n}`, name: "Camille Ardent", headline: "", score: 0.6 });
