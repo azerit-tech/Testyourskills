@@ -918,69 +918,14 @@ svg {
 
 /* ============ accueil ============ */
 
-/* --- la couverture (§18.31, §18.48) ---
-   Une mosaïque encadrée (Cover.tsx) : un cadre prune foncé plat, des cases
-   séparées par des joints d'encre (le fond du cadre), autant de marge que de
-   joint. Les grilles viennent de lib/cover.ts par variables (--cover-*-s pour
-   le téléphone, --cover-*-l pour l'ordinateur) : une seule source pour la
-   feuille et pour le test des lumières voisines. Ni lueur, ni ombre, ni dégradé.
-   Elle garde ses angles de planche (6 px, 3 px par case). Les cinq cases du
-   téléphone à toutes les largeurs : une bande sous la barre sur téléphone, la
-   colonne de droite du héros au bureau (les cases « is-wide » restent cachées). */
+/* --- le visage sans nom (ErrorPage.tsx) : la silhouette prune devant le mur, les
+   traits de la toise par-dessus, la plaque en bas. Le dessin de la case « Ta place »
+   de l'ancienne couverture (§18.31, retirée au §18.81) ; les tailles suivent la case
+   (unités cq). Ni lueur, ni ombre, ni dégradé d'ambiance. --- */
 :root {
+  /* le cadre prune foncé de la page d'erreur (.err-frame) */
   --cover-frame: #241a3a;
 }
-.cover {
-  --cover-gap: 4px;
-  display: grid;
-  grid-template-columns: var(--cover-cols-s);
-  grid-template-rows: repeat(2, minmax(0, 1fr));
-  grid-template-areas: var(--cover-areas-s);
-  gap: var(--cover-gap);
-  width: 100%;
-  height: clamp(128px, 38vw, 300px);
-  padding: var(--cover-gap);
-  border-radius: 6px;
-  background: var(--cover-frame);
-}
-.cover-panel {
-  position: relative;
-  display: block;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-  padding: 0;
-  border: 0;
-  border-radius: 3px;
-  /* la teinte de la case tant que l'image se charge : rien ne bouge à l'arrivée */
-  background: var(--s-call);
-  animation: cover-in 0.3s var(--ease-out) both;
-  animation-delay: calc(var(--i, 0) * 40ms);
-}
-.cover-panel.is-wide {
-  display: none;
-}
-.cover-panel img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-/* un portrait peint : la tête est dans le haut de l'image (docs/brief-personnages.md §3).
-   Assez haut pour que la tête ne touche pas le bord dans une case plus large que haute
-   (s2 sur ordinateur, 310 × 255 px) ; le bas coupé est l'ombre prune, sans détail. */
-.cover-suspect img {
-  object-position: 50% 12%;
-}
-/* les bras croisés, plus bas : dans s2 sur ordinateur, la case descend un peu pour les
-   garder, quitte à rogner le haut des cheveux. Sans effet ailleurs : les autres cases
-   montrent presque toute la hauteur. */
-.cover-suspect[data-suspect="kingpin"] img {
-  object-position: 50% 20%;
-}
-/* un visage (joueur du top, Jacques, place libre) : la photo en pleine case et
-   en deux tons, prune dans les ombres et la teinte du mur dans les lumières ;
-   les traits de la toise par-dessus ; la plaque en bas. Les tailles suivent la
-   case (unités cq). */
 .cover-face {
   position: absolute;
   inset: 0;
@@ -990,19 +935,7 @@ svg {
   isolation: isolate;
   background: var(--tint, #ccc2f5);
 }
-.cover-face-photo {
-  position: absolute;
-  inset: 0;
-  object-position: 50% 22%;
-  filter: grayscale(1) contrast(1.3) brightness(1.08);
-  mix-blend-mode: multiply;
-  /* cachée tant qu'elle charge : la silhouette tient la case */
-  opacity: 0;
-}
-.cover-face-photo.is-on {
-  opacity: 1;
-}
-/* les ombres de la photo remontent au prune : jamais de noir */
+/* les ombres remontent au prune : jamais de noir */
 .cover-face::after {
   content: "";
   position: absolute;
@@ -1026,13 +959,6 @@ svg {
   width: 100%;
   height: 88%;
   fill: var(--s-call);
-}
-/* les initiales, dans la tête de la silhouette : la couleur du mur (la taille est en
-   unités du dessin, 100 de large) */
-.cover-face-initials {
-  font: 800 var(--t-22) / 1 var(--f-name);
-  letter-spacing: 0.02em;
-  fill: var(--tint, #ccc2f5);
 }
 .cover-face-mark {
   position: absolute;
@@ -1087,41 +1013,6 @@ svg {
   }
   .cover-plate b {
     line-height: 1.05;
-  }
-}
-/* « Ta place », quand une fiche est en mémoire : sa vignette. Le haut de la fiche (la note,
-   les étoiles, le portrait) en pleine case, sans toise ni deux tons, la plaque par-dessus. */
-.cover-mine .cover-face::before,
-.cover-mine .cover-face::after {
-  content: none;
-}
-.cover-mine .tys-card {
-  position: absolute;
-  top: 5cqw;
-  left: 5cqw;
-  width: 90cqw;
-}
-a.cover-panel:focus-visible,
-button.cover-panel:focus-visible {
-  border-radius: 3px;
-}
-@keyframes cover-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-}
-@media (min-width: 900px) {
-  .cover {
-    --cover-gap: 8px;
-  }
-  .cover-panel {
-    border-radius: 4px;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .cover-panel {
-    animation: none;
   }
 }
 

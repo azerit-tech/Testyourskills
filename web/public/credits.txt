@@ -178,8 +178,8 @@ Modèles, textures et ciel, CC0 / Models, textures and sky, CC0
 2. La fiche et les images / The sheet and the images
 ----------------------------------------------------
 
-- Illustrations des profils et des personnages : créées pour Azerit.
-  Profile and character illustrations: made for Azerit.
+- Illustrations des profils : créées pour Azerit.
+  Profile illustrations: made for Azerit.
 - Icônes des langages / language icons : Simple Icons, CC0.
   https://simpleicons.org
 - Polices / fonts, SIL Open Font License 1.1 (https://openfontlicense.org) :

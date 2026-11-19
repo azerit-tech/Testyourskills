@@ -4,7 +4,6 @@ import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FIXTURES } from "../../../shared/fixtures";
-import { Cover } from "../components/Cover";
 import { Sunset } from "../components/Sunset";
 import { SUNSET } from "../../../shared/sunset";
 import { LangProvider } from "../i18n";
@@ -51,11 +50,6 @@ describe("la fiche de Jacques sous le titre", () => {
       expect(links[0]!.attrs).toContain(`href="${s.href}"`);
     }
   });
-
-  it("la case du fondateur sur la couverture mène au même endroit", () => {
-    const html = render(createElement(Cover, { onPlay: () => undefined, top: null, founder: COMPARED, suspects: [] }));
-    expect(html).toMatch(/<a[^>]*class="cover-panel cover-founder[^"]*"[^>]*href="\/c\/Cmp1234567"/);
-  });
 });
 
 describe("la scène du premier écran (§18.81)", () => {
@@ -64,7 +58,7 @@ describe("la scène du premier écran (§18.81)", () => {
   const css = read("../styles.css");
 
   it("la fiche d'exemple est dans le héros, après le formulaire, sur le crépuscule ; plus de couverture", () => {
-    expect(home).not.toContain("<Cover");
+    expect(home).not.toMatch(/<Cover|components\/Cover/);
     const top = home.slice(home.indexOf('<div className="home-top">'), home.indexOf('<div className="home-proof">'));
     expect(top.indexOf("<EntryForm inputRef")).toBeGreaterThan(0);
     expect(top).toMatch(/<\/section>\n[^\n]*§18\.81[^\n]*\n\s*<div className="home-stage">\n\s*<div className="home-stage-in">\n\s*<Sunset \/>\n\s*<ExampleCard \{\.\.\.showcase\} \/>/);

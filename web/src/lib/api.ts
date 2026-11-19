@@ -520,7 +520,7 @@ async function getShowcase(): Promise<Showcase | null> {
   return { card: body.card, href: body.href ?? `/c/${body.card.id}`, ...(pieces ? { pieces } : {}) };
 }
 
-/** La requête du top en cours : la couverture et le tableau de l'accueil la partagent. */
+/** La requête du top en cours : le tableau de l'accueil et son ancre « /#semaine » la partagent. */
 let topFlight: Promise<WeekTop | null> | null = null;
 
 /** Le haut du classement de la semaine (§18.22) ; null si le serveur ne répond pas. */
