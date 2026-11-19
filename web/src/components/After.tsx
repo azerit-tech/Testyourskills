@@ -677,7 +677,7 @@ export function Contest({ card, cardId, onDeleted }: { card: CardData; cardId: s
 export function AddSource({ card, strong = false }: { card: CardData; strong?: boolean }) {
   const { t } = useT();
   // Fiche LinkedIn seule (§18.24) : un seul appel, « Ajoute ton GitHub pour prouver ».
-  if (declaredOf(card) === "linkedin") return card.linkedinUrl ? <ProveGithub linkedinUrl={card.linkedinUrl} strong={strong} /> : null;
+  if (declaredOf(card) === "linkedin") return card.linkedinUrl ? <ProveGithub linkedinUrl={card.linkedinUrl} strong={strong} name={card.name} /> : null;
   const fromGithub = card.source === "github";
   const copy = fromGithub ? t.result.addCv : t.result.addGithub;
   return (

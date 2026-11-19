@@ -118,6 +118,11 @@ export interface AppConfig {
   claim: boolean;
   /** Le champ unique accepte un lien LinkedIn : le serveur a un fournisseur de profils (§18.24). */
   linkedinEntry: boolean;
+  /** Le champ « Ton nom » propose des profils LinkedIn (§18.80). */
+  linkedinSearch: boolean;
+  /** Les boutons « Se connecter avec LinkedIn » et « Se connecter avec GitHub » (§18.80). */
+  linkedinLogin: boolean;
+  githubLogin: boolean;
   /** Une prime au moins est ouverte (data/season.json, §18.4). */
   primesOpen: boolean;
   /** La saison porte au moins une prime, ouverte, à venir ou close : /primes existe. */
@@ -138,6 +143,9 @@ export function parseConfig(raw: unknown): AppConfig {
     linkedin: c.linkedin === true,
     claim: c.claim === true,
     linkedinEntry: c.linkedinEntry === true,
+    linkedinSearch: c.linkedinSearch === true,
+    linkedinLogin: c.linkedinLogin === true,
+    githubLogin: c.githubLogin === true,
     primesOpen: c.primesOpen === true,
     primesListed: c.primesListed === true,
     rulesPublished: c.rulesPublished === true,
@@ -161,7 +169,7 @@ export const SEASON_FILE: SeasonDates | null = parsedSeason ? seasonDates(parsed
 
 let configPromise: Promise<AppConfig> | null = null;
 /** Mode démo : la saison du fichier, aucune prime ouverte (il n'en existe pas encore). */
-const MOCK_CONFIG: AppConfig = { linkedin: true, claim: true, linkedinEntry: true, primesOpen: false, primesListed: false, rulesPublished: false, season: SEASON_FILE, interviews: 0 };
+const MOCK_CONFIG: AppConfig = { linkedin: true, claim: true, linkedinEntry: true, linkedinSearch: true, linkedinLogin: true, githubLogin: true, primesOpen: false, primesListed: false, rulesPublished: false, season: SEASON_FILE, interviews: 0 };
 const CONFIG_KEY = "tys_config";
 /** La configuration une fois connue : en RAM, et dans sessionStorage pour la page suivante. */
 let configMemo: AppConfig | null = null;

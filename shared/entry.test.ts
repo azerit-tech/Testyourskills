@@ -82,8 +82,25 @@ describe("resolveDoor : ce que donne le champ de chaque porte", () => {
     expect(resolveDoor("linkedin", raw)).toEqual({ kind: "linkedin", url });
   });
 
-  it.each(["ab", "jean dupont", "@lea", "linkedin.com/company/azerit", "https://www.linkedin.com/in/"])("porte LinkedIn, refusé : %j", (raw) => {
+  it.each(["ab", "jean 2 dupont", "@lea", "linkedin.com/company/azerit", "https://www.linkedin.com/in/"])("porte LinkedIn, refusé : %j", (raw) => {
     expect(resolveDoor("linkedin", raw)).toEqual({ kind: "error", error: "linkedin" });
+  });
+
+  // §18.80 : un nom en plusieurs mots ne lance rien seul, la personne se choisit dans les suggestions.
+  it.each([
+    ["jean dupont", "jean dupont"],
+    ["  Céline   Dupré ", "Céline Dupré"],
+    ["Jean-Marc O'Neil", "Jean-Marc O'Neil"],
+    ["Ana de la Vega", "Ana de la Vega"],
+  ])("un nom, sur les deux portes : %j", (raw, name) => {
+    expect(resolveDoor("linkedin", raw)).toEqual({ kind: "name", name });
+    expect(resolveDoor("github", raw)).toEqual({ kind: "name", name });
+  });
+
+  it("un seul mot reste ce qu'il était : la fin d'un lien LinkedIn, ou un pseudo GitHub", () => {
+    expect(resolveDoor("linkedin", "camille")).toEqual({ kind: "linkedin", url: "https://www.linkedin.com/in/camille" });
+    expect(resolveDoor("github", "camille")).toEqual({ kind: "github", login: "camille" });
+    expect(resolveDoor("github", "x".repeat(40) + " " + "y".repeat(45))).toEqual({ kind: "error", error: "github" });
   });
 
   it("porte LinkedIn, une adresse GitHub bascule vers GitHub", () => {

@@ -305,6 +305,14 @@ const fr = {
         ],
       },
       {
+        h: "Entrer sans rien coller",
+        blocks: [
+          "« Se connecter avec LinkedIn » : LinkedIn nous donne ton nom, ta photo et ton email vérifié. Le nom et la photo servent à retrouver ton profil public ; l'email, à retrouver ton GitHub par la recherche publique de GitHub. Ton email est gardé avec ta fiche, comme si tu l'avais laissé dessous : il rejoint les contacts d'Azerit et part avec la fiche. Aucun jeton de connexion n'est gardé.",
+          "La recherche par nom passe par un service tiers de collecte de profils publics (nom, titre, photo) et par la recherche publique de GitHub ; ses résultats sont gardés 24 heures.",
+          "« Se connecter avec GitHub » : GitHub nous donne ton pseudo, rien d'autre.",
+        ],
+      },
+      {
         h: "Ta photo LinkedIn",
         blocks: ["Seulement si tu connectes LinkedIn toi-même : on récupère ta photo de profil, rangée avec la fiche et supprimée avec elle. Rien d'autre n'est lu par cette connexion."],
       },
@@ -490,6 +498,14 @@ const en: PagesDict = {
             "If you sign in with GitHub, we only read your public username and ID, with no permission on your account. The access token is thrown away at once.",
             "A signed cookie, valid for 30 days, remembers that your sheets are yours.",
           ],
+        ],
+      },
+      {
+        h: "Getting in without pasting",
+        blocks: [
+          "“Sign in with LinkedIn”: LinkedIn gives us your name, picture and verified email. The name and picture are used to find your public profile; the email, to find your GitHub through GitHub's public search. Your email is kept with your sheet, as if you had left it underneath: it joins Azerit's contacts and is deleted with the sheet. No sign-in token is kept.",
+          "The name search goes through a third-party service that collects public profiles (name, headline, picture) and through GitHub's public search; its results are kept for 24 hours.",
+          "“Sign in with GitHub”: GitHub gives us your username, nothing else.",
         ],
       },
       {

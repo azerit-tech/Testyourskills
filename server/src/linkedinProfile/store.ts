@@ -8,12 +8,17 @@
 //   facultative (LINKEDIN_AUTOFIND=crustdata) pour un login GitHub, mêmes durées.
 // - linkedin_reads : profils lus (et recherches) par jour UTC, comme ai_spend :
 //   un redémarrage ne remet pas le compteur à zéro.
+// - linkedin_searches : résultats d'une recherche par nom (§18.80), 24 h ;
+//   linkedin_search_days : recherches payées par jour UTC (LINKEDIN_DAILY_SEARCHES).
 
 import type Database from "better-sqlite3";
 import type { LinkedinProfile } from "./profile";
 
 export const FOUND_TTL_MS = 30 * 24 * 3600 * 1000;
 export const NOT_FOUND_TTL_MS = 7 * 24 * 3600 * 1000;
+/** Résultats d'une recherche par nom : un jour ; une recherche vide, six heures. */
+export const SEARCH_TTL_MS = 24 * 3600 * 1000;
+export const SEARCH_EMPTY_TTL_MS = 6 * 3600 * 1000;
 
 export const LINKEDIN_SCHEMA = `
 CREATE TABLE IF NOT EXISTS linkedin_profiles (
@@ -36,6 +41,18 @@ CREATE TABLE IF NOT EXISTS linkedin_reads (
   day   TEXT PRIMARY KEY,         -- AAAA-MM-JJ (UTC)
   reads INTEGER NOT NULL          -- appels au fournisseur (profils lus, recherches)
 );
+
+CREATE TABLE IF NOT EXISTS linkedin_searches (
+  key        TEXT PRIMARY KEY,    -- « n:prenom nom » (sans accents ni casse), « s:… » en recherche stricte
+  fetched_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL,    -- 24 h ; une recherche vide : 6 h
+  json       TEXT NOT NULL        -- candidats : adresse, nom, titre, adresse de la photo
+);
+
+CREATE TABLE IF NOT EXISTS linkedin_search_days (
+  day      TEXT PRIMARY KEY,      -- AAAA-MM-JJ (UTC)
+  searches INTEGER NOT NULL       -- recherches par nom payées au fournisseur
+);
 `;
 
 /** Crée les tables si elles manquent (appelé par migrate()). Idempotent. */
@@ -49,6 +66,8 @@ export function purgeLinkedin(db: Database.Database, now = Date.now()): void {
   db.prepare(`DELETE FROM linkedin_lookups WHERE expires_at < ?`).run(now);
   const cutoff = new Date(now - 60 * 24 * 3600 * 1000).toISOString().slice(0, 10);
   db.prepare(`DELETE FROM linkedin_reads WHERE day < ?`).run(cutoff);
+  db.prepare(`DELETE FROM linkedin_searches WHERE expires_at < ?`).run(now);
+  db.prepare(`DELETE FROM linkedin_search_days WHERE day < ?`).run(cutoff);
 }
 
 /** Oublie un profil et les recherches qui y mènent (suppression d'une fiche, §11). */
@@ -131,6 +150,41 @@ export class LinkedinCache {
   addRead(now = Date.now()): void {
     this.db
       .prepare(`INSERT INTO linkedin_reads (day, reads) VALUES (?, 1) ON CONFLICT(day) DO UPDATE SET reads = reads + 1`)
+      .run(day(now));
+  }
+
+  // --- Recherche par nom (§18.80) ---
+
+  /** Les candidats gardés pour cette recherche, ou null (jamais faite, ou expirée). */
+  getSearch<T>(key: string, now = Date.now()): T[] | null {
+    const r = this.db.prepare(`SELECT json FROM linkedin_searches WHERE key = ? AND expires_at > ?`).get(key, now) as { json: string } | undefined;
+    if (!r) return null;
+    try {
+      const v: unknown = JSON.parse(r.json);
+      return Array.isArray(v) ? (v as T[]) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  putSearch(key: string, results: unknown[], now = Date.now()): void {
+    this.db
+      .prepare(
+        `INSERT INTO linkedin_searches (key, fetched_at, expires_at, json) VALUES (?, ?, ?, ?)
+         ON CONFLICT(key) DO UPDATE SET fetched_at = excluded.fetched_at, expires_at = excluded.expires_at, json = excluded.json`,
+      )
+      .run(key, now, now + (results.length ? SEARCH_TTL_MS : SEARCH_EMPTY_TTL_MS), JSON.stringify(results));
+  }
+
+  /** Recherches payées aujourd'hui (UTC). */
+  searchesToday(now = Date.now()): number {
+    const r = this.db.prepare(`SELECT searches FROM linkedin_search_days WHERE day = ?`).get(day(now)) as { searches: number } | undefined;
+    return r?.searches ?? 0;
+  }
+
+  addSearch(now = Date.now()): void {
+    this.db
+      .prepare(`INSERT INTO linkedin_search_days (day, searches) VALUES (?, 1) ON CONFLICT(day) DO UPDATE SET searches = searches + 1`)
       .run(day(now));
   }
 }

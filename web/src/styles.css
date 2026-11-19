@@ -1128,15 +1128,12 @@ svg {
   .page-home .home-last .entry {
     max-width: none;
   }
-  /* les deux formulaires de l'accueil, empilés comme sur téléphone : portes, champ, bouton */
+  /* les deux formulaires de l'accueil, empilés comme sur téléphone : les deux boutons, ou le champ puis l'envoi */
   .page-home .entry {
     grid-template-columns: minmax(0, 1fr);
     max-width: 440px;
   }
-  .page-home .entry > *,
-  .page-home .entry.has-doors > .entry-doors,
-  .page-home .entry.has-doors > .field,
-  .page-home .entry.has-doors > .entry-submit {
+  .page-home .entry > * {
     grid-column: 1;
     grid-row: auto;
   }
@@ -1801,36 +1798,179 @@ svg {
   text-transform: uppercase;
   color: var(--c-text-2);
 }
-/* le préfixe de la porte LinkedIn, un cran plus petit : à 360 px, « linkedin.com/in/ »
-   laisse la place du slug */
-.field-li .field-prefix {
-  font-size: var(--t-16);
+
+/* --- les suggestions d'un champ (§18.80, Suggest.tsx) : on tape un nom, des personnes
+   sortent sous le champ, on en touche une. La liste est dans le .field, posée sous lui,
+   par-dessus ce qui suit : rien ne bouge dans la page. Mat : un aplat, un filet, pas d'ombre.
+   Une ligne : la photo (36 px), le nom en crème, le titre ou le pseudo dessous ; 52 px à toucher. --- */
+.field-who {
+  position: relative;
+  scroll-margin-top: 12px;
+}
+.suggest {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  display: grid;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  border-radius: var(--r-block);
+  background: var(--s-item);
+  box-shadow: inset 0 0 0 1.5px var(--c-line);
+  text-align: left;
+  animation: suggest-in 0.16s var(--ease-out);
+}
+@keyframes suggest-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+.suggest li,
+.pick-list button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: var(--h-main);
+  min-width: 0;
+  padding: 6px 10px;
+  border-radius: var(--r-item);
+  cursor: pointer;
+}
+.suggest li.is-active,
+.pick-list button:hover,
+.pick-list button:focus-visible {
+  background: rgba(229, 221, 255, 0.1);
+}
+.suggest-face {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--ink-0);
+  font: 700 var(--t-16) / 1 var(--f-name);
+  font-style: normal;
+  color: var(--cream);
+}
+.suggest-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+}
+.suggest-text b,
+.suggest-text span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.suggest-text b {
+  font: 600 var(--t-16) / 1.2 var(--f-text);
+  color: var(--cream);
+}
+.suggest-text span {
+  font: 400 var(--t-14) / 1.25 var(--f-text);
+  color: var(--c-text);
+}
+/* liste mêlée (dénoncer) : d'où vient la ligne */
+.suggest-src {
+  flex: none;
+  font: var(--font-label);
+  letter-spacing: var(--ls-label);
+  text-transform: uppercase;
+  color: var(--c-text-2);
+}
+/* l'entrée par défaut (§18.80) : « Se connecter avec LinkedIn » (rose) puis « avec GitHub » (contour),
+   empilés, de toute la largeur ; dessous, la petite ligne « ou avec ton CV · ou colle un lien » */
+.entry-login {
+  width: 100%;
+  gap: 10px;
+}
+.entry-or {
+  gap: 0 10px;
+  color: var(--c-text-2);
 }
 
-/* --- les deux portes (EntryForm) : LinkedIn, puis GitHub, au-dessus du champ.
-   La piste des onglets (.seg), en pilule de la largeur du champ, sur le même fond ;
-   la porte ouverte en crème, texte d'encre, l'autre transparente, texte lilas,
-   comme le choix de la langue. Texte seul, ni logo ni lueur. 44 px de haut,
-   10 px jusqu'au champ (l'écart de .entry). --- */
-.entry-doors {
-  background: var(--s-field);
+/* « C'est toi ? » (§18.80) : au retour de LinkedIn, trois profils au plus. Une feuille au bas du
+   téléphone, une fenêtre au milieu du bureau ; un toucher sur le voile la ferme. */
+.pick-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  display: grid;
+  align-items: end;
+  background: rgba(12, 13, 27, 0.72);
+  animation: fade-in 0.2s var(--ease-out);
 }
-.entry-doors button {
-  color: var(--c-text);
+.pick {
+  display: grid;
+  gap: 8px;
+  padding: 20px 14px calc(18px + env(safe-area-inset-bottom, 0px));
+  border-radius: var(--r-block) var(--r-block) 0 0;
+  background: var(--s-call);
+  animation: pick-up 0.28s var(--ease-out);
 }
-.entry-doors button[aria-checked="true"] {
-  background: var(--cream);
-  color: var(--ink-0);
+@keyframes pick-up {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
 }
-.entry-doors button:hover:not([aria-checked="true"]) {
-  color: var(--c-text);
+.pick-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-left: 10px;
 }
-/* la ligne d'aide de « Où est mon lien ? », sous les liens du pied */
-.entry-help {
-  flex-basis: 100%;
-  font: var(--font-small);
-  color: var(--c-text);
+.pick-head h2 {
+  font: var(--font-block);
+  text-transform: uppercase;
+  color: var(--cream);
 }
+.pick-list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pick-list button {
+  width: 100%;
+  min-height: 60px;
+  border: 0;
+  background: none;
+  text-align: left;
+}
+.pick-list .suggest-face {
+  width: 44px;
+  height: 44px;
+}
+@media (min-width: 700px) {
+  .pick-veil {
+    place-items: center;
+    padding: 24px;
+  }
+  .pick {
+    width: min(440px, 100%);
+    padding: 24px 18px 18px;
+    border-radius: var(--r-block);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .suggest,
+  .pick,
+  .pick-veil {
+    animation: none;
+  }
+}
+
 .entry-submit {
   width: 100%;
 }
@@ -1867,11 +2007,6 @@ svg {
   justify-content: center;
   gap: 0 16px;
   text-align: center;
-}
-/* porte LinkedIn : deux liens qui ne se lisent pas comme une phrase, un à chaque bout
-   (« Où est mon lien ? » à gauche, « Plutôt avec ton CV » à droite) */
-.entry-foot:has(> .entry-where) {
-  justify-content: space-between;
 }
 .entry-reassure {
   flex-basis: 100%;
@@ -3867,14 +4002,21 @@ a.dossier-item:hover {
   .entry > :not(.field):not(.entry-submit) {
     grid-column: 1 / -1;
   }
-  /* les portes au-dessus du champ seul, de sa largeur ; la pilule reste à côté du champ */
-  .entry.has-doors > .entry-doors {
-    grid-column: 1;
-    grid-row: 1;
+  /* l'entrée simple (§18.80) : tout s'empile comme sur téléphone, les deux boutons, ou le champ puis l'envoi */
+  .entry.is-stack {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 440px;
   }
-  .entry.has-doors > .field,
-  .entry.has-doors > .entry-submit {
-    grid-row: 2;
+  .entry.is-stack > * {
+    grid-column: 1;
+    grid-row: auto;
+  }
+  .entry.is-stack .entry-submit {
+    width: 100%;
+  }
+  .entry.is-stack .entry-foot {
+    justify-content: center;
+    text-align: center;
   }
   .entry .drop {
     grid-column: 1 / -1;
@@ -3934,12 +4076,6 @@ a.dossier-item:hover {
   .is-visitor .you .entry {
     grid-template-columns: minmax(0, 1fr);
     max-width: none;
-  }
-  .is-visitor .you .entry.has-doors > .entry-doors,
-  .is-visitor .you .entry.has-doors > .field,
-  .is-visitor .you .entry.has-doors > .entry-submit {
-    grid-column: 1;
-    grid-row: auto;
   }
   .is-visitor .you .entry-submit {
     width: 100%;

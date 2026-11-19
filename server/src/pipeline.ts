@@ -337,6 +337,15 @@ export interface JobInput {
   linkedinUrl?: string;
   /** Prend une unité de la limite par IP avant une lecture payante de profil ; false : refusé. */
   linkedinSpend?: () => boolean;
+  /**
+   * Entrée « Se connecter avec LinkedIn » (§18.80) : le GitHub retrouvé d'après
+   * l'identité rendue par LinkedIn. `email` : un commit signé de son adresse
+   * vérifiée, une preuve, qui passe devant les liens du profil. `name` : le seul
+   * compte à son nom, un indice, pris seulement si le profil ne donne aucun
+   * GitHub, et jamais prouvé. `sureProfile` : le profil lu est sûrement le sien
+   * (email ou photo), pas un choix parmi des homonymes.
+   */
+  identity?: { githubLogin: string; how: "email" | "name"; sureProfile: boolean };
 }
 
 interface Ctx {
@@ -651,6 +660,12 @@ export class Pipeline {
     // Entrée LinkedIn (§18.24) : le profil, et le GitHub que ses liens donnent.
     const entry = input.linkedinUrl && !login && !pdf ? await this.linkedinEntry(input.linkedinUrl, input, ctx) : null;
     if (entry?.githubLogin) login = entry.githubLogin;
+    // Le GitHub de l'identité (§18.80) : l'email d'abord, puis les liens du profil,
+    // puis le nom. Masqué par son propriétaire : la fiche LinkedIn sort seule.
+    const identity = entry && input.identity && !this.opts.store.isHidden(input.identity.githubLogin) ? input.identity : undefined;
+    if (identity && (identity.how === "email" || !login)) login = identity.githubLogin;
+    /** Prouvé par l'identité : son email mène à ce GitHub, et ce profil est sûrement le sien. */
+    const identityProven = !!identity && identity.how === "email" && identity.sureProfile && login === identity.githubLogin;
 
     // Le LinkedIn lu : celui que le joueur donne, sinon, pour le pseudo dont le
     // serveur se porte garant, le sien (§18.35) ; sinon celui que GitHub affiche.
@@ -757,7 +772,7 @@ export class Pipeline {
     // se lit à son adresse et par le cache de son adresse LinkedIn, mais ne passe
     // jamais devant la fiche GitHub du pseudo et n'entre pas au top (§18.24).
     const vouchedLink = !!vouched && linkedinAsked === vouched.linkedinUrl;
-    const linkedinProven = !!li && !!linkedinUrl && (li.proven || vouchedLink || githubShowsLinkedin(gh.facts, linkedinUrl));
+    const linkedinProven = !!li && !!linkedinUrl && (li.proven || vouchedLink || identityProven || githubShowsLinkedin(gh.facts, linkedinUrl));
 
     // Comparaison : trois lignes, la comparaison et ses deux cartes, chacune son id.
     ctx.emit("compare");

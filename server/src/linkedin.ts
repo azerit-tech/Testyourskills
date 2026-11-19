@@ -17,10 +17,10 @@
 import { randomBytes } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { Hono } from "hono";
+import type { Context, Hono } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import type { CardData, ComparisonData } from "../../shared/types";
-import { ownerFromRequest, sign, unsign } from "./auth";
+import { ownerFromRequest, safeReturnPath, sign, unsign } from "./auth";
 import type { CardRow, Store } from "./db";
 import { ID_RE } from "./pipeline";
 
@@ -152,7 +152,7 @@ export async function fetchProfile(
   cfg: LinkedinConfig,
   redirectUri: string,
   fetchImpl: typeof fetch,
-): Promise<{ picture?: string; name?: string }> {
+): Promise<OidcProfile> {
   const tokenRes = await fetchImpl(TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
@@ -174,11 +174,34 @@ export async function fetchProfile(
     signal: AbortSignal.timeout(API_TIMEOUT_MS),
   });
   if (!infoRes.ok) throw new PhotoError(`userinfo : HTTP ${infoRes.status}`);
-  const info = (await infoRes.json()) as { picture?: unknown; name?: unknown };
+  const info = (await infoRes.json()) as { picture?: unknown; name?: unknown; given_name?: unknown; family_name?: unknown; email?: unknown; email_verified?: unknown };
+  const text = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 80) : undefined);
+  const email = typeof info.email === "string" && /^[^\s@]{1,64}@[^\s@]{1,190}$/.test(info.email.trim()) ? info.email.trim().toLowerCase() : undefined;
   return {
     picture: typeof info.picture === "string" ? info.picture : undefined,
-    name: typeof info.name === "string" && info.name.trim() ? info.name.trim().slice(0, 80) : undefined,
+    name: text(info.name) ?? text([text(info.given_name), text(info.family_name)].filter(Boolean).join(" ")),
+    // L'adresse n'est rendue que si LinkedIn la dit vérifiée (scope email, demandé par l'entrée seulement).
+    ...(email && (info.email_verified === true || info.email_verified === "true") ? { email } : {}),
   };
+}
+
+/** Ce que « Sign in with LinkedIn » rend de la personne. Jamais l'adresse de son profil. */
+export interface OidcProfile {
+  picture?: string;
+  name?: string;
+  /** Adresse vérifiée par LinkedIn. */
+  email?: string;
+}
+
+/**
+ * « Se connecter avec LinkedIn » (§18.80, entry/linkedinLogin.ts) : la même
+ * connexion, le même retour, pour entrer au lieu de poser une photo.
+ */
+export interface LinkedinEnterHook {
+  /** Peut-on lancer une connexion depuis cette adresse (limite par IP) ? */
+  allow(c: Context): boolean;
+  /** Le retour de LinkedIn : ce qu'il rend de la personne, puis la page où revenir. */
+  finish(c: Context, returnPath: string, profile: OidcProfile): Response | Promise<Response>;
 }
 
 // --- Mise à jour des cartes -------------------------------------------------
@@ -233,10 +256,14 @@ export interface LinkedinRoutesOptions {
   secure?: boolean;
   /** Secret de signature du cookie d'état (SESSION_SECRET). Absent : tiré au hasard, pour la durée du processus. */
   stateSecret?: string;
+  /** « Se connecter avec LinkedIn » (§18.80). Absent : /auth/linkedin/enter n'existe pas. */
+  enter?: LinkedinEnterHook;
 }
 
 export function mountLinkedin(app: Hono, o: LinkedinRoutesOptions) {
   const states = new StateStore();
+  /** Les états d'une entrée : ce qu'ils gardent est la page où revenir, pas une fiche. */
+  const enterStates = new StateStore();
   // Les états ne survivent pas non plus à un redémarrage : un secret du processus suffit.
   const secret = o.stateSecret ?? randomBytes(32).toString("base64url");
   const cookieBase = { httpOnly: true, secure: o.secure ?? o.baseUrl.startsWith("https://"), sameSite: "Lax" as const, path: STATE_PATH };
@@ -289,6 +316,27 @@ export function mountLinkedin(app: Hono, o: LinkedinRoutesOptions) {
     return c.redirect(url.toString(), 302);
   });
 
+  // « Se connecter avec LinkedIn » (§18.80) : nom, photo et email vérifié, pour retrouver le profil.
+  app.get("/auth/linkedin/enter", (c) => {
+    c.header("Cache-Control", "no-store");
+    const returnPath = safeReturnPath(c.req.query("return")) ?? "/";
+    if (!o.config || !o.enter) return c.json({ ok: false, message: { fr: "Connexion LinkedIn désactivée.", en: "LinkedIn sign-in is disabled." } }, 404);
+    if (!o.enter.allow(c)) {
+      const u = new URL(returnPath, o.baseUrl);
+      u.searchParams.set("li", "error");
+      return c.redirect(`${o.baseUrl}${u.pathname}${u.search}`, 302);
+    }
+    const state = enterStates.create(returnPath);
+    setCookie(c, LI_STATE_COOKIE, sign(secret, "linkedin", { s: state, e: Date.now() + STATE_TTL_MS }), { ...cookieBase, maxAge: STATE_TTL_MS / 1000 });
+    const url = new URL(AUTHORIZE_URL);
+    url.searchParams.set("response_type", "code");
+    url.searchParams.set("client_id", o.config.clientId);
+    url.searchParams.set("redirect_uri", redirectUri);
+    url.searchParams.set("state", state);
+    url.searchParams.set("scope", "openid profile email");
+    return c.redirect(url.toString(), 302);
+  });
+
   app.get("/auth/linkedin/callback", async (c) => {
     c.header("Cache-Control", "no-store");
     const given = c.req.query("state");
@@ -296,9 +344,30 @@ export function mountLinkedin(app: Hono, o: LinkedinRoutesOptions) {
     // Usage unique : le cookie d'état et l'état partent quoi qu'il arrive.
     deleteCookie(c, LI_STATE_COOKIE, cookieBase);
     const id = states.take(given);
+    const enterPath = enterStates.take(given);
     // L'état de l'URL doit être celui que ce navigateur a reçu au départ, comparé en temps constant.
     const sameBrowser =
       typeof bound?.s === "string" && typeof bound.e === "number" && bound.e > Date.now() && o.tokenMatches(given, bound.s);
+    // « Se connecter avec LinkedIn » : même retour, mais on revient sur la page de départ avec ?li=.
+    if (enterPath !== null) {
+      const home = (result: "1" | "error" | "cancel") => {
+        const u = new URL(sameBrowser ? enterPath : "/", o.baseUrl);
+        u.searchParams.set("li", result);
+        return `${o.baseUrl}${u.pathname}${u.search}`;
+      };
+      if (!sameBrowser || !o.config || !o.enter) return c.redirect(home("error"), 302);
+      const code = c.req.query("code");
+      if (!code || c.req.query("error")) return c.redirect(home("cancel"), 302);
+      try {
+        const profile = await fetchProfile(code, o.config, redirectUri, o.fetchImpl);
+        if (!profile.name) throw new PhotoError("pas de nom");
+        const done = await o.enter.finish(c, enterPath, profile);
+        return done;
+      } catch (err) {
+        console.warn("[linkedin] entrée non aboutie :", (err as Error).message);
+        return c.redirect(home("error"), 302);
+      }
+    }
     if (!id || !sameBrowser || !o.config) return c.redirect(back(null, "error"), 302);
     const code = c.req.query("code");
     // Annulation côté LinkedIn : ?error=user_cancelled_login, pas de code.
