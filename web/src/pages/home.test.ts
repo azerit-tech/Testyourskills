@@ -129,12 +129,13 @@ describe("l'accueil de qui a déjà sa fiche (§18.89)", () => {
   it("la page : sa fiche, le top de la semaine, les primes ouvertes, les bandes, puis « Faire une autre fiche » ; rien d'autre", () => {
     const home = read("./Home.tsx");
     const page = home.slice(home.indexOf("if (mineHome && mem.mine) {"), home.indexOf('<main className="page page-home" id="main">'));
-    const order = ["<MineCard ", "<WeekBoard ", "<PrimesStrip />", "<HomeBands ", "h.back.another"].map((x) => page.indexOf(x));
+    const order = ["<MineCard ", "<WeekBoard ", "<PrimesStrip />", "<BandsTop onPlay={play} cardId={mem.mine.id} />", "h.back.another"].map((x) => page.indexOf(x));
     expect(order.every((i) => i > 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     // le formulaire ne s'ouvre qu'à la demande, à la place du lien ; connecté (§18.91), « Se déconnecter » à côté
     expect(page).toMatch(/\{open \? \(\s*<EntryForm inputRef=\{inputRef\} another \/>\s*\) : acct \? \([\s\S]*?h\.account\.out[\s\S]*?\) : \(\s*<button type="button" className="link-alt home-another"/);
-    for (const gone of ["hero-title", "hero-hook", "<ExampleCard", "<Spin", "<ProfileWall", "<BandsTop", "home-last", "<BackLine"]) expect(page).not.toContain(gone);
+    // les bandes : les deux classements du §18.92 (BandsTop), et non le bloc d'avant (HomeBands)
+    for (const gone of ["hero-title", "hero-hook", "<ExampleCard", "<Spin", "<ProfileWall", "<HomeBands", "home-last", "<BackLine"]) expect(page).not.toContain(gone);
     // un préremplissage (« Réessayer », /<pseudo>), une dénonciation, un film à voir ou un dossier en cours gardent l'accueil du formulaire
     expect(home).toMatch(/const returning = !!mem\.mine && !owed && !mem\.pending;/);
     expect(home).toMatch(/const mineHome = returning && !denounce && !fromPrefill && !returnBack;/);
@@ -144,7 +145,7 @@ describe("l'accueil de qui a déjà sa fiche (§18.89)", () => {
     const css = read("../styles.css");
     expect(css).toMatch(/\.home-mine \{[^}]*grid-template-columns: minmax\(0, 1fr\);/);
     expect(css).toMatch(/@media \(min-width: 900px\) \{\s*\.home-mine \{\s*grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1fr\);/);
-    expect(css).toMatch(/\.home-mine > \.board \{\s*grid-column: 2;/);
+    expect(css).toMatch(/\.home-mine > \.board,\s*\.home-mine > \.leagues \{\s*grid-column: 2;/);
   });
 });
 

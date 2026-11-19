@@ -1,5 +1,5 @@
-// Sa propre bande en formation (§18.85) : un bloc, pas une ligne. Sur /bandes, en
-// tête de sa ligue ; sur l'accueil de qui a sa fiche (§18.89), en tête des bandes.
+// Sa propre bande en formation (§18.85) : un bloc, pas une ligne, en tête de sa
+// ligue sur /bandes.
 import type { BandStanding } from "../../../shared/bands";
 import { bandPath } from "../../../shared/bands";
 import { useT } from "../i18n";

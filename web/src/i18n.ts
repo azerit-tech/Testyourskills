@@ -116,8 +116,6 @@ const fr = frTypoDeep({
     next: "Voir la suite",
     /** Le dernier formulaire de l'accueil, avant le pied de page (§18.48). */
     lastTitle: "À toi.",
-    /** Au-dessus du tableau des bandes : pourquoi une bande. */
-    bandsLead: "Fais ta fiche. Fais gagner ta bande.",
     /** L'accueil se souvient (§18.48) : la fiche déjà faite, ou le dossier encore en cours. */
     back: {
       mine: "Ta fiche\u00a0:",
@@ -971,7 +969,6 @@ const en: Dict = {
     exampleFrom: (labels) => `based on ${labels}`,
     next: "See more",
     lastTitle: "Your turn.",
-    bandsLead: "Get your rap sheet. Make your crew win.",
     back: {
       mine: "Your sheet:",
       mineGo: "See it again",

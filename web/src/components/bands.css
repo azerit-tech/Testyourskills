@@ -518,12 +518,43 @@
 
 /* ---------- le top de l'accueil ---------- */
 
-.bands-top-cols {
+/* un classement par ligue (§18.92), fait comme le top de la semaine : les écoles, puis les
+   boîtes, puis le lien vers /bandes */
+.leagues {
   display: grid;
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 40px;
+  width: 100%;
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 0 var(--gutter);
 }
+.leagues > .board {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+/* le nom comme au top de la semaine : en clair ; sa propre bande, en crème et en gras */
+.league-row .band-name .board-login {
+  color: var(--c-text);
+  font-weight: 500;
+}
+.league-row.is-me .band-name .board-login {
+  color: var(--cream);
+  font-weight: 700;
+}
+.league-row:hover .band-name .board-login,
+.league-row:focus-visible .band-name .board-login {
+  color: var(--cream);
+}
+/* la ligne des places libres : trois colonnes, l'invitation dans la dernière */
+.league-row .board-take {
+  grid-column: auto;
+}
+/* le lien se rattache au dernier classement : 16 px dessous */
 .bands-top-all {
   justify-self: start;
+  margin-top: -24px;
 }
 
 @media (min-width: 900px) {
@@ -598,13 +629,12 @@
   .band-main > .band-hire {
     grid-column: 1 / -1;
   }
-  .board > .bands-top-cols {
-    grid-template-columns: 1fr 1fr;
-    max-width: var(--page-w);
-    text-align: left;
+  /* les deux classements côte à côte, le lien sous eux */
+  .leagues {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
   }
-  .board > .bands-top-all {
-    width: auto;
-    justify-self: center;
+  .leagues > .bands-top-all {
+    grid-column: 1 / -1;
   }
 }

@@ -3,13 +3,13 @@
 // Jacques (le produit) debout sur son crépuscule : à droite au bureau, juste
 // sous le formulaire sur téléphone, où son haut dépasse du premier écran.
 // Ensuite, dans l'ordre de l'envie : la berline (§18.79), le top de la semaine
-// (§18.22), les primes si elles sont ouvertes (§18.4), les bandes (§18.38), le
+// (§18.22), les primes si elles sont ouvertes (§18.4), un classement des écoles et un des boîtes (§18.92), le
 // mur des 13 profils (§18.28), et un dernier formulaire avant le pied de page.
 // Rien d'autre. La couverture en mosaïque du §18.31 a disparu (§18.81).
 // L'accueil se souvient : le dossier encore en cours tient en une ligne au-dessus du
 // formulaire, à la place de la promesse.
 // Qui a déjà sa fiche a un autre accueil (§18.89) : sa fiche en haut, les classements
-// dessous (le top de la semaine, les primes ouvertes, les bandes), et rien d'autre.
+// dessous (le top de la semaine, les primes ouvertes, les écoles, les boîtes, §18.92), et rien d'autre.
 // L'exemple est la vraie fiche de Jacques (fondateur d'Azerit) : la maquette
 // s'affiche d'abord, la fiche calculée par le serveur la remplace dès qu'elle existe.
 // Aucun dégradé dans la page : seul celui de la fiche.
@@ -20,7 +20,6 @@ import { fileOf, pieceLabel } from "../../../shared/caseFile";
 import { FIXTURES } from "../../../shared/fixtures";
 import { CardView } from "../card/CardView";
 import { EntryForm } from "../components/EntryForm";
-import { HomeBands } from "../components/HomeBands";
 import { ProfileWall } from "../components/ProfileWall";
 import { Spin } from "../components/Spin";
 import { Sunset } from "../components/Sunset";
@@ -394,7 +393,7 @@ export function Home() {
           <MineCard mine={mem.mine} card={mem.card} />
           <WeekBoard onPlay={play} />
           <PrimesStrip />
-          <HomeBands cardId={mem.mine.id} toast={toast.show} />
+          <BandsTop onPlay={play} cardId={mem.mine.id} />
         </div>
         <div className="home-more" ref={moreRef}>
           {open ? (
@@ -465,7 +464,7 @@ export function Home() {
       </div>
       {/* Les primes ouvertes (§18.4) : rien tant que la saison n'en porte pas. */}
       <PrimesStrip />
-      <BandsTop lead={h.bandsLead} />
+      <BandsTop onPlay={play} />
       <ProfileWall onPlay={play} />
       {/* Qui a tout lu n'a pas à remonter : le même formulaire, dans le bloc d'appel. */}
       <section className="home-last block block-call" aria-labelledby="home-last-title">

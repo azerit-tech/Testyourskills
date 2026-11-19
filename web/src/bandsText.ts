@@ -107,11 +107,14 @@ const fr = {
     notFound: "Cette bande n'existe pas. Pas encore.",
   },
   home: {
-    title: "Top des bandes",
-    /** La phrase des bandes, pour leur section de l'accueil. */
+    /** La phrase des bandes. */
     hook: "Fais ta fiche. Fais gagner ta bande.",
-    empty: "Trois fiches font une bande. Aucune n'est encore au tableau.",
     all: "Toutes les bandes",
+    /** Sous le nom d'une bande en formation, au classement de l'accueil (§18.92) : la règle des trois fiches, sans phrase. */
+    forming: (k: number) => `${n(k, "fiche", "fiches")}, en formation`,
+    /** Une ligne du classement pour un lecteur d'écran : sa place, son nom, ses étoiles, ses fiches. */
+    rowLabel: (place: number, label: string, score: number, dossiers: number, forming: boolean) =>
+      `Place ${place} : ${label}, ${n(score, "étoile", "étoiles")}, ${n(dossiers, "fiche", "fiches")}${forming ? ", en formation" : ""}`,
   },
   /* --- clés neuves de la revue du 15 novembre (SPEC §18.48), groupées --- */
   /** La page d'une bande, trois états : sans fiche, avec une fiche, membre. */
@@ -218,10 +221,11 @@ const en: BandsDict = {
     notFound: "This crew doesn't exist. Not yet.",
   },
   home: {
-    title: "Top crews",
     hook: "Get your rap sheet. Put your crew on top.",
-    empty: "Three sheets make a crew. None has made the board yet.",
     all: "All crews",
+    forming: (k: number) => `${nEn(k, "sheet", "sheets")}, forming`,
+    rowLabel: (place: number, label: string, score: number, dossiers: number, forming: boolean) =>
+      `Spot ${place}: ${label}, ${nEn(score, "star", "stars")}, ${nEn(dossiers, "sheet", "sheets")}${forming ? ", forming" : ""}`,
   },
   states: {
     follow: "Once your sheet lands, you are in this crew: your stars count right away.",

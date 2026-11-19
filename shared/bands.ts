@@ -78,10 +78,27 @@ export interface BandBoard {
   extra: BandStanding | null;
 }
 
-/** GET /api/bands/top : les cinq premières de chaque ligue, pour l'accueil. */
+/**
+ * GET /api/bands/top : le classement de chaque ligue pour l'accueil (§18.92), cinq lignes
+ * au plus. Les bandes au tableau d'abord, dans leur ordre ; s'il reste des places, les
+ * bandes en formation qui ont leur page publique (`rank` null), les plus étoilées
+ * d'abord. La place d'une ligne est sa position dans la liste.
+ */
 export interface BandsTop {
   ecole: BandStanding[];
   boite: BandStanding[];
+  /**
+   * La bande demandée (`?ecole=`, `?boite=`) quand elle est plus bas que les cinq
+   * lignes : sa place dans le même ordre. Absente si elle est déjà dans la liste, ou
+   * sans page publique.
+   */
+  mine?: Partial<Record<BandType, BandPlace>>;
+}
+
+/** Une bande et sa place dans le classement de l'accueil. */
+export interface BandPlace {
+  place: number;
+  band: BandStanding;
 }
 
 /**
