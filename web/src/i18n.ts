@@ -787,7 +787,26 @@ const fr = frTypoDeep({
     charge: (status: string) => `Chef d'accusation : ${status}`,
     /* le seul bouton : à la personne elle-même, pour qu'elle la reprenne (parcours 2 et 25) */
     send: (who: string) => `Envoyer à ${who}`,
-    sendText: (who: string, stars: string, tag: string) => `${who}, Azerit a dressé ta fiche de dev : ${stars ? `${stars}, ` : ""}${tag}. C'est toi ? Reprends-la :`,
+    /* le message envoyé (§18.91) : on l'a dénoncé, le duel en chiffres, puis le lien. `them` nul : dossier scellé ; `me` nul : sa note inconnue */
+    sendText: (who: string, me: number | null, them: number | null, lead: string) =>
+      me === null
+        ? `${who}, je viens de te dénoncer sur Azerit. À toi de jouer :`
+        : them === null
+          ? `${who}, je viens de te dénoncer sur Azerit. Ta fiche t'attend : fais mieux que mes ${me} ?`
+          : `${who}, je viens de te dénoncer sur Azerit : ${me} contre ${them}, ${lead}. À toi de jouer :`,
+    /** L'écart vu par qui envoie : « j'ai une étoile d'avance », « tu as 3 points d'avance ». */
+    iLead: (gap: string) => `j'ai ${gap}`,
+    youLead: (gap: string) => `tu as ${gap}`,
+    sendTie: "égalité parfaite",
+    mailSubject: "Je viens de te dénoncer sur Azerit",
+    /** Les canaux de l'envoi : téléphone (raccourcis sous le bouton) et ordinateur (la rangée). */
+    viaWhatsapp: "WhatsApp",
+    viaSms: "SMS",
+    viaEmail: "E-mail",
+    viaLinkedin: "LinkedIn",
+    viaCopy: "Copier",
+    linkedinCopied: "Message copié : colle-le dans LinkedIn.",
+    previewAlt: (who: string) => `Le face-à-face envoyé à ${who}`,
     sendCopied: (who: string) => `Message copié : envoie-le à ${who}.`,
     see: "Voir sa fiche",
     copyLink: "Copier le lien",
@@ -1526,7 +1545,23 @@ const en: Dict = {
     inSights: "is in the crosshairs",
     charge: (status) => `Charge: ${status}`,
     send: (who) => `Send to ${who}`,
-    sendText: (who, stars, tag) => `${who}, Azerit drew up your dev rap sheet: ${stars ? `${stars}, ` : ""}${tag}. That's you? Take it back:`,
+    sendText: (who, me, them, lead) =>
+      me === null
+        ? `${who}, I just turned you in on Azerit. Your move:`
+        : them === null
+          ? `${who}, I just turned you in on Azerit. Your sheet is waiting: can you beat my ${me}?`
+          : `${who}, I just turned you in on Azerit: ${me} vs ${them}, ${lead}. Your move:`,
+    iLead: (gap) => `I'm ${gap}`,
+    youLead: (gap) => `you're ${gap}`,
+    sendTie: "a dead heat",
+    mailSubject: "I just turned you in on Azerit",
+    viaWhatsapp: "WhatsApp",
+    viaSms: "Text",
+    viaEmail: "Email",
+    viaLinkedin: "LinkedIn",
+    viaCopy: "Copy",
+    linkedinCopied: "Message copied: paste it into LinkedIn.",
+    previewAlt: (who) => `The face-off sent to ${who}`,
     sendCopied: (who) => `Message copied: send it to ${who}.`,
     see: "See their sheet",
     copyLink: "Copy link",

@@ -422,7 +422,7 @@ export function Home() {
               <BackLine mine={mem.mine} pending={null} />
               <div className="home-denounce">
                 <Suspense fallback={null}>
-                  <Denounce cardId={mem.mine.id} selfLogin={mem.mine.login ?? undefined} toast={toast.show} initial={denounce} />
+                  <Denounce cardId={mem.mine.id} selfLogin={mem.mine.login ?? undefined} mine={mem.mine.overall} toast={toast.show} initial={denounce} />
                 </Suspense>
               </div>
             </>

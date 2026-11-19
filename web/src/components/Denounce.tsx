@@ -10,7 +10,7 @@ import type { CSSProperties, FormEvent } from "react";
 import { fileOf } from "../../../shared/caseFile";
 import { detectEntry, linkedinSlug } from "../../../shared/entry";
 import type { Entry } from "../../../shared/entry";
-import { starsLine } from "../../../shared/stars";
+import { IMAGE_QUERY } from "../../../shared/images";
 import type { CardData, Lang } from "../../../shared/types";
 import { LEVEL_LABELS, starsFor } from "../../../shared/types";
 import { pick, useT } from "../i18n";
@@ -20,8 +20,9 @@ import { onLinkClick } from "../lib/router";
 import { rememberDenounced } from "../lib/session";
 import { hasNativeShare } from "../lib/sharing";
 import { copyText, isTouch, shareUrl } from "../lib/util";
-import { ManualCopy } from "./After";
-import { IconShare } from "./Icons";
+import { verdict } from "../lib/versus";
+import { aimAt, ManualCopy } from "./After";
+import { IconCopy, IconLinkedIn, IconMail, IconShare, IconSms, IconWhatsApp } from "./Icons";
 import { Stars } from "./Stars";
 import { useSuggestBox, useSuggestions } from "./Suggest";
 import type { Suggestion } from "./Suggest";
@@ -89,9 +90,11 @@ interface Props {
   toast: (m: string) => void;
   /** Le champ déjà rempli (l'accueil ouvert sur /<pseudo> par qui a déjà sa fiche). */
   initial?: string;
+  /** La note du dénonciateur : le duel en chiffres dans le message envoyé (§18.91). */
+  mine?: number | null;
 }
 
-export function Denounce({ cardId, selfLogin, toast, initial }: Props) {
+export function Denounce({ cardId, selfLogin, toast, initial, mine }: Props) {
   const { t, lang } = useT();
   const d = t.denounce;
   const uid = useId().replace(/:/g, "");
@@ -195,7 +198,7 @@ export function Denounce({ cardId, selfLogin, toast, initial }: Props) {
     run(value);
   };
 
-  if (state.s === "done") return <Wanted card={state.card} byId={cardId} toast={toast} onAgain={() => setState({ s: "idle" })} />;
+  if (state.s === "done") return <Wanted card={state.card} byId={cardId} mine={mine} toast={toast} onAgain={() => setState({ s: "idle" })} />;
 
   // « @x est dans le viseur », tout de suite : le titre de la fiche prête, avec sa barre en attendant les étoiles.
   if (state.s === "pending")
@@ -279,10 +282,13 @@ export function Denounce({ cardId, selfLogin, toast, initial }: Props) {
 
 /**
  * Ce que le dénonciateur reçoit : la fiche du complice résumée, prête à envoyer. Dénoncer s'adresse à une
- * personne : un seul bouton, qui lui envoie le lien (§18.48), et « Copier le lien ». Aucun partage public :
- * la fiche d'un tiers ne part pas dans un post ; une fois reprise, c'est la personne qui la partage.
+ * personne (§18.48) : aucun partage public, la fiche d'un tiers ne part pas dans un post. Au-dessus des
+ * boutons, l'aperçu de ce qui part : l'image du duel (§18.91), celle que la messagerie montrera. Sur
+ * téléphone, « Envoyer à @x » ouvre la feuille du système (texte et lien, sans fichier : WhatsApp,
+ * iMessage et Messenger bâtissent eux-mêmes l'aperçu), WhatsApp et SMS en raccourcis dessous ; sur
+ * ordinateur, une rangée de canaux : WhatsApp, e-mail, LinkedIn (message copié avant l'ouverture), Copier.
  */
-export function Wanted({ card, byId, toast, onAgain }: { card: CardData; byId: string; toast: (m: string) => void; onAgain: () => void }) {
+export function Wanted({ card, byId, mine, toast, onAgain }: { card: CardData; byId: string; mine?: number | null; toast: (m: string) => void; onAgain: () => void }) {
   const { t, lang } = useT();
   const d = t.denounce;
   // La fiche prête prend plus de place que son attente : si son titre est passé au-dessus de l'écran, il y revient.
@@ -297,13 +303,13 @@ export function Wanted({ card, byId, toast, onAgain }: { card: CardData; byId: s
   }, []);
   // Presse-papiers refusé : le message ou le texte s'affiche, sélectionné, pour un appui long.
   const [manual, setManual] = useState<{ kind: "message" | "link"; value: string } | null>(null);
+  // L'image du duel manque (fiche déjà dénoncée par un autre, démo) : pas d'aperçu, les boutons restent.
+  const [noPreview, setNoPreview] = useState(false);
   // « @pseudo », ou le nom d'une fiche tirée d'un LinkedIn.
   const who = card.login ? `@${card.login}` : card.name;
   const n = starsFor(card.overall);
-  // Dossier vide, pas encore revendiqué (shared/publicView.ts) : ni étoiles ni note, ni ici ni dans le partage.
+  // Dossier vide, pas encore revendiqué (shared/publicView.ts) : ni étoiles ni note, ni ici ni dans le message.
   const sealed = !!card.sealed;
-  // Les six, pleines puis vides (§18.27).
-  const stars = sealed ? "" : starsLine(n);
   const tag = tagOf(card, lang);
   const status = bestStatus(card, lang);
   const level = pick(LEVEL_LABELS[n], lang);
@@ -311,30 +317,74 @@ export function Wanted({ card, byId, toast, onAgain }: { card: CardData; byId: s
   const url = shareUrl(card.id, byId);
   const canNative = isTouch() && hasNativeShare();
   const track = (channel: string) => api.track("card_shared", card.id, { channel, kind: "denounce" });
+  const me = typeof mine === "number" ? mine : null;
+  // Le duel en chiffres, vu par qui envoie : la règle de la page partagée (lib/versus.ts).
+  const lead = (() => {
+    if (me === null || sealed) return "";
+    const v = verdict(me, card.overall);
+    if (v.by === "tie") return d.sendTie;
+    const gap = v.by === "stars" ? d.starsAhead(v.n) : d.pointsAhead(v.n);
+    return v.ahead ? d.iLead(gap) : d.youLead(gap);
+  })();
+  const text = d.sendText(who, me, sealed ? null : card.overall, lead);
+  const message = `${text} ${url}`;
 
-  /** À la personne : la feuille de partage du téléphone, sinon le message et le lien dans le presse-papiers. */
-  const onSend = async () => {
-    const lead = d.sendText(who, stars, tag);
-    if (canNative) {
-      try {
-        await navigator.share({ title: "Azerit", text: lead, url });
-        track("native");
-      } catch {
-        /* partage annulé */
-      }
-      return;
-    }
-    const message = `${lead} ${url}`;
-    if (await copyText(message)) toast(d.sendCopied(who));
+  /** Le message dans le presse-papiers ; refusé, il s'affiche à copier à la main. */
+  const copyMessage = async (done: string) => {
+    if (await copyText(message)) toast(done);
     else setManual({ kind: "message", value: message });
-    track("copy");
+  };
+
+  /** Téléphone : la feuille de partage du système, texte et lien, sans fichier. */
+  const onNative = async () => {
+    try {
+      await navigator.share({ title: "Azerit", text, url });
+      track("native");
+    } catch {
+      /* partage annulé */
+    }
   };
 
   const onCopy = async () => {
+    await copyMessage(d.sendCopied(who));
+    track("copy");
+  };
+
+  const onCopyLink = async () => {
     if (await copyText(url)) toast(d.linkCopied);
     else setManual({ kind: "link", value: url });
     track("copy_link");
   };
+
+  // Les adresses des canaux. WhatsApp et LinkedIn ne prennent la leur que le temps du clic
+  // (aimAt, comme le partage LinkedIn) : les bloqueurs de contenu masquent les liens de partage.
+  const wa = `https://wa.me/?text=${encodeURIComponent(message)}`;
+  const sms = `sms:?&body=${encodeURIComponent(message)}`;
+  const mail = `mailto:?subject=${encodeURIComponent(d.mailSubject)}&body=${encodeURIComponent(`${text}\n\n${url}`)}`;
+  const LI_COMPOSE = "https://www.linkedin.com/messaging/compose/";
+  const cardHref = `/c/${card.id}`;
+
+  const whatsapp = (className: string) => (
+    <a
+      className={className}
+      href={cardHref}
+      target="_blank"
+      rel="noopener"
+      onClick={(e) => {
+        aimAt(e.currentTarget, wa, cardHref);
+        track("whatsapp");
+      }}
+    >
+      <IconWhatsApp />
+      <span>{d.viaWhatsapp}</span>
+    </a>
+  );
+  const smsLink = (
+    <a className="pill denounce-via" href={sms} onClick={() => track("sms")}>
+      <IconSms />
+      <span>{d.viaSms}</span>
+    </a>
+  );
 
   return (
     <section ref={root} className="after-block denounce is-done" aria-live="polite">
@@ -347,18 +397,66 @@ export function Wanted({ card, byId, toast, onAgain }: { card: CardData; byId: s
         <span className="denounce-tag">{tag}</span>
       </p>
       {status && <p>{d.charge(status)}</p>}
-      <div className="denounce-actions">
-        <button type="button" className="pill pill-big" onClick={() => void onSend()}>
-          <IconShare />
-          <span className="denounce-send">{d.send(who)}</span>
-        </button>
-      </div>
+      {/* Ce qui part : l'aperçu du lien, le duel. Le ratio est réservé, la page ne saute pas au chargement. */}
+      {!noPreview && (
+        <img
+          className="denounce-preview"
+          src={`/og/${card.id}-vs-${byId}.png?${IMAGE_QUERY}`}
+          width={1200}
+          height={630}
+          loading="lazy"
+          decoding="async"
+          alt={d.previewAlt(who)}
+          onError={() => setNoPreview(true)}
+        />
+      )}
+      {canNative ? (
+        <div className="denounce-actions">
+          <button type="button" className="pill pill-big" onClick={() => void onNative()}>
+            <IconShare />
+            <span className="denounce-send">{d.send(who)}</span>
+          </button>
+          <div className="denounce-via-row">
+            {whatsapp("pill denounce-via")}
+            {smsLink}
+          </div>
+        </div>
+      ) : (
+        <div className="denounce-actions denounce-via-row is-desk">
+          {whatsapp("pill pill-big denounce-via")}
+          <a className="pill denounce-via" href={mail} onClick={() => track("email")}>
+            <IconMail />
+            <span>{d.viaEmail}</span>
+          </a>
+          <a
+            className="pill denounce-via"
+            href={cardHref}
+            target="_blank"
+            rel="noopener"
+            onClick={(e) => {
+              aimAt(e.currentTarget, LI_COMPOSE, cardHref);
+              // Le texte part dans le presse-papiers dans le geste, avant que l'onglet s'ouvre.
+              void copyMessage(d.linkedinCopied);
+              track("linkedin");
+            }}
+          >
+            <IconLinkedIn />
+            <span>{d.viaLinkedin}</span>
+          </a>
+          <button type="button" className="pill denounce-via" onClick={() => void onCopy()}>
+            <IconCopy />
+            <span>{d.viaCopy}</span>
+          </button>
+        </div>
+      )}
       {manual && <ManualCopy m={manual} />}
       <div className="denounce-links">
-        <button type="button" className="link-alt" onClick={() => void onCopy()}>
-          {d.copyLink}
-        </button>
-        <a className="link-alt" href={`/c/${card.id}`} onClick={(e) => onLinkClick(e, `/c/${card.id}`)}>
+        {canNative && (
+          <button type="button" className="link-alt" onClick={() => void onCopyLink()}>
+            {d.copyLink}
+          </button>
+        )}
+        <a className="link-alt" href={cardHref} onClick={(e) => onLinkClick(e, cardHref)}>
           {d.see}
         </a>
         <button type="button" className="link-alt" onClick={onAgain}>
