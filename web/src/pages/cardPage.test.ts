@@ -396,11 +396,13 @@ describe("la lecture du recruteur (§18.37)", () => {
     }
   });
 
-  it("avec sa grille : un seul pli fermé, « Comment c'est noté », huit tuiles notées sur 10, aucun « + n » (§18.76)", () => {
+  it("avec sa grille : un seul pli fermé, « Comment c'est noté », sept tuiles notées sur 10 et le niveau, aucun « + n » (§18.76)", () => {
     const html = renderResult(card({ grid, overall: grid.overall }), { owner: true, token: "tok" });
     const fold = /<details class="fold rr">.*?<\/details>/s.exec(html)![0];
     expect(fold).toMatch(/^<details class="fold rr"><summary class="fold-row"><span>Comment c&#x27;est noté<\/span>/);
-    expect(fold.match(/class="rr-tile /g)).toHaveLength(8);
+    expect(fold.match(/class="rr-tile /g)).toHaveLength(7);
+    // L'expérience ne se note plus (barème 0.5.0) : une ligne courte dit le niveau.
+    expect(fold).toMatch(/class="rr-pending-line rr-level">Jugé au niveau [^<]+</);
     expect(fold.replace(/<[^>]+>/g, " ")).not.toMatch(/(^|\s)[+−]\s?\d/);
     // Le détail critère par critère et le calcul : un pli dans le pli, fermé ; plus d'invitation à toucher une tuile (§18.76).
     expect(fold).toMatch(/<details class="rg rg-fold"><summary class="rg-fold-sum"><span>Le détail, critère par critère<\/span>/);
@@ -417,18 +419,18 @@ describe("la lecture du recruteur (§18.37)", () => {
     expect(html).not.toContain("lit @");
   });
 
-  it("la ligne du recruteur et les huit tuiles : le premier des plis, après le verdict, la dénonciation et le partage (§18.48, §18.76, §18.83)", () => {
+  it("la ligne du recruteur, le niveau et les sept tuiles : le premier des plis, après le verdict, la dénonciation et le partage (§18.48, §18.76, §18.83)", () => {
     const html = renderResult(card({ grid, overall: grid.overall }), { owner: true, token: "tok", plea: 4 });
     const order = at(html, ['class="result-stage"', 'class="after-head"', 'class="after-block denounce"', 'class="after-block out"', 'add-linkedin', 'class="rest"', 'class="fold rr"', 'class="fold email"']);
     expect(ascending(order), JSON.stringify(order)).toBe(true);
-    expect(html.match(/class="rr-tile /g)).toHaveLength(8);
+    expect(html.match(/class="rr-tile /g)).toHaveLength(7);
     expect(html).toMatch(/<p class="rr-line">[^<]+, [^<]+\. Point fort\u00a0: [^<]+, \d+\/10\./);
     // Les tuiles dans l'ordre du recruteur, les critères sans note en bas (deux au plus en tuiles).
     const names = [...html.matchAll(/<span class="rr-name">([^<]+)<\/span>/g)].map((m) => m[1]);
     const { scored, pending } = tileOrder(grid);
     expect(pending.length).toBeLessThanOrEqual(2);
-    expect(names).toEqual([...scored, ...pending].map((c) => DICTS.fr.read.short[c.code]));
-    expect(names[0]).toBe("Expérience");
+    expect(names).toEqual([...scored, ...pending].filter((c) => c.code !== "XP").map((c) => DICTS.fr.read.short[c.code]));
+    expect(names).not.toContain("Expérience");
     if (pending.length) expect(html).toContain('<p class="rr-pending">Pas encore au dossier</p>');
   });
 

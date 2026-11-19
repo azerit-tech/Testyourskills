@@ -17,7 +17,7 @@
 //   camille-ardent (ou un LinkedIn et un pseudo)  la comparaison et la note du dossier, 76
 //   un LinkedIn et le pseudo x  face à un GitHub vide : code non prouvé, dossier 66
 
-import { GRID_WEIGHTS } from "../../../shared/gridText";
+import { GRID_WEIGHTS, SENIORITY_TEXT } from "../../../shared/gridText";
 import { EDU_NEXT, EDU_NEXT_GITHUB, SCHOOL_COUNTED, schoolCounted } from "../../../shared/schoolRank";
 import type { CriterionCode, Fact, Grid, GridCriterion, GridSeniority, GridSource } from "../../../shared/types";
 import { CRITERION_CODES } from "../../../shared/types";
@@ -33,8 +33,11 @@ function c(code: CriterionCode, score: number | null, state: GridCriterion["stat
  * Les quatre règles du §4, comme le moteur : hors moyenne sans note ou sans coefficient (l'expérience, 0.5.0) ;
  * école, open source et critère seulement déclaré seulement au-dessus ; plafond 85 sans code ; dossier vide 20.
  */
-export function finalizeMock(drafts: Draft[], seniority?: GridSeniority): Grid {
+export function finalizeMock(drafts: Draft[], given?: GridSeniority): Grid {
   const byCode = new Map(drafts.map((d) => [d.code, d]));
+  // Sans niveau donné (fiche GitHub seule) : celui que son brouillon d'expérience estime.
+  const xp = byCode.get("XP");
+  const seniority = given ?? (xp ? GITHUB_LEVEL.get(xp) : undefined);
   const ordered = CRITERION_CODES.map((code) => byCode.get(code)!).filter(Boolean);
   const w2 = (code: CriterionCode) => Math.round(GRID_WEIGHTS[code] * 2);
   const total2 = CRITERION_CODES.reduce((s, code) => s + w2(code), 0);
@@ -68,13 +71,22 @@ const eduNone = () =>
 const empNone = () =>
   c("EMP", null, "missing", "github", f("Le parcours se lit sur LinkedIn ou le CV : pas encore au dossier.", "Career path is read on LinkedIn or the résumé: not on file yet."));
 
-function xpGh(login: string, active: number, score: number, next: Fact): Draft {
+/** Le niveau qu'estime GitHub seul, par brouillon d'expérience : une année active vaut douze mois (comme le moteur, githubSeniority). */
+const GITHUB_LEVEL = new WeakMap<Draft, GridSeniority>();
+const levelCode = (months: number): GridSeniority["code"] => (months >= 120 ? "expert" : months >= 72 ? "senior" : months >= 36 ? "mid" : months >= 12 ? "junior" : "student");
+
+/** L'expérience d'une fiche GitHub seule (0.5.0) : elle estime le niveau, elle ne pèse plus. `_next` : la marche d'avant 0.5.0, plus dite. */
+function xpGh(login: string, active: number, score: number, _next: Fact): Draft {
   const yfr = `${active} année${active > 1 ? "s" : ""} active${active > 1 ? "s" : ""}`;
   const yen = `${active} active year${active > 1 ? "s" : ""}`;
-  return c("XP", score, "scored", "github", f(`Estimée : ${yfr} sur GitHub (50 contributions ou plus sur douze mois), table arrêtée à 8.`, `Estimated: ${yen} on GitHub (50+ contributions over twelve months), table stops at 8.`), {
-    next,
+  const seniority: GridSeniority = { code: levelCode(active * 12), months: active * 12, source: "github" };
+  const name = SENIORITY_TEXT[seniority.code].name;
+  const draft = c("XP", score, "scored", "github", f(`${yfr} sur GitHub (50 contributions ou plus sur douze mois) : niveau « ${name.fr} », estimé.`, `${yen} on GitHub (50+ contributions over twelve months): “${name.en}” level, estimated.`), {
+    next: f("Pour le niveau exact : des postes datés sur LinkedIn.", "For the exact level: dated roles on LinkedIn."),
     evidence: { text: f(`${yfr}, d'après le calendrier de contributions.`, `${yen}, going by the contribution calendar.`), source: "github", proof: gh(login) },
   });
+  GITHUB_LEVEL.set(draft, seniority);
+  return draft;
 }
 const xpMore = (score: number, years: number, active: number) =>
   f(`Pour ${score} : ${years} années actives. Tu en as ${active}. Ou des postes datés sur LinkedIn.`, `For ${score}: ${years} active years. You have ${active}. Or dated roles on LinkedIn.`);

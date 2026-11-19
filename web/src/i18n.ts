@@ -510,6 +510,7 @@ const fr = frTypoDeep({
     /** Plus de deux critères sans note : une ligne, jamais un mur de cases vides (§18.48). */
     /** Les noms en bas de casse au milieu de la phrase (« expérience, parcours, code »). */
     pendingLine: (names: string) => `Pas encore au dossier : ${names.toLowerCase()}.`,
+    level: (label: string) => `Jugé au niveau ${label}`,
     hint: "Touche un critère\u00a0: sa preuve s'affiche.",
     tile: (name: string, n: number) => `${name}\u00a0: ${n} sur 10`,
     tileNone: (name: string) => `${name}\u00a0: pas encore de note`,
@@ -1272,6 +1273,7 @@ const en: Dict = {
   read: {
     pending: "Not on file yet",
     pendingLine: (names: string) => `Not on file yet: ${names}.`,
+    level: (label: string) => `Judged at level: ${label}`,
     hint: "Tap a criterion to see its evidence.",
     tile: (name: string, n: number) => `${name}: ${n} out of 10`,
     tileNone: (name: string) => `${name}: no score yet`,

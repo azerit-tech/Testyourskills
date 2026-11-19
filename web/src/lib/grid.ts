@@ -4,8 +4,8 @@
 // pièce où la note a été lue, et la version de la page partagée, sans nom d'école ni
 // d'ancien employeur (question 5 du barème). Pur : testé sans navigateur.
 
-import { dec, excludedWhy, gridMath, GRID_WEIGHTS, schoolState } from "../../../shared/gridText";
-import type { CriterionCode, DeclaredSource, Grid, GridCriterion, GridSource, Lang } from "../../../shared/types";
+import { dec, excludedWhy, gridMath, GRID_WEIGHTS, schoolState, seniorityLabel, weightsOf } from "../../../shared/gridText";
+import type { CriterionCode, DeclaredSource, Fact, Grid, GridCriterion, GridSource, Lang } from "../../../shared/types";
 import type { Dict } from "../i18n";
 
 type G = Dict["grid"];
@@ -82,10 +82,26 @@ export function keptFrom(c: GridCriterion, g: G, declared: DeclaredSource): stri
 
 // --- La table des niveaux -------------------------------------------------------
 
-/** La table du critère : la table « déclarée » (arrêtée à 6) pour un critère déclaré, sinon la table de preuve. */
-export function levelTable(c: GridCriterion, g: G): [number, string][] {
+/**
+ * La table du critère. Barème 0.5.0 : celle que le moteur a lue, au niveau d'expérience de la
+ * personne, rangée avec la grille (`c.table`). Sinon (fiches d'avant) : la table « déclarée »
+ * (arrêtée à 6) pour un critère déclaré, ou la table de preuve.
+ */
+export function levelTable(c: GridCriterion, g: G, pick?: (f: Fact) => string): [number, string][] {
+  if (c.table?.length && pick) return c.table.map((r) => [r.score, pick(r.text)]);
   return (c.state === "declared" && g.declaredLevels[c.code]) || g.levels[c.code];
 }
+
+/**
+ * Le niveau d'expérience de la personne, « Junior · 1,1 an » (barème 0.5.0) : l'expérience ne
+ * se note plus, elle dit à quel niveau le reste se lit. null pour une grille d'avant.
+ */
+export function levelLabel(grid: Grid, lang: Lang): string | null {
+  return grid.seniority && weightsOf(grid).XP === 0 ? seniorityLabel(grid.seniority, lang) : null;
+}
+
+/** Ce critère donne le niveau et ne se note pas : l'expérience, depuis 0.5.0. */
+export const givesLevel = (c: GridCriterion, grid: Grid): boolean => c.code === "XP" && weightsOf(grid).XP === 0 && !!grid.seniority;
 
 /** L'indice du niveau atteint dans la table : la ligne la plus haute dont la note ne dépasse pas celle du critère. -1 sans note. */
 export function reachedRow(c: GridCriterion, table: [number, string][]): number {
@@ -176,7 +192,7 @@ export function rowText(c: GridCriterion, opts: { g: G; pick: PickFn; declared: 
     };
   }
   // Page partagée, pièce lue sur LinkedIn ou le CV : rien qui nomme une école ou un employeur.
-  const table = levelTable(c, g);
+  const table = levelTable(c, g, pick);
   const row = reachedRow(c, table);
   const level = row >= 0 ? table[row][1] : "";
   let safe: string;

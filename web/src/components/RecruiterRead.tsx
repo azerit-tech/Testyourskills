@@ -18,7 +18,7 @@ import { recruiterRead, tileOrder } from "../../../shared/recruiterLine";
 import type { CriterionCode, Grid, GridCriterion } from "../../../shared/types";
 import { declaredOf } from "../../../shared/types";
 import { pick, useT } from "../i18n";
-import { keptFrom, rowText } from "../lib/grid";
+import { keptFrom, levelLabel, rowText } from "../lib/grid";
 import { useAppConfig } from "../lib/season";
 import { useReducedMotion } from "../lib/util";
 import { Fold, type Shareable } from "./After";
@@ -65,7 +65,11 @@ export function RecruiterRead({ item, shared }: Props) {
   // Le métier et le langage viennent de la fiche du dossier (shared/caseFile.ts), la grille aussi.
   const card = item.kind === "card" ? item.card : fileOf(item.comparison);
   const read = recruiterRead(card, grid, lang);
-  const { scored, pending } = tileOrder(grid);
+  // L'expérience (0.5.0) ne se note plus : pas de tuile, une ligne courte qui dit le niveau.
+  const level = levelLabel(grid, lang);
+  const order = tileOrder(grid);
+  const scored = level ? order.scored.filter((c) => c.code !== "XP") : order.scored;
+  const pending = level ? order.pending.filter((c) => c.code !== "XP") : order.pending;
   const declared = item.kind === "card" && item.card.source === "github" ? "linkedin" : declaredOf(item.kind === "card" ? item.card : item.comparison);
   const chosen = open ? grid.criteria.find((c) => c.code === open) : undefined;
   const detail = chosen ? rowText(chosen, { g: t.grid, pick: (f) => pick(f, lang), declared, shared }).line : "";
@@ -136,6 +140,7 @@ export function RecruiterRead({ item, shared }: Props) {
   return (
     <Fold name="rr" title={t.grid.title}>
       {read && <p className="rr-line">{read.text}</p>}
+      {level && <p className="rr-pending-line rr-level">{R.level(level)}</p>}
       {scored.length > 0 && (
         <ul className="rr-tiles" aria-label={t.grid.criteriaLabel}>
           {scored.map(tile)}
