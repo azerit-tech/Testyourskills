@@ -6,6 +6,7 @@
 // la berline (une étiquette, une ligne), la plaque, le niveau et la ligne de
 // l'étoile refusée à l'arrêt sur image (son image en deux tons, toise comprise,
 // est tirée par freeze.ts), le score qui monte jusqu'à la note (§18.78), le
+// relevé des critères qui tombent un par un (§18.95), le
 // grain, la vignette et deux ombres d'encre. Tout
 // vient de hudAt : aucun état, aucune animation CSS qui dériverait de l'image.
 // Mat : aplats, ni halo ni ombre lumineuse.
@@ -99,6 +100,39 @@ function ScoreDigits({ n, className }: { n: number; className: string }) {
   );
 }
 
+/**
+ * Le relevé des critères (§18.95), à gauche sous le score : une étiquette (le nom court du critère, celui du dos de
+ * la fiche), puis sa note sur 10 qui claque et compte, ou son état sans chiffre. Toutes les lignes sont posées dès la
+ * première image, invisibles tant qu'elles ne sont pas tombées : le relevé ne bouge pas en se remplissant. Posé sur
+ * l'image, ou dans la marge d'encre de gauche (téléphone couché, Film.tsx).
+ */
+export function FilmDetail({ hud }: { hud: Hud }) {
+  if (!hud.detail.length) return null;
+  const w = Math.max(...hud.detail.map((r) => r.label.length));
+  return (
+    <ol className="film-detail" style={{ opacity: hud.bands, "--w": w } as CSSProperties} aria-hidden="true">
+      {hud.detail.map((r) => (
+        <li
+          key={r.code}
+          className={`film-detail-row${r.hit ? " is-hit" : ""}${r.out ? " is-out" : ""}${r.kind === "note" ? "" : " is-state"}`}
+          style={{ visibility: r.shown ? undefined : "hidden", "--enter": r.enter, "--slap": r.slap } as CSSProperties}
+        >
+          <small className="film-detail-name">{r.label}</small>
+          {r.kind === "note" ? (
+            <b className="film-detail-note">
+              <ScoreDigits n={r.value} className="film-detail-run" />
+              <ScoreDigits n={r.step} className="film-detail-step" />
+              <small>/10</small>
+            </b>
+          ) : (
+            <span className="film-detail-state">{r.state}</span>
+          )}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 export function FilmHud({ plan, hud, lang }: { plan: FilmPlan; hud: Hud; lang: Lang }) {
   const grain = grainTile();
   const stamp = hud.stamp;
@@ -156,6 +190,8 @@ export function FilmHud({ plan, hud, lang }: { plan: FilmPlan; hud: Hud; lang: L
           <path className="film-star-body" d={STAR} />
         </svg>
       )}
+
+      <FilmDetail hud={hud} />
 
       <FilmLine line={hud.line} />
 
