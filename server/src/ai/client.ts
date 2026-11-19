@@ -45,7 +45,7 @@ export interface ChatRequest {
     function: { name: string; description: string; parameters: Record<string, unknown>; strict?: boolean };
   }[];
   tool_choice?: { type: "function"; function: { name: string } };
-  provider?: { require_parameters?: boolean };
+  provider?: { require_parameters?: boolean; order?: string[] };
   reasoning?: { effort: "none" | "minimal" | "low" };
 }
 
@@ -59,6 +59,8 @@ export interface ChatResponse {
     error?: { code?: number | string; message?: string };
   }[];
   usage?: UsageLike;
+  /** Le fournisseur qui a répondu (OpenRouter route un même modèle vers plusieurs). */
+  provider?: string;
   error?: { code?: number | string; message?: string };
 }
 
@@ -232,6 +234,22 @@ export function issueKinds(issues: string[]): string {
   return [...new Set(issues.map(kind))].join(", ") || "inconnue";
 }
 
+/**
+ * Les fournisseurs à essayer d'abord, dans l'ordre (`AI_PROVIDER_ORDER`, noms
+ * OpenRouter séparés par des virgules, ex. `Azure,Google`). OpenRouter route un
+ * même modèle vers plusieurs fournisseurs qui ne répondent pas à la même vitesse
+ * (SPEC §18.89) ; les autres restent en repli si ceux-là sont en panne. Vide : le
+ * routage d'OpenRouter.
+ */
+function providerOrder(): { order?: string[] } {
+  const order = (process.env.AI_PROVIDER_ORDER ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => /^[\w .-]{1,40}$/.test(s))
+    .slice(0, 5);
+  return order.length ? { order } : {};
+}
+
 function buildRequest(call: StructuredCall<unknown>, userParts: ChatContentPart[], toolMode: boolean): ChatRequest {
   const body: ChatRequest = {
     model: call.model,
@@ -242,7 +260,7 @@ function buildRequest(call: StructuredCall<unknown>, userParts: ChatContentPart[
       { role: "user", content: userParts },
     ],
     // Ne router que vers un fournisseur qui respecte tous les paramètres (schéma compris).
-    provider: { require_parameters: true },
+    provider: { require_parameters: true, ...providerOrder() },
   };
   if (supportsTemperature(call.model)) body.temperature = 0;
   const reasoning = reasoningFor(call.model);
@@ -314,10 +332,11 @@ export async function callStructured<T>(call: StructuredCall<T>): Promise<T | nu
     let res: ChatResponse;
     const sentAt = performance.now();
     // Le chronométrage de la fiche (timing.ts) : modèle, tokens, durée. Jamais de contenu.
-    const timed = (usage: UsageLike | undefined, finish: string) =>
+    const timed = (usage: UsageLike | undefined, finish: string, provider?: unknown) =>
       noteAi({
         label: call.label,
         model: call.model,
+        ...(typeof provider === "string" && /^[\w .-]{1,40}$/.test(provider) ? { provider } : {}),
         ms: performance.now() - sentAt,
         inputTokens: usage?.prompt_tokens ?? 0,
         outputTokens: usage?.completion_tokens ?? 0,
@@ -358,7 +377,7 @@ export async function callStructured<T>(call: StructuredCall<T>): Promise<T | nu
       return null;
     }
 
-    timed(res.usage, res.choices?.[0]?.finish_reason ?? "error");
+    timed(res.usage, res.choices?.[0]?.finish_reason ?? "error", res.provider);
     if (res.usage) recordUsage(call.model, res.usage);
     else recordUsage(call.model, { prompt_tokens: 0, completion_tokens: 0 });
 

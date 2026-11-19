@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetBudgetForTests } from "./budget";
 import { callStructured, ChatHttpError, issueKinds, resetToolModeForTests, type StructuredCall } from "./client";
 import { fakeClient } from "./testing";
+import { Trace, withTrace } from "../timing";
 
 const call = (model: string, client: StructuredCall<unknown>["client"]): StructuredCall<{ ok: true }> => ({
   label: "essai",
@@ -61,6 +62,36 @@ describe("le raisonnement", () => {
     const { client, calls } = fakeClient([{ error: new ChatHttpError(400, "bad request") }]);
     expect(await callStructured(call("anthropic/claude-haiku-5.5", client))).toBeNull();
     expect(calls).toHaveLength(1);
+  });
+});
+
+describe("le fournisseur", () => {
+  afterEach(() => {
+    delete process.env.AI_PROVIDER_ORDER;
+  });
+
+  it("sans réglage : le routage d'OpenRouter, parmi ceux qui respectent le schéma", async () => {
+    const { client, calls } = fakeClient([{}]);
+    await callStructured(call("anthropic/claude-haiku-5.5", client));
+    expect(calls[0]!.body.provider).toEqual({ require_parameters: true });
+  });
+
+  it("AI_PROVIDER_ORDER : ces fournisseurs d'abord, dans l'ordre, les autres en repli", async () => {
+    process.env.AI_PROVIDER_ORDER = " Azure, Google ,, <script> ";
+    const { client, calls } = fakeClient([{}]);
+    await callStructured(call("anthropic/claude-haiku-5.5", client));
+    // Pas de `allow_fallbacks: false` : un fournisseur en panne ne ferme pas la lecture.
+    expect(calls[0]!.body.provider).toEqual({ require_parameters: true, order: ["Azure", "Google"] });
+  });
+
+  it("le fournisseur qui a répondu va au chronométrage de la fiche", async () => {
+    const { client } = fakeClient([{}]);
+    const complete = client.complete.bind(client);
+    const trace = new Trace();
+    await withTrace(trace, () =>
+      callStructured(call("anthropic/claude-haiku-5.5", { complete: async (body, o) => ({ ...(await complete(body, o)), provider: "Azure" }) })),
+    );
+    expect(trace.ai).toMatchObject([{ label: "essai", model: "anthropic/claude-haiku-5.5", provider: "Azure" }]);
   });
 });
 
