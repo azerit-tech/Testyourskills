@@ -102,12 +102,12 @@ describe("la ligne de la note finale", () => {
       const g = DICTS[lang].grid;
       expect(f.formula!.startsWith(`(${g.final.term(g.names.CODE, 8, "2")} + ${g.final.term(g.names.STK, 8, lang === "fr" ? "1,5" : "1.5")} + `)).toBe(true);
       expect(f.formula).toContain("÷");
-      expect(f.overall).toBe(79);
+      expect(f.overall).toBe(82);
       expect(f.rule).toBeNull();
       expect(all(f)).not.toMatch(BONUS);
     }
-    expect(finalLines(grid, FR, "fr").result).toBe(FR.final.result("7,93"));
-    expect(FR.final.result("7,93")).toContain("7,93 sur 10");
+    expect(finalLines(grid, FR, "fr").result).toBe(FR.final.result("8,15"));
+    expect(FR.final.result("8,15")).toContain("8,15 sur 10");
   });
 
   it("le plafond sans code prouvé est dit, avec la note avant plafond quand il a joué", () => {
@@ -175,7 +175,7 @@ describe("la page partagée : ni école ni ancien employeur", () => {
     const [edu, xp, emp] = rows(old, true);
     expect(edu.line.startsWith("École gardée pour la personne fichée.")).toBe(true);
     expect(xp.line).toContain("8,4 ans");
-    expect(emp.line).toBe(FR.levels.EMP.find(([n]) => n <= 8)![1]);
+    expect(emp.line).toBe(FR.levels.EMP.find(([n]) => n <= 6)![1]);
     for (const r of rows(old, true)) expect(text(r)).not.toMatch(NAMES);
   });
 

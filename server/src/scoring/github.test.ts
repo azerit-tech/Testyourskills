@@ -29,8 +29,9 @@ describe("barème GitHub sur un profil synthétique", () => {
     // La note globale est celle de la grille ; sans lecture IA, le code n'est pas prouvé (plafond 85).
     expect(card.overall).toBe(card.grid?.overall);
     expect(card.grid?.rule).toBe("capped_unproven");
-    expect(card.overall).toBe(58);
-    expect(card.tier).toBe("bronze");
+    // L'expérience estimée (4) ne pèse plus (barème 0.5.0) : 58 sous 0.4.0, 65.
+    expect(card.overall).toBe(65);
+    expect(card.tier).toBe("silver");
   });
 
   it("sans IA : TEC au repli, non suffisant, fiabilité 76", () => {

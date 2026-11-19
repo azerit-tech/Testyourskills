@@ -96,6 +96,24 @@ export interface Finding {
 export type CriterionCode = "EDU" | "XP" | "EMP" | "STK" | "CODE" | "ACT" | "OWN" | "OSS";
 export const CRITERION_CODES: CriterionCode[] = ["EDU", "XP", "EMP", "STK", "CODE", "ACT", "OWN", "OSS"];
 
+/**
+ * Le niveau d'expérience auquel le dossier est lu (barème 0.5.0, SPEC §18.82) : la note
+ * dit « quel niveau pour cette expérience », plus « combien d'années ». Moins d'un an
+ * compté, de 1 à 3 ans, de 3 à 6, de 6 à 10, 10 et plus (data/grid.json, `seniority`).
+ */
+export type SeniorityCode = "student" | "junior" | "mid" | "senior" | "expert";
+export const SENIORITY_CODES: SeniorityCode[] = ["student", "junior", "mid", "senior", "expert"];
+
+export interface GridSeniority {
+  code: SeniorityCode;
+  /** Mois comptés sur les postes datés (stage et alternance pour moitié) ; années actives × 12 quand GitHub estime. */
+  months: number;
+  /** linkedin : compté sur les postes datés (LinkedIn ou CV) ; github : estimé sur les années actives. */
+  source: "linkedin" | "github";
+  /** Des années affirmées, sans aucun poste daté. */
+  claimed?: boolean;
+}
+
 /** D'où vient une note ou une pièce : ce qui déclare (LinkedIn ou CV), ce qui prouve (GitHub), ou les deux recoupés. */
 export type GridSource = "linkedin" | "github" | "both";
 
@@ -146,6 +164,11 @@ export interface GridCriterion {
   flags: Fact[];
   /** La pièce : un fait précis et sa provenance, avec le lien public quand il existe. */
   evidence?: GridEvidence;
+  /**
+   * La table où la note a été lue, du plus haut au plus bas, quand elle dépend du niveau
+   * d'expérience (parcours, stack, ownership ; barème 0.5.0). Absente : la table commune du critère.
+   */
+  table?: { score: number; text: Fact }[];
   /** Page partagée (shared/publicView.ts) : la note est gardée pour la personne fichée (l'école hors moyenne). */
   private?: boolean;
 }
@@ -157,6 +180,10 @@ export interface Grid {
   overall: number;
   /** capped_unproven : aucun code prouvé (plafond 85) ; empty_file : moins d'un quart des coefficients noté (note 20). */
   rule?: "capped_unproven" | "empty_file";
+  /** Le niveau d'expérience auquel la grille a été lue (0.5.0). Absent : inconnu, ou grille d'avant. */
+  seniority?: GridSeniority;
+  /** Les coefficients qui ont fait la moyenne (0.5.0). Absents : ceux du barème 0.4.0. */
+  weights?: Record<CriterionCode, number>;
 }
 
 /** La peine (axe le plus faible) et la caution (le geste qui lèverait un chef d'accusation), §18.2. */

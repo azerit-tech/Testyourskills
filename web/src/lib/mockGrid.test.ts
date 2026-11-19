@@ -22,10 +22,13 @@ describe("les grilles de démo", () => {
     }
   });
 
-  it("les notes attendues : 44, 68, 79, 64, 64, 46, 20 ; 75 déclarée ; 83 pour le dossier", () => {
-    expect(KEYS.map((k) => githubGridMock(k, "dev")!.overall)).toEqual([44, 68, 79, 64, 64, 46, 20]);
-    expect(declaredGridMock("LinkedIn").overall).toBe(75);
-    expect(comparisonGridsMock("LinkedIn", "dev").grid.overall).toBe(83);
+  it("les notes attendues (barème 0.5.0) : 45, 65, 82, 70, 62, 30, 20 ; 66 déclarée ; 76 pour le dossier", () => {
+    expect(KEYS.map((k) => githubGridMock(k, "dev")!.overall)).toEqual([45, 65, 82, 70, 62, 30, 20]);
+    expect(declaredGridMock("LinkedIn").overall).toBe(66);
+    expect(comparisonGridsMock("LinkedIn", "dev").grid.overall).toBe(76);
+    // L'expérience ne pèse nulle part : elle garde sa lecture, hors moyenne ; le dossier porte le niveau de ses postes datés.
+    for (const [k, g] of ALL) expect(g.criteria.find((c) => c.code === "XP")!.counted, k).toBe(false);
+    expect(comparisonGridsMock("LinkedIn", "dev").grid.seniority).toEqual({ code: "senior", months: 101, source: "linkedin" });
   });
 
   it("couvrent les quatre états, le plafond et le dossier vide", () => {

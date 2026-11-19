@@ -162,18 +162,18 @@ describe("CvRole.kind → Expérience, rattaché au poste du profil par l'entrep
 });
 
 describe("CvRole.employer_type → Parcours", () => {
-  it("un an dans une startup de produit ouvre le 6 ; sans le type d'employeur, 4", () => {
+  it("au niveau « Junior », un an dans une startup de produit ouvre le 8 ; sans le type d'employeur, 6 (l'entreprise fondée)", () => {
     const item = itemDeux();
     editItem(item, "Sejo", { position: "Product Manager", endDate: { month: "Sep", year: 2025, text: "Sep 2025" } });
     const { profile, text } = collected(item);
     const raw = rawDeux();
     editReading(raw, "Sejo", { title: "Product Manager", end: "2025-09" });
     const emp = crit(input(profile, read(raw, text)), "EMP");
-    expect(emp.score).toBe(6);
-    expect(emp.reached.fr).toBe("12 mois dans une startup de produit : Sejo.");
+    expect(emp.score).toBe(8);
+    expect(emp.reached.fr.replace(/\u00a0/g, " ")).toBe("12 mois dans une équipe produit exigeante : Sejo.");
 
     editReading(raw, "Sejo", { employer_type: undefined });
-    expect(crit(input(profile, read(raw, text)), "EMP").score).toBe(4);
+    expect(crit(input(profile, read(raw, text)), "EMP").score).toBe(6);
   });
 });
 
@@ -256,12 +256,12 @@ describe("les deux profils d'exemple, du fournisseur à la note de la fiche Link
     return scoreCv(read(raw, text), cvCounts(), { lang: "fr", judgedInSeconds: 6, linkedin: declaredLinkedin(profile), now: FOUNDERS_NOW });
   };
 
-  it("exemple un : 41 ; exemple deux : 45 (docs/bareme-recrutement.md §7)", () => {
+  it("exemple un : 60 ; exemple deux : 66 (docs/bareme-recrutement.md §7 ; 41 et 45 sous 0.4.0)", () => {
     const un = card(itemUn(), rawUn());
     expect(un.grid!.criteria.find((c) => c.code === "XP")!.evidence!.text.fr).toBe(
       "1,1 an compté, poste par poste. 13 mois de stage ou d'alternance comptés pour moitié. 7 mois à la tête d'Azerit. Centrale Méditerranée Finance est une association : non compté.",
     );
-    expect(un.overall).toBe(41);
-    expect(card(itemDeux(), rawDeux()).overall).toBe(45);
+    expect(un.overall).toBe(60);
+    expect(card(itemDeux(), rawDeux()).overall).toBe(66);
   });
 });

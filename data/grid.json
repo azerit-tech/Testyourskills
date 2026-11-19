@@ -1,11 +1,25 @@
 {
-  "_doc": "Barème de recrutement (docs/bareme-recrutement.md §3 et §4, SPEC §18.37). Chaque critère est une note entière sur 10 lue dans sa table : le niveau le plus haut dont toute la ligne est remplie, sans base, sans ajout, sans retrait. Les lignes de chaque table vont du niveau le plus haut au plus bas. Changer un seuil ou un coefficient = une ligne ici, et la version de data/scoring.json.",
+  "_doc": "Barème de recrutement (docs/bareme-recrutement.md §3 et §4, SPEC §18.37 et §18.82). Depuis 0.5.0 la note dit « quel niveau pour cette expérience » : les années comptées donnent le niveau d'expérience (seniority) et sortent de la moyenne (coefficient 0), et le parcours se lit dans la table de ce niveau. Chaque critère est une note entière sur 10 lue dans sa table : le niveau le plus haut dont toute la ligne est remplie, sans base, sans ajout, sans retrait. Les lignes de chaque table vont du niveau le plus haut au plus bas. Changer un seuil ou un coefficient = une ligne ici, et la version de data/scoring.json.",
 
-  "weights": { "EDU": 1, "XP": 1.5, "EMP": 1.5, "STK": 1.5, "CODE": 2, "ACT": 1, "OWN": 1, "OSS": 0.5 },
+  "weights": { "EDU": 1, "XP": 0, "EMP": 2.5, "STK": 1.5, "CODE": 2, "ACT": 1, "OWN": 1.5, "OSS": 0.5 },
+
+  "seniority": {
+    "_doc": "Le niveau d'expérience auquel le dossier est lu (SPEC §18.82) : les mois comptés sur les postes datés (stage et alternance pour moitié, XP.share), du plus haut au plus bas. Sans LinkedIn ni CV : les années actives de GitHub × 12, « estimé ». Inconnu (aucun poste daté, aucune année active) : les tables du niveau `default`, et aucun niveau affiché.",
+    "levels": [
+      { "code": "expert", "months": 120 },
+      { "code": "senior", "months": 72 },
+      { "code": "mid", "months": 36 },
+      { "code": "junior", "months": 12 },
+      { "code": "student", "months": 0 }
+    ],
+    "default": "junior"
+  },
 
   "final": {
     "_doc": "Quatre règles (§4) : non prouvé ou non renseigné sort de la moyenne ; neverLower n'entre que s'il est au-dessus de la moyenne des autres ; plafond sans code prouvé ; dossier vide sous emptyBelowShare des coefficients notés.",
     "neverLower": ["EDU", "OSS"],
+    "_declaredDoc": "0.5.0 : une stack ou un ownership seulement déclarés (LinkedIn ou CV, sans preuve GitHub) suivent la même règle que l'école : ils n'entrent dans la moyenne que s'ils la font monter. Décrire ses technos ne peut plus faire baisser une note.",
+    "declaredNeverLower": true,
     "capUnproven": 85,
     "emptyBelowShare": 0.25,
     "emptyScore": 20,
@@ -57,16 +71,52 @@
   },
 
   "EMP": {
-    "_doc": "Parcours, sur LinkedIn ou le CV seulement. Mois par employeur (postes du même employeur réunis). Un « vrai poste » est un poste hors stage, alternance et association.",
+    "_doc": "Parcours, sur LinkedIn ou le CV seulement, lu dans la table du niveau d'expérience (0.5.0) : un stage dans une équipe exigeante est en haut de la table d'un début de carrière, dix ans sans progression en bas de celle d'un expert. Mois par employeur (postes du même employeur réunis). Un « vrai poste » est un poste hors stage, alternance et association.",
     "founderPattern": "\\b(co-?)?(founder|founding|fondat(eur|rice)|cofondat(eur|rice)|createur|creatrice|cofounder)\\b",
     "productTypes": ["startup", "scaleup"],
-    "levels": [
-      { "score": 10, "highBarMonths": 24, "needsRiseOrTeam": true },
-      { "score": 8, "productMonths": 24, "foundedMonths": 36 },
-      { "score": 6, "roleMonths": 24, "productStartupMonths": 12, "foundedMonths": 12 },
-      { "score": 4, "anyRealRole": true, "internships": 2 },
-      { "score": 2, "anyInternship": true, "anyRoleMonthsBelow": 6 }
-    ],
+    "_tablesDoc": "Une table par niveau d'expérience. Chaque ligne s'ouvre par l'une de ses conditions (any) ; on obtient la plus haute ligne ouverte. role : un vrai poste (hors stage) chez un même employeur, months tenus ; at product : startup ou scale-up (lu par l'IA) ou employeur de la liste à forte barre ; at highBar : la liste seule. founded : une entreprise fondée, months tenus. internship : un stage ou une alternance chez un même employeur. internships : count stages ou alternances, ou months cumulés. riseOrTeam : deux intitulés datés qui progressent, ou une équipe encadrée avec un fait cité.",
+    "tables": {
+      "student": [
+        { "score": 10, "any": [{ "what": "internship", "at": "highBar", "months": 4 }, { "what": "role", "at": "highBar", "months": 6 }] },
+        { "score": 8, "any": [{ "what": "internships", "at": "product", "count": 2 }, { "what": "role", "at": "product", "months": 6 }, { "what": "founded", "months": 6 }] },
+        { "score": 7, "any": [{ "what": "internship", "at": "product", "months": 4 }, { "what": "internships", "months": 12 }] },
+        { "score": 6, "any": [{ "what": "internships", "count": 2 }, { "what": "role" }, { "what": "founded" }] },
+        { "score": 5, "any": [{ "what": "internship", "months": 4 }] },
+        { "score": 3, "any": [{ "what": "internship" }] }
+      ],
+      "junior": [
+        { "score": 10, "any": [{ "what": "role", "at": "highBar", "months": 12 }] },
+        { "score": 8, "any": [{ "what": "role", "at": "product", "months": 12 }, { "what": "founded", "months": 12 }] },
+        { "score": 6, "any": [{ "what": "role", "at": "product", "months": 6 }, { "what": "founded", "months": 6 }, { "what": "role", "months": 24 }] },
+        { "score": 5, "any": [{ "what": "role", "months": 12 }] },
+        { "score": 4, "any": [{ "what": "role" }, { "what": "founded" }] },
+        { "score": 3, "any": [{ "what": "internship" }] }
+      ],
+      "mid": [
+        { "score": 10, "any": [{ "what": "role", "at": "highBar", "months": 24, "riseOrTeam": true }] },
+        { "score": 8, "any": [{ "what": "role", "at": "product", "months": 24 }, { "what": "founded", "months": 36 }] },
+        { "score": 6, "any": [{ "what": "role", "at": "product", "months": 12 }, { "what": "founded", "months": 12 }, { "what": "role", "months": 24, "riseOrTeam": true }] },
+        { "score": 5, "any": [{ "what": "role", "months": 24 }] },
+        { "score": 4, "any": [{ "what": "role" }, { "what": "founded" }] },
+        { "score": 2, "any": [{ "what": "internship" }] }
+      ],
+      "senior": [
+        { "score": 10, "any": [{ "what": "role", "at": "highBar", "months": 36, "riseOrTeam": true }] },
+        { "score": 8, "any": [{ "what": "role", "at": "product", "months": 36, "riseOrTeam": true }, { "what": "founded", "months": 48 }] },
+        { "score": 6, "any": [{ "what": "role", "at": "product", "months": 36 }, { "what": "founded", "months": 24 }, { "what": "role", "months": 36, "riseOrTeam": true }] },
+        { "score": 5, "any": [{ "what": "role", "months": 36 }] },
+        { "score": 4, "any": [{ "what": "role" }, { "what": "founded" }] },
+        { "score": 2, "any": [{ "what": "internship" }] }
+      ],
+      "expert": [
+        { "score": 10, "any": [{ "what": "role", "at": "highBar", "months": 48, "riseAndTeam": true }] },
+        { "score": 8, "any": [{ "what": "role", "at": "product", "months": 48, "riseOrTeam": true }, { "what": "founded", "months": 60 }] },
+        { "score": 6, "any": [{ "what": "role", "at": "product", "months": 48 }, { "what": "founded", "months": 36 }, { "what": "role", "months": 48, "riseOrTeam": true }] },
+        { "score": 5, "any": [{ "what": "role", "months": 48 }] },
+        { "score": 4, "any": [{ "what": "role" }, { "what": "founded" }] },
+        { "score": 2, "any": [{ "what": "internship" }] }
+      ]
+    },
     "rankPatterns": [
       { "rank": 5, "pattern": "\\b(head|director|directeur|directrice|vp|vice president|cto|ceo|chief|manager|responsable)\\b" },
       { "rank": 4, "pattern": "\\b(lead|staff|principal|tech lead|architect|architecte)\\b" },

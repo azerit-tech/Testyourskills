@@ -8,7 +8,7 @@ import sentencesJson from "../../../data/sentences.json";
 import gridJson from "../../../data/grid.json";
 import type { RoleKind as CvRoleKind, SchoolTier, SelectionKind } from "../../../shared/readings";
 import type { ContractType } from "../linkedinProfile/profile";
-import type { CriterionCode, Fact, Position, StatCode, StatusTone } from "../../../shared/types";
+import type { CriterionCode, Fact, Position, SeniorityCode, StatCode, StatusTone } from "../../../shared/types";
 
 export type Scale = [number, number][];
 
@@ -158,10 +158,31 @@ export interface SentencesConfig {
 /** Comment un poste compte dans l'expérience (§3.2) : en plein, à moitié, pour rien (association, bénévolat), pour rien (projet personnel). */
 export type GridRoleKind = "full" | "internship" | "association" | "project";
 
+/**
+ * Une condition d'une ligne de la table du parcours (0.5.0). role : un vrai poste chez un
+ * même employeur ; founded : une entreprise fondée ; internship : un stage ou une alternance
+ * chez un même employeur ; internships : `count` stages, ou `months` cumulés. `at` : équipe
+ * produit (startup, scale-up, ou liste à forte barre) ou liste à forte barre seule.
+ */
+export interface EmpCondition {
+  what: "role" | "founded" | "internship" | "internships";
+  at?: "product" | "highBar";
+  months?: number;
+  count?: number;
+  riseOrTeam?: boolean;
+  riseAndTeam?: boolean;
+}
+export interface EmpRow {
+  score: number;
+  any: EmpCondition[];
+}
+
 /** Barème de recrutement (data/grid.json) : tables de niveaux, coefficients, familles, traces. */
 export interface GridConfig {
   weights: Record<CriterionCode, number>;
-  final: { neverLower: CriterionCode[]; capUnproven: number; emptyBelowShare: number; emptyScore: number; bounds: { min: number; max: number } };
+  /** Le niveau d'expérience auquel le dossier est lu : seuils en mois comptés, du plus haut au plus bas. */
+  seniority: { levels: { code: SeniorityCode; months: number }[]; default: SeniorityCode };
+  final: { neverLower: CriterionCode[]; declaredNeverLower: boolean; capUnproven: number; emptyBelowShare: number; emptyScore: number; bounds: { min: number; max: number } };
   thinGithub: { minRepos: number; repoCommits: number };
   EDU: { tiers: Record<Exclude<SchoolTier, "none">, number>; selection: Record<SelectionKind, number>; githubPattern: string; githubScore: number };
   XP: {
@@ -184,19 +205,8 @@ export interface GridConfig {
   EMP: {
     founderPattern: string;
     productTypes: string[];
-    levels: {
-      score: number;
-      highBarMonths?: number;
-      needsRiseOrTeam?: boolean;
-      productMonths?: number;
-      foundedMonths?: number;
-      roleMonths?: number;
-      productStartupMonths?: number;
-      anyRealRole?: boolean;
-      internships?: number;
-      anyInternship?: boolean;
-      anyRoleMonthsBelow?: number;
-    }[];
+    /** Une table par niveau d'expérience, du plus haut au plus bas : la plus haute ligne dont une condition est remplie. */
+    tables: Record<SeniorityCode, EmpRow[]>;
     rankPatterns: { rank: number; pattern: string }[];
     defaultRank: number;
   };

@@ -13,16 +13,17 @@
 // Les chefs d'accusation (`flags`) ne touchent jamais une note.
 
 import type { CodeReadingResult, CvReading, EmployerType, RoleKind as CvRoleKind, SelectionKind } from "../../../shared/readings";
-import { CRITERION_CODES, type CriterionCode, type Fact, type Grid, type GridCriterion, type GridSource } from "../../../shared/types";
+import { CRITERION_CODES, type CriterionCode, type Fact, type Grid, type GridCriterion, type GridSeniority, type GridSource, type SeniorityCode } from "../../../shared/types";
 import type { ExternalMergedPR, GithubFacts, GithubRepo } from "../github/facts";
 import type { LinkedinRole } from "../linkedinProfile/profile";
 import { df, nf } from "./common";
-import { GRID, type GridRoleKind } from "./config";
+import { GRID, type EmpCondition, type GridRoleKind } from "./config";
 import { isTutorialRepo, type GithubMetrics } from "./derive";
 import { highBarEmployer, type HighBarList } from "./employers";
 import { normSchool, rankedSchools, schoolListNames, schoolTier, type RankedSchoolList } from "./school";
 import { EDU_NEXT, EDU_NEXT_GITHUB, SCHOOL_COUNTED, schoolCounted } from "../../../shared/schoolRank";
 import { frTypo } from "../../../shared/typo";
+import { SENIORITY_TEXT } from "../../../shared/gridText";
 
 const DAY = 86_400_000;
 const YEAR = 365.25 * DAY;
@@ -334,6 +335,46 @@ function unionMonths(infos: RoleInfo[]): number {
 
 const levelFor = (y: number) => GRID.XP.levels.find((l) => y >= l.years) ?? GRID.XP.levels[GRID.XP.levels.length - 1];
 
+// --- Le niveau d'expérience (0.5.0, SPEC §18.82) ------------------------------------
+//
+// La note dit « quel niveau pour cette expérience » : les mois comptés ne sont plus
+// une note dans la moyenne, ils donnent le niveau auquel le dossier est lu, et les
+// critères qui récompensaient l'ancienneté se lisent dans la table de ce niveau.
+
+/** Le niveau pour ce nombre de mois comptés (data/grid.json, `seniority`). */
+export function seniorityOf(months: number): SeniorityCode {
+  const L = GRID.seniority.levels;
+  return (L.find((l) => months >= l.months) ?? L[L.length - 1]).code;
+}
+
+/** LinkedIn ou CV : les mois comptés sur les postes datés ; sans aucun poste daté, les années affirmées. Rien des deux : inconnu. */
+export function declaredSeniority(d: Pick<DeclaredInput, "roles" | "now" | "reading">): GridSeniority | undefined {
+  const infos = analyzeRoles(d.roles, d.now);
+  if (infos.some((r) => r.start !== null)) {
+    const months = countedMonths(infos);
+    return { code: seniorityOf(months), months, source: "linkedin" };
+  }
+  const claimed = d.reading.years_declared;
+  if (claimed > 0) return { code: seniorityOf(claimed * 12), months: Math.round(claimed * 12), source: "linkedin", claimed: true };
+  return undefined;
+}
+
+/** GitHub seul : les années actives (douze mois avec 50 contributions ou plus) × 12, « estimé ». GitHub trop mince ou sans année active : inconnu. */
+export function githubSeniority(g: Pick<GithubInput, "facts" | "m">): GridSeniority | undefined {
+  const byYear = g.facts.activityByYear;
+  if (!byYear || thinGithub(g.m)) return undefined;
+  const active = byYear.filter((y) => y.contributions >= GRID.XP.githubActiveYearContributions).length;
+  return active ? { code: seniorityOf(active * 12), months: active * 12, source: "github" } : undefined;
+}
+
+/** La table à lire : celle du niveau, ou celle du niveau par défaut quand il est inconnu. */
+const tableOf = (s: GridSeniority | undefined): SeniorityCode => s?.code ?? GRID.seniority.default;
+/** « niveau « Junior » (de 1 à 3 ans) ». */
+const levelName = (s: GridSeniority): Fact => {
+  const t = SENIORITY_TEXT[s.code];
+  return f(`niveau « ${t.name.fr} » (${t.range.fr})`, `“${t.name.en}” level (${t.range.en})`);
+};
+
 // --- EDU : école et sélection ------------------------------------------------------
 
 interface Signal {
@@ -417,6 +458,7 @@ export function xpDeclared(d: DeclaredInput): Draft {
   const total = countedMonths(infos);
   const proof = d.url ? { proof: d.url } : {};
   const src = d.label;
+  const seniority = declaredSeniority(d);
 
   // Senior à confirmer : l'intitulé d'un poste en cours (ou du plus récent) dit senior, lead, staff ou head, avec moins de 4 ans comptés.
   const flagsFor = (y: number): Fact[] => {
@@ -433,17 +475,18 @@ export function xpDeclared(d: DeclaredInput): Draft {
     if (claimed > 0) {
       const lvl = levelFor(claimed);
       const score = Math.min(lvl.score, GRID.XP.claimedCap);
+      const level = levelName(seniority!);
       return crit("XP", {
         score,
         state: "declared",
         source: "linkedin",
-        reached: f(`${years(claimed).fr} affirmés, sans aucun poste daté : table arrêtée à ${GRID.XP.claimedCap}.`, `${years(claimed).en} claimed, no dated role: table stops at ${GRID.XP.claimedCap}.`),
-        next: f(`Pour aller plus haut : des postes datés sur ${src}.`, `To go higher: dated roles on ${src}.`),
+        reached: f(`${years(claimed).fr} affirmés, sans aucun poste daté : ${level.fr}, à confirmer.`, `${years(claimed).en} claimed, no dated role: ${level.en}, to confirm.`),
+        next: f(`Pour confirmer le niveau : des postes datés sur ${src}.`, `To confirm the level: dated roles on ${src}.`),
         flags: flagsFor(claimed),
         evidence: { text: f(`${src}, années affirmées.`, `${src}, years claimed.`), publicText: f(`${src}, années affirmées.`, `${src}, years claimed.`), source: "linkedin", ...proof },
       });
     }
-    return missing("XP", "linkedin", f("Aucun poste daté.", "No dated role."), f(`Pour 2 : un premier poste daté sur ${src}.`, `For 2: a first dated role on ${src}.`));
+    return missing("XP", "linkedin", f("Aucun poste daté.", "No dated role."), f(`Pour donner le niveau : un premier poste daté sur ${src}.`, `To set the level: a first dated role on ${src}.`));
   }
   if (total <= 0) {
     const a = infos.find((r) => r.kind === "association");
@@ -456,13 +499,13 @@ export function xpDeclared(d: DeclaredInput): Draft {
         : p
           ? f(`Aucun mois compté : ${projectFact(p).fr}`, `No month counted: ${projectFact(p).en}`)
           : f("Aucun mois compté sur les postes datés.", "No month counted on the dated roles."),
-      f("Pour 2 : un premier poste ou un stage daté.", "For 2: a first dated job or internship."),
+      f("Pour donner le niveau : un premier poste ou un stage daté.", "To set the level: a first dated job or internship."),
     );
   }
 
   const y = total / 12;
   const lvl = levelFor(y);
-  const nextLvl = [...GRID.XP.levels].reverse().find((l) => l.score > lvl.score);
+  const level = levelName(seniority!);
   // La pièce : le total d'abord (le dos de la fiche n'en montre que la première phrase),
   // puis stages à moitié, postes, associations non comptées. Chaque morceau a sa
   // version sans nom, pour la page partagée (même ordre, mêmes chiffres).
@@ -492,10 +535,7 @@ export function xpDeclared(d: DeclaredInput): Draft {
     score: lvl.score,
     state: "scored",
     source: "linkedin",
-    reached: f(`${years(y).fr} ${counted(y)} sur les postes datés : le palier « ${lvl.years ? years(lvl.years).fr : "moins d'un an"} ».`, `${years(y).en} counted on the dated roles: the “${lvl.years ? years(lvl.years).en : "under a year"}” step.`),
-    ...(nextLvl
-      ? { next: f(`Pour ${nextLvl.score} : ${years(nextLvl.years).fr} ${counted(nextLvl.years)}. Tu en as ${df(y, "fr")}.`, `For ${nextLvl.score}: ${years(nextLvl.years).en} counted. You have ${df(y, "en")}.`) }
-      : {}),
+    reached: f(`${years(y).fr} ${counted(y)} sur les postes datés : ${level.fr}.`, `${years(y).en} counted on the dated roles: ${level.en}.`),
     flags: flagsFor(y),
     evidence: { text: join(parts), publicText: join(publicParts), source: "linkedin", ...proof },
   });
@@ -516,19 +556,17 @@ export function xpGithub(g: GithubInput): Draft {
     );
   const lvl = levelFor(active);
   const score = Math.min(lvl.score, GRID.XP.githubCap);
-  const nextLvl = score < GRID.XP.githubCap ? [...GRID.XP.levels].reverse().find((l) => l.score > score) : undefined;
+  const level = levelName({ code: seniorityOf(active * 12), months: active * 12, source: "github" });
   const yrs = f(`${active} année${active > 1 ? "s" : ""} active${active > 1 ? "s" : ""}`, `${active} active year${active > 1 ? "s" : ""}`);
   return crit("XP", {
     score,
     state: "scored",
     source: "github",
     reached: f(
-      `Estimée : ${yrs.fr} sur GitHub (${min} contributions ou plus sur douze mois), table arrêtée à ${GRID.XP.githubCap}.`,
-      `Estimated: ${yrs.en} on GitHub (${min}+ contributions over twelve months), table stops at ${GRID.XP.githubCap}.`,
+      `Estimée : ${yrs.fr} sur GitHub (${min} contributions ou plus sur douze mois), ${level.fr}.`,
+      `Estimated: ${yrs.en} on GitHub (${min}+ contributions over twelve months), ${level.en}.`,
     ),
-    next: nextLvl
-      ? f(`Pour ${nextLvl.score} : ${nextLvl.years} années actives. Tu en as ${active}. Ou des postes datés sur LinkedIn.`, `For ${nextLvl.score}: ${nextLvl.years} active years. You have ${active}. Or dated roles on LinkedIn.`)
-      : f("Pour aller plus haut : des postes datés sur LinkedIn.", "To go higher: dated roles on LinkedIn."),
+    next: f("Pour le niveau exact : des postes datés sur LinkedIn.", "For the exact level: dated roles on LinkedIn."),
     evidence: { text: f(`${yrs.fr}, d'après le calendrier de contributions.`, `${yrs.en}, going by the contribution calendar.`), source: "github", proof: profileUrl(facts.login) },
   });
 }
@@ -556,118 +594,169 @@ const roleWhen = (r: RoleInfo): Fact =>
     ? f(`depuis ${monthName(r.start!).fr}`, `since ${monthName(r.start!).en}`)
     : f(`${monthName(r.start!).fr} – ${monthName(r.end!).fr}`, `${monthName(r.start!).en} – ${monthName(r.end!).en}`);
 
-export function empDeclared(d: DeclaredInput): Draft {
+/** « un an », « 2 ans », « 6 mois » : une durée de table. */
+const span = (m: number): Fact => (m % 12 ? months(m) : m === 12 ? f("un an", "a year") : f(`${m / 12} ans`, `${m / 12} years`));
+const capFirst = (x: Fact): Fact => ({ fr: x.fr.charAt(0).toUpperCase() + x.fr.slice(1), en: x.en.charAt(0).toUpperCase() + x.en.slice(1) });
+
+/** Une condition de la table du parcours, en clair : « un an dans une équipe produit exigeante (startup, scale-up) ». */
+function empConditionText(c: EmpCondition): Fact {
+  const at =
+    c.at === "highBar"
+      ? f(" chez un employeur à forte barre d'embauche", " at a high-bar employer")
+      : c.at === "product"
+        ? f(" dans une équipe produit exigeante (startup, scale-up)", " in a demanding product team (startup, scale-up)")
+        : f("", "");
+  const more = c.riseAndTeam
+    ? f(", avec une trajectoire qui monte et une équipe encadrée", ", with a rising path and a team led")
+    : c.riseOrTeam
+      ? f(", avec une trajectoire qui monte ou une équipe encadrée", ", with a rising path or a team led")
+      : f("", "");
+  const m = c.months ?? 0;
+  switch (c.what) {
+    case "founded":
+      return m ? f(`une entreprise fondée tenue ${span(m).fr}`, `a company founded and run for ${span(m).en}`) : f("une entreprise fondée", "a company founded");
+    case "internship":
+      return m
+        ? f(`un stage ou une alternance de ${m} mois ou plus${at.fr}`, `an internship or apprenticeship of ${m} months or more${at.en}`)
+        : f(`un stage ou une alternance${at.fr}`, `an internship or apprenticeship${at.en}`);
+    case "internships": {
+      const ats = c.at === "highBar" ? f(" chez des employeurs à forte barre d'embauche", " at high-bar employers") : c.at === "product" ? f(" dans des équipes produit exigeantes", " in demanding product teams") : f("", "");
+      return c.count
+        ? f(`${c.count} stages ou alternances${ats.fr}`, `${c.count} internships or apprenticeships${ats.en}`)
+        : f(`${m} mois de stage ou d'alternance cumulés${ats.fr}`, `${m} months of internships or apprenticeships in total${ats.en}`);
+    }
+    default:
+      if (c.at) return m ? f(`${span(m).fr}${at.fr}${more.fr}`, `${span(m).en}${at.en}${more.en}`) : f(`un poste${at.fr}${more.fr}`, `a role${at.en}${more.en}`);
+      return m ? f(`un poste tenu ${span(m).fr}${more.fr}`, `a role held for ${span(m).en}${more.en}`) : f("un vrai poste, hors stage", "a real role, not an internship");
+  }
+}
+/** Une ligne de la table : ses conditions, « , ou » entre elles. */
+const empRowText = (row: { any: EmpCondition[] }): Fact => {
+  const parts = row.any.map(empConditionText);
+  return f(parts.map((p) => p.fr).join(", ou "), parts.map((p) => p.en).join(", or "));
+};
+
+/** La table du parcours pour ce niveau, telle que la grille la porte (du plus haut au plus bas). */
+export function empTable(code: SeniorityCode): { score: number; text: Fact }[] {
+  return GRID.EMP.tables[code].map((row) => {
+    const t = capFirst(empRowText(row));
+    return { score: row.score, text: f(`${t.fr}.`, `${t.en}.`) };
+  });
+}
+
+/**
+ * Le parcours, lu dans la table du niveau d'expérience (0.5.0) : un stage dans une
+ * équipe exigeante est en haut de la table d'un début de carrière, dix ans sans
+ * progression en bas de celle d'un expert. La plus haute ligne dont une condition
+ * est remplie donne la note.
+ */
+export function empDeclared(d: DeclaredInput, seniority: GridSeniority | undefined = declaredSeniority(d)): Draft {
   const src = d.label;
   const proof = d.url ? { proof: d.url } : {};
   // Une association, un bénévolat ou un projet personnel ne sont pas des postes.
   const infos = analyzeRoles(d.roles, d.now).filter((r) => r.kind === "full" || r.kind === "internship");
-  if (!infos.length) return missing("EMP", "linkedin", f("Aucun poste.", "No role."), f("Pour 2 : un premier poste ou un stage.", "For 2: a first job or internship."));
-  const L = GRID.EMP.levels;
-  const lv = (s: number) => L.find((x) => x.score === s)!;
+  const level = tableOf(seniority);
+  const rows = GRID.EMP.tables[level];
+  const table = empTable(level);
+  const lowest = rows[rows.length - 1];
+  if (!infos.length)
+    return {
+      ...missing("EMP", "linkedin", f("Aucun poste.", "No role."), f(`Pour ${lowest.score} : ${empRowText(lowest).fr}.`, `For ${lowest.score}: ${empRowText(lowest).en}.`)),
+      table,
+    };
   const highBar = d.highBar ?? NO_HIGH_BAR;
   const product = new Set(GRID.EMP.productTypes);
 
-  // Mois par employeur, postes hors stage réunis.
+  // Mois par employeur : les vrais postes d'un côté, les stages et alternances de l'autre.
   interface Emp {
     name: string;
     months: number;
     founder: boolean;
-    /** Un poste de l'employeur est en cours. */
-    current: boolean;
     product: boolean;
-    startup: boolean;
     highBar: boolean;
   }
+  const group = (rs: RoleInfo[]): Emp[] => {
+    const byKey = new Map<string, RoleInfo[]>();
+    for (const r of rs) byKey.set(r.companyKey, [...(byKey.get(r.companyKey) ?? []), r]);
+    return [...byKey.values()].map((g) => {
+      const type = g.find((r) => r.employerType)?.employerType ?? "";
+      const hb = highBarEmployer(g[0].role.company, highBar) !== null;
+      return { name: g[0].role.company || g[0].role.title, months: unionMonths(g), founder: g.some((r) => r.founder), product: product.has(type) || hb, highBar: hb };
+    });
+  };
   const fullRoles = infos.filter((r) => r.kind === "full");
-  const byKey = new Map<string, RoleInfo[]>();
-  for (const r of fullRoles) byKey.set(r.companyKey, [...(byKey.get(r.companyKey) ?? []), r]);
-  const emps: Emp[] = [...byKey.values()].map((rs) => {
-    const type = rs.find((r) => r.employerType)?.employerType ?? "";
-    const hb = highBarEmployer(rs[0].role.company, highBar) !== null;
-    return {
-      name: rs[0].role.company || rs[0].role.title,
-      months: unionMonths(rs),
-      founder: rs.some((r) => r.founder),
-      current: rs.some((r) => r.role.end === null && r.start !== null),
-      startup: product.has(type),
-      product: product.has(type) || hb,
-      highBar: hb,
-    };
-  });
-  const top = (xs: Emp[]) => xs.reduce<Emp | null>((b, e) => (!b || e.months > b.months ? e : b), null);
-  const founded = emps.filter((e) => e.founder);
-  const bestFounded = top(founded);
-  const currentFounded = top(founded.filter((e) => e.current));
-  const bestFull = top(emps);
-  const bestHigh = top(emps.filter((e) => e.highBar));
-  const bestProduct = top(emps.filter((e) => e.product));
-  const bestStartup = top(emps.filter((e) => e.startup));
   const interns = infos.filter((r) => r.kind === "internship");
+  const emps = group(fullRoles);
+  const internEmps = group(interns);
+  const top = (xs: Emp[]) => xs.reduce<Emp | null>((b, e) => (!b || e.months > b.months ? e : b), null);
+  const at = (xs: Emp[], where: EmpCondition["at"]) => (where === "highBar" ? xs.filter((e) => e.highBar) : where === "product" ? xs.filter((e) => e.product) : xs);
   const datedFull = fullRoles.filter((r) => r.start !== null).sort((a, b) => a.start! - b.start!);
   const rise = datedFull.some((a, i) => datedFull.slice(i + 1).some((b) => b.start! > a.start! && titleRank(b.role.title) > titleRank(a.role.title)));
   const team = managementQuote(d.reading);
+  const held = (e: Emp) => (e.months ? duration(e.months) : null);
 
-  let score: number;
-  let reached: Fact;
-  if (bestHigh && bestHigh.months >= lv(10).highBarMonths! && (rise || team)) {
-    score = 10;
-    reached = f(
-      `${duration(bestHigh.months).fr} chez ${bestHigh.name}, employeur à forte barre d'embauche, et ${rise ? "une trajectoire qui monte" : "une équipe encadrée"}.`,
-      `${duration(bestHigh.months).en} at ${bestHigh.name}, a high-bar employer, and ${rise ? "a rising path" : "a team led"}.`,
-    );
-  } else if (bestProduct && bestProduct.months >= lv(8).productMonths!) {
-    score = 8;
-    reached = f(`${duration(bestProduct.months).fr} dans une équipe produit exigeante : ${bestProduct.name}.`, `${duration(bestProduct.months).en} in a demanding product team: ${bestProduct.name}.`);
-  } else if (bestFounded && bestFounded.months >= lv(8).foundedMonths!) {
-    score = 8;
-    reached = f(`${bestFounded.name} fondée et tenue ${duration(bestFounded.months).fr}.`, `${bestFounded.name} founded and run for ${duration(bestFounded.months).en}.`);
-  } else if (bestFull && bestFull.months >= lv(6).roleMonths!) {
-    score = 6;
-    reached = f(`Un poste tenu ${duration(bestFull.months).fr} : ${bestFull.name}.`, `A role held for ${duration(bestFull.months).en}: ${bestFull.name}.`);
-  } else if (bestStartup && bestStartup.months >= lv(6).productStartupMonths!) {
-    score = 6;
-    reached = f(`${duration(bestStartup.months).fr} dans une startup de produit : ${bestStartup.name}.`, `${duration(bestStartup.months).en} in a product startup: ${bestStartup.name}.`);
-  } else if (bestFounded && bestFounded.months >= lv(6).foundedMonths!) {
-    score = 6;
-    reached = f(`${bestFounded.name} fondée et tenue ${duration(bestFounded.months).fr}.`, `${bestFounded.name} founded and run for ${duration(bestFounded.months).en}.`);
-  } else if (founded.length) {
-    score = 4;
-    reached =
-      founded.length === 1
-        ? f(`Une entreprise fondée, tenue ${duration(bestFounded!.months).fr}.`, `One company founded, run for ${duration(bestFounded!.months).en}.`)
-        : f(`${founded.length} entreprises fondées, la plus longue tenue ${duration(bestFounded!.months).fr}.`, `${founded.length} companies founded, the longest run for ${duration(bestFounded!.months).en}.`);
-  } else if (fullRoles.length) {
-    score = 4;
-    reached = f(`Un vrai poste, hors stage : ${bestFull!.name}, ${duration(bestFull!.months).fr}.`, `A real role, not an internship: ${bestFull!.name}, ${duration(bestFull!.months).en}.`);
-  } else if (interns.length >= lv(4).internships!) {
-    score = 4;
-    reached = f(`${interns.length} stages.`, `${interns.length} internships.`);
-  } else {
-    score = 2;
-    reached = f("Un seul stage.", "A single internship.");
-  }
+  /** Ce que la personne a, si la condition est remplie ; sinon null. */
+  const met = (c: EmpCondition): Fact | null => {
+    const need = c.months ?? 0;
+    if (c.what === "internships") {
+      const keys = new Set(at(internEmps, c.at).map((e) => e.name));
+      const list = c.at ? interns.filter((r) => keys.has(r.role.company || r.role.title)) : interns;
+      const total = unionMonths(list);
+      if (c.count ? list.length < c.count : !list.length || total < need) return null;
+      const where = c.at === "highBar" ? f(" chez des employeurs à forte barre d'embauche", " at high-bar employers") : c.at === "product" ? f(" dans des équipes produit exigeantes", " in demanding product teams") : f("", "");
+      return c.count
+        ? f(`${list.length} stages ou alternances${where.fr}.`, `${list.length} internships or apprenticeships${where.en}.`)
+        : f(`${total} mois de stage ou d'alternance cumulés${where.fr}.`, `${total} months of internships or apprenticeships in total${where.en}.`);
+    }
+    if (c.what === "internship") {
+      const e = top(at(internEmps, c.at));
+      if (!e || e.months < need) return null;
+      const what = e.months ? f(`Un stage ou une alternance de ${e.months} mois`, `An internship or apprenticeship of ${months(e.months).en}`) : f("Un stage ou une alternance", "An internship or apprenticeship");
+      return c.at === "highBar"
+        ? f(`${what.fr} chez ${e.name}, employeur à forte barre d'embauche.`, `${what.en} at ${e.name}, a high-bar employer.`)
+        : c.at === "product"
+          ? f(`${what.fr} dans une équipe produit exigeante : ${e.name}.`, `${what.en} in a demanding product team: ${e.name}.`)
+          : f(`${what.fr} : ${e.name}.`, `${what.en}: ${e.name}.`);
+    }
+    const e = top(at(c.what === "founded" ? emps.filter((x) => x.founder) : emps, c.at));
+    if (!e || e.months < need) return null;
+    if (c.riseAndTeam && !(rise && team)) return null;
+    if (c.riseOrTeam && !(rise || team)) return null;
+    const path = c.riseAndTeam
+      ? f(", une trajectoire qui monte et une équipe encadrée", ", a rising path and a team led")
+      : c.riseOrTeam
+        ? f(`, et ${rise ? "une trajectoire qui monte" : "une équipe encadrée"}`, `, and ${rise ? "a rising path" : "a team led"}`)
+        : f("", "");
+    const h = held(e);
+    if (e.founder && !c.at)
+      return h ? f(`${e.name} fondée et tenue ${h.fr}${path.fr}.`, `${e.name} founded and run for ${h.en}${path.en}.`) : f(`Une entreprise fondée : ${e.name}.`, `A company founded: ${e.name}.`);
+    if (c.at === "highBar")
+      return h
+        ? f(`${h.fr} chez ${e.name}, employeur à forte barre d'embauche${path.fr}.`, `${h.en} at ${e.name}, a high-bar employer${path.en}.`)
+        : f(`Un poste chez ${e.name}, employeur à forte barre d'embauche${path.fr}.`, `A role at ${e.name}, a high-bar employer${path.en}.`);
+    if (c.at === "product")
+      return h
+        ? f(`${h.fr} dans une équipe produit exigeante : ${e.name}${path.fr}.`, `${h.en} in a demanding product team: ${e.name}${path.en}.`)
+        : f(`Un poste dans une équipe produit exigeante : ${e.name}${path.fr}.`, `A role in a demanding product team: ${e.name}${path.en}.`);
+    if (need) return f(`Un poste tenu ${h!.fr} : ${e.name}${path.fr}.`, `A role held for ${h!.en}: ${e.name}${path.en}.`);
+    return h ? f(`Un vrai poste, hors stage : ${e.name}, ${h.fr}.`, `A real role, not an internship: ${e.name}, ${h.en}.`) : f(`Un vrai poste, hors stage : ${e.name}.`, `A real role, not an internship: ${e.name}.`);
+  };
 
-  let next: Fact | undefined;
-  if (score === 2) next = f("Pour 4 : un vrai poste hors stage, une entreprise fondée, ou un deuxième stage.", "For 4: a real role outside internships, a company founded, or a second internship.");
-  else if (score === 4)
-    next = currentFounded
-      ? f(`Pour 6 : tenir ${currentFounded.name} un an (${months(currentFounded.months).fr} aujourd'hui), ou un poste tenu deux ans.`, `For 6: run ${currentFounded.name} for a year (${months(currentFounded.months).en} today), or hold a role for two years.`)
-      : bestFounded
-        ? f(`Pour 6 : une entreprise fondée tenue un an (la plus longue : ${months(bestFounded.months).fr}), ou un poste tenu deux ans.`, `For 6: a company founded and run for a year (the longest: ${months(bestFounded.months).en}), or a role held for two years.`)
-        : f(
-          `Pour 6 : un poste tenu deux ans, ou un an dans une startup de produit. Le plus long : ${months(bestFull?.months ?? 0).fr}.`,
-          `For 6: a role held for two years, or a year in a product startup. The longest: ${months(bestFull?.months ?? 0).en}.`,
-        );
-  else if (score === 6)
-    next = f(
-      "Pour 8 : deux ans dans une équipe produit exigeante (startup, scale-up), ou une entreprise fondée tenue trois ans.",
-      "For 8: two years in a demanding product team (startup, scale-up), or a company founded and run for three years.",
-    );
-  else if (score === 8)
-    next = f(
-      "Pour 10 : deux ans chez un employeur à forte barre d'embauche, et une trajectoire qui monte ou une équipe encadrée.",
-      "For 10: two years at a high-bar employer, and a rising path or a team led.",
-    );
+  let index = rows.length - 1;
+  let reached: Fact | null = null;
+  for (let i = 0; i < rows.length && !reached; i++)
+    for (const c of rows[i].any) {
+      const hit = met(c);
+      if (hit) {
+        index = i;
+        reached = hit;
+        break;
+      }
+    }
+  const score = rows[index].score;
+  if (!reached) reached = f("Une première expérience.", "A first experience.");
+  const above = index > 0 ? rows[index - 1] : undefined;
+  const next = above ? f(`Pour ${above.score} : ${empRowText(above).fr}.`, `For ${above.score}: ${empRowText(above).en}.`) : undefined;
 
   // La pièce : les deux postes les plus récents, datés ; sans nom ni intitulé pour la page partagée.
   const recent = infos.filter((r) => r.start !== null).sort((a, b) => b.start! - a.start!).slice(0, 2);
@@ -692,6 +781,7 @@ export function empDeclared(d: DeclaredInput): Draft {
     ...(next ? { next } : {}),
     flags: team ? [f(`Équipe encadrée : « ${team.slice(0, 100)} »`, `Team led: “${team.slice(0, 100)}”`)] : [],
     evidence: { text: evidenceText, publicText: evidencePublic, source: "linkedin", ...proof },
+    table,
   });
 }
 
@@ -1431,24 +1521,28 @@ export function stkCrossCheck(draft: Draft, d: DeclaredInput, gh: GithubSide): D
  * quart des coefficients noté : 20. Calcul en entiers (coefficients doublés),
  * arrondi au supérieur à ,5, bornes 1 à 99.
  */
-export function finalize(drafts: Draft[]): Grid {
+export function finalize(drafts: Draft[], seniority?: GridSeniority): Grid {
   const F = GRID.final;
   const byCode = new Map(drafts.map((d) => [d.code, d]));
   const ordered = CRITERION_CODES.map((c) => byCode.get(c)!).filter(Boolean);
   const w2 = (c: CriterionCode) => Math.round(GRID.weights[c] * 2);
   const total2 = CRITERION_CODES.reduce((s, c) => s + w2(c), 0);
-  const scored = ordered.filter((d) => d.score !== null);
+  // Un critère de coefficient 0 (l'expérience, depuis 0.5.0) garde sa lecture et reste hors moyenne.
+  const scored = ordered.filter((d) => d.score !== null && w2(d.code) > 0);
   const scored2 = scored.reduce((s, d) => s + w2(d.code), 0);
-  const never = new Set(F.neverLower);
+  const neverCodes = new Set(F.neverLower);
+  // L'école et l'open source, et (0.5.0) ce qui n'est que déclaré : jamais vers le bas.
+  const never = (d: Draft) => neverCodes.has(d.code) || (F.declaredNeverLower && d.state === "declared" && d.source === "linkedin");
+  const meta = { weights: { ...GRID.weights }, ...(seniority ? { seniority } : {}) };
 
   if (scored2 < F.emptyBelowShare * total2) {
-    return { criteria: ordered.map((d) => ({ ...d, counted: false })), overall: F.emptyScore, rule: "empty_file" };
+    return { criteria: ordered.map((d) => ({ ...d, counted: false })), overall: F.emptyScore, rule: "empty_file", ...meta };
   }
-  const base = scored.filter((d) => !never.has(d.code));
+  const base = scored.filter((d) => !never(d));
   const n0 = base.reduce((s, d) => s + d.score! * w2(d.code), 0);
   const d0 = base.reduce((s, d) => s + w2(d.code), 0);
   const counted = new Set<CriterionCode>(base.map((d) => d.code));
-  for (const d of scored) if (never.has(d.code) && (d0 === 0 || d.score! * d0 > n0)) counted.add(d.code);
+  for (const d of scored) if (never(d) && (d0 === 0 || d.score! * d0 > n0)) counted.add(d.code);
   const inMean = scored.filter((d) => counted.has(d.code));
   const n = inMean.reduce((s, d) => s + d.score! * w2(d.code), 0);
   const den = inMean.reduce((s, d) => s + w2(d.code), 0);
@@ -1461,14 +1555,15 @@ export function finalize(drafts: Draft[]): Grid {
     overall = Math.min(overall, F.capUnproven);
   }
   overall = Math.min(F.bounds.max, Math.max(F.bounds.min, overall));
-  return { criteria: ordered.map((d) => ({ ...d, counted: counted.has(d.code) })), overall, ...(rule ? { rule } : {}) };
+  return { criteria: ordered.map((d) => ({ ...d, counted: counted.has(d.code) })), overall, ...(rule ? { rule } : {}), ...meta };
 }
 
 // --- Les trois grilles (§4) ----------------------------------------------------------------
 
 /** Fiche GitHub : la note prouvée. École et parcours non renseignés (sauf un hackathon dans un dépôt), expérience estimée. */
-export function githubGrid(g: GithubInput): Grid {
-  return finalize([
+export function githubGrid(g: GithubInput, seniority: GridSeniority | undefined = githubSeniority(g)): Grid {
+  return finalize(
+    [
     eduGithub(g),
     xpGithub(g),
     missing("EMP", "github", f("Le parcours se lit sur LinkedIn ou le CV\u00a0: pas encore au dossier.", "Career path is read on LinkedIn or the résumé: not on file yet.")),
@@ -1477,7 +1572,9 @@ export function githubGrid(g: GithubInput): Grid {
     actGithub(g),
     ownGithub(g),
     ossGithub(g),
-  ]);
+    ],
+    seniority,
+  );
 }
 
 /**
@@ -1489,16 +1586,20 @@ export function declaredGrid(d: DeclaredInput, gh?: Pick<GithubInput, "facts" | 
   const src = d.label;
   // Avec les faits GitHub d'une comparaison, les pièces recoupées (notes inchangées).
   const check = (draft: Draft, fn: (x: Draft, d: DeclaredInput, gh: GithubSide) => Draft) => (gh ? fn(draft, d, gh) : draft);
-  return finalize([
+  const seniority = declaredSeniority(d);
+  return finalize(
+    [
     eduDeclared(d),
     check(xpDeclared(d), xpCrossCheck),
-    check(empDeclared(d), empCrossCheck),
+    check(empDeclared(d, seniority), empCrossCheck),
     check(stkDeclared(d, gh), stkCrossCheck),
     unproven("CODE", "linkedin", f(`Le code ne se prouve pas sur ${src}.`, `Code cannot be proven on ${src}.`)),
     unproven("ACT", "linkedin", f(`L'activité ne se lit pas sur ${src}.`, `Activity cannot be read on ${src}.`)),
     ownDeclared(d),
     unproven("OSS", "linkedin", f(`Une mention « open source » sur ${src} ne donne rien sans trace.`, `An "open source" mention on ${src} gives nothing without a trace.`)),
-  ]);
+    ],
+    seniority,
+  );
 }
 
 /** Les flags des deux côtés, sans doublon. */
@@ -1552,7 +1653,8 @@ export function caseGrid(declared: Grid, proven: Grid, label: "LinkedIn" | "CV" 
     const { evidence: _e, ...rest } = strip(chosen);
     return { ...rest, source, ...both, flags, ...(evidence ? { evidence } : {}) };
   });
-  return finalize(drafts);
+  // Le niveau du dossier : celui des postes datés ; sans eux, l'estimation de GitHub.
+  return finalize(drafts, declared.seniority ?? proven.seniority);
 }
 
 /** « Sur LinkedIn : une entreprise fondée. » : la pièce du côté déclaratif, après celle de GitHub. */

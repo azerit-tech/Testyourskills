@@ -9,7 +9,7 @@
 
 import { t as cardT } from "./card/i18n";
 import { langTitle } from "./card/languages";
-import { FORMULA_ORDER, GRID_WEIGHTS, schoolState, usableGrid } from "./gridText";
+import { formulaOrder, schoolState, usableGrid, weightsOf } from "./gridText";
 import type { CardData, CriterionCode, Grid, GridCriterion, Lang } from "./types";
 
 /** L'ordre du recruteur : le métier et les années, où, la stack, le code, puis le reste. */
@@ -41,10 +41,12 @@ export function tileOrder(grid: Grid): { scored: GridCriterion[]; pending: GridC
 
 /** La note la plus haute (5 et plus), jamais l'école ; à égalité, le plus lourd coefficient, puis l'ordre du recruteur. */
 export function strongPoint(grid: Grid): (GridCriterion & { score: number }) | null {
+  // Un critère sans coefficient (l'expérience, depuis 0.5.0 : elle donne le niveau) n'est ni un point fort ni un point à creuser.
+  const W = weightsOf(grid);
   const ranked = RECRUITER_ORDER.map((code) => grid.criteria.find((c) => c.code === code))
     .filter(noted)
-    .filter((c) => !NEVER_STRONG.includes(c.code) && c.score >= STRONG_MIN)
-    .sort((a, b) => b.score - a.score || GRID_WEIGHTS[b.code] - GRID_WEIGHTS[a.code] || RECRUITER_ORDER.indexOf(a.code) - RECRUITER_ORDER.indexOf(b.code));
+    .filter((c) => W[c.code] > 0 && !NEVER_STRONG.includes(c.code) && c.score >= STRONG_MIN)
+    .sort((a, b) => b.score - a.score || W[b.code] - W[a.code] || RECRUITER_ORDER.indexOf(a.code) - RECRUITER_ORDER.indexOf(b.code));
   return ranked[0] ?? null;
 }
 
@@ -56,10 +58,11 @@ export function strongPoint(grid: Grid): (GridCriterion & { score: number }) | n
  */
 export function weakestCriterion(grid: Grid | undefined | null): (GridCriterion & { score: number }) | null {
   if (!usableGrid(grid) || grid.rule === "empty_file") return null;
+  const W = weightsOf(grid);
   const ranked = RECRUITER_ORDER.map((code) => grid.criteria.find((c) => c.code === code))
     .filter(noted)
     .filter((c) => c.counted && c.code !== "EDU")
-    .sort((a, b) => a.score - b.score || GRID_WEIGHTS[b.code] - GRID_WEIGHTS[a.code] || RECRUITER_ORDER.indexOf(a.code) - RECRUITER_ORDER.indexOf(b.code));
+    .sort((a, b) => a.score - b.score || W[b.code] - W[a.code] || RECRUITER_ORDER.indexOf(a.code) - RECRUITER_ORDER.indexOf(b.code));
   return ranked[0] ?? null;
 }
 
@@ -79,14 +82,17 @@ export type Dig =
  */
 export function digPoint(grid: Grid, strong = strongPoint(grid)): Dig | null {
   const byCode = new Map(grid.criteria.map((c) => [c.code, c]));
-  const open = FORMULA_ORDER.filter((code) => !NEVER_DIG.includes(code)).find((code) => {
-    const c = byCode.get(code);
-    return !!c && c.score === null;
-  });
+  const W = weightsOf(grid);
+  const open = formulaOrder(grid)
+    .filter((code) => W[code] > 0 && !NEVER_DIG.includes(code))
+    .find((code) => {
+      const c = byCode.get(code);
+      return !!c && c.score === null;
+    });
   if (open) return { kind: "prove", code: open, ...(byCode.get(open)?.state === "missing" ? { missing: true as const } : {}) };
   const marked = RECRUITER_ORDER.map((code) => byCode.get(code))
     .filter(noted)
-    .filter((c) => !NEVER_DIG.includes(c.code));
+    .filter((c) => W[c.code] > 0 && !NEVER_DIG.includes(c.code));
   const low = marked
     .filter((c) => c.code !== strong?.code && c.score <= DIG_MAX && (!strong || c.score < strong.score))
     .sort((a, b) => a.score - b.score || RECRUITER_ORDER.indexOf(a.code) - RECRUITER_ORDER.indexOf(b.code))[0];

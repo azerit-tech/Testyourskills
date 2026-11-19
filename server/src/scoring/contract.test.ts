@@ -74,7 +74,7 @@ describe("contrat sur faits réels figés", () => {
     const card = scoreGithub(gaearon, ai, opts);
     checkShape(card);
     expect(values(card).TEC).toBe(84);
-    expect(card.overall).toBe(79);
+    expect(card.overall).toBe(78);
     expect(card.tier).toBe("gold");
     expect(card.reliability).toBe(95);
     expect(card.statuses.find((s) => s.byAI)?.id).toBe("ai_clean_arch");

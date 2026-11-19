@@ -167,7 +167,8 @@ describe("« recoupé » : de la sortie du moteur à l'étiquette affichée", ()
         // Chaque critère noté dit la pièce où sa note a été lue.
         const rows = rowsOf(html);
         for (const c of comparison.grid!.criteria) {
-          if (c.score === null || c.private) continue;
+          // L'école hors moyenne ne dit que « hors moyenne » (§18.52), sans pièce d'origine.
+          if (c.score === null || c.private || (c.code === "EDU" && !c.counted)) continue;
           expect(rows.get(dict.names[c.code]), c.code).toContain(`<span class="rg-kept">${keptFrom(c, dict, "linkedin")}</span>`);
         }
       }
@@ -189,7 +190,7 @@ describe("« recoupé » : de la sortie du moteur à l'étiquette affichée", ()
       expect(allowed).toContain(from);
       expect(from).toBe(c.source === "both" ? "LinkedIn et GitHub" : c.source === "github" ? "GitHub" : "LinkedIn");
       // L'école comptée ne dit jamais son niveau (§18.48) : « comptée dans la note ».
-      if (c.code === "EDU") expect(aria.replace(/&#x27;/g, "'")).toBe(R.tileCounted(name));
+      if (c.code === "EDU") expect(aria.replace(/&#x27;/g, "'")).toBe(c.counted ? R.tileCounted(name) : R.tileKept(name));
       else expect(aria.replace(/&#x27;/g, "'")).toBe(`${name}\u00a0: ${c.score} sur 10, ${keptFrom(c, DICTS.fr.grid, "linkedin")}`);
     }
     // En anglais : « LinkedIn and GitHub », « read on … ».

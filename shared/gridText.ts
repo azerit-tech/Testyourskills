@@ -4,13 +4,54 @@
 // juger : la note affichée reste `grid.overall`, ce module dit d'où elle vient.
 // Aucun terme additif : une note par critère, un coefficient, une moyenne.
 
-import type { CriterionCode, Grid, GridCriterion, Lang } from "./types";
+import type { CriterionCode, Fact, Grid, GridCriterion, GridSeniority, Lang, SeniorityCode } from "./types";
 
-/** Les coefficients de data/grid.json (un test vérifie qu'ils n'ont pas dérivé). */
-export const GRID_WEIGHTS: Record<CriterionCode, number> = { EDU: 1, XP: 1.5, EMP: 1.5, STK: 1.5, CODE: 2, ACT: 1, OWN: 1, OSS: 0.5 };
+/**
+ * Les coefficients de data/grid.json (un test vérifie qu'ils n'ont pas dérivé). Depuis
+ * 0.5.0 (SPEC §18.82) l'expérience ne pèse plus : les années comptées donnent le
+ * niveau auquel le dossier est lu, et son poids est passé au parcours et à l'ownership.
+ */
+export const GRID_WEIGHTS: Record<CriterionCode, number> = { EDU: 1, XP: 0, EMP: 2.5, STK: 1.5, CODE: 2, ACT: 1, OWN: 1.5, OSS: 0.5 };
+/** Les coefficients du barème 0.4.0 : ceux d'une grille rangée sans les siens. */
+export const LEGACY_GRID_WEIGHTS: Record<CriterionCode, number> = { EDU: 1, XP: 1.5, EMP: 1.5, STK: 1.5, CODE: 2, ACT: 1, OWN: 1, OSS: 0.5 };
+/** Les coefficients qui ont fait la moyenne de cette grille : les siens, ou ceux de 0.4.0 pour une grille d'avant. */
+export function weightsOf(grid: Pick<Grid, "weights"> | null | undefined): Record<CriterionCode, number> {
+  return grid?.weights ?? LEGACY_GRID_WEIGHTS;
+}
 
-/** L'ordre de la formule : du plus lourd au plus léger, comme le §4 (« Code 7 × 2 + Stack 6 × 1,5 + … »). */
-export const FORMULA_ORDER: CriterionCode[] = ["CODE", "STK", "XP", "EMP", "OWN", "ACT", "EDU", "OSS"];
+/** L'ordre de la formule : du plus lourd au plus léger, comme le §4 (« Parcours 6 × 2,5 + Code 7 × 2 + … »). */
+export const FORMULA_ORDER: CriterionCode[] = ["EMP", "CODE", "STK", "OWN", "ACT", "EDU", "OSS", "XP"];
+/** L'ordre du barème 0.4.0 (« Code 7 × 2 + Stack 6 × 1,5 + … »), pour une grille d'avant. */
+export const LEGACY_FORMULA_ORDER: CriterionCode[] = ["CODE", "STK", "XP", "EMP", "OWN", "ACT", "EDU", "OSS"];
+export function formulaOrder(grid: Pick<Grid, "weights"> | null | undefined): CriterionCode[] {
+  return grid?.weights ? FORMULA_ORDER : LEGACY_FORMULA_ORDER;
+}
+
+/** Les niveaux d'expérience (data/grid.json, `seniority` ; un test vérifie les bornes). */
+export const SENIORITY_TEXT: Record<SeniorityCode, { name: Fact; range: Fact }> = {
+  student: { name: { fr: "Début de carrière", en: "Early career" }, range: { fr: "moins d'un an", en: "under a year" } },
+  junior: { name: { fr: "Junior", en: "Junior" }, range: { fr: "de 1 à 3 ans", en: "1 to 3 years" } },
+  mid: { name: { fr: "Confirmé", en: "Mid-level" }, range: { fr: "de 3 à 6 ans", en: "3 to 6 years" } },
+  senior: { name: { fr: "Senior", en: "Senior" }, range: { fr: "de 6 à 10 ans", en: "6 to 10 years" } },
+  expert: { name: { fr: "Expert", en: "Expert" }, range: { fr: "10 ans et plus", en: "10 years and more" } },
+};
+
+/**
+ * Le niveau en une ligne courte, à côté de la note : « Junior · 1,1 an », « Début de
+ * carrière · moins d'un an », « Junior · 2 ans (estimé) » quand GitHub seul l'estime.
+ */
+export function seniorityLabel(s: GridSeniority, lang: Lang): string {
+  const name = SENIORITY_TEXT[s.code].name[lang];
+  const y = Math.round((s.months / 12) * 10) / 10;
+  const span =
+    s.months < 12
+      ? SENIORITY_TEXT.student.range[lang]
+      : lang === "fr"
+        ? `${dec(y, "fr")} an${y >= 2 ? "s" : ""}`
+        : `${dec(y, "en")} year${y === 1 ? "" : "s"}`;
+  const how = s.source === "github" ? (lang === "fr" ? " (estimé)" : " (estimated)") : s.claimed ? (lang === "fr" ? " (affirmé)" : " (claimed)") : "";
+  return `${name} · ${span}${how}`;
+}
 
 /** Plafond sans code prouvé et note du dossier vide (data/grid.json, `final`). */
 export const GRID_CAP_UNPROVEN = 85;
@@ -23,8 +64,11 @@ export function dec(n: number, lang: Lang, digits = 1): string {
   return lang === "fr" ? s.replace(".", ",") : s;
 }
 
-/** Pourquoi un critère sort de la moyenne : son état, ou l'école / l'open source sous la moyenne des autres. */
-export type ExcludedWhy = "unproven" | "missing" | "below";
+/**
+ * Pourquoi un critère sort de la moyenne : son état, l'école / l'open source / le déclaré
+ * sous la moyenne des autres, ou (0.5.0) l'expérience, qui donne le niveau et ne pèse pas.
+ */
+export type ExcludedWhy = "unproven" | "missing" | "below" | "level";
 
 export interface GridMath {
   /** Les critères comptés, dans l'ordre de la formule. */
@@ -50,6 +94,8 @@ export function excludedWhy(c: GridCriterion): ExcludedWhy | null {
   // Gardée pour la personne fichée (page partagée) : hors moyenne, sans dire pourquoi.
   if (c.private) return null;
   if (c.score === null || c.state === "unproven" || c.state === "missing") return c.state === "missing" ? "missing" : "unproven";
+  // L'expérience notée et hors moyenne : une grille 0.5.0, où elle donne le niveau.
+  if (!c.counted && c.code === "XP") return "level";
   return c.counted ? null : "below";
 }
 
@@ -73,11 +119,12 @@ export function schoolState(c: Pick<GridCriterion, "code" | "score" | "counted" 
 /** D'où vient la note sur 100 : les termes comptés, la moyenne, la règle qui a joué. */
 export function gridMath(grid: Grid): GridMath {
   const byCode = new Map(grid.criteria.map((c) => [c.code, c]));
-  const ordered = FORMULA_ORDER.map((code) => byCode.get(code)).filter((c): c is GridCriterion => !!c);
+  const ordered = formulaOrder(grid).map((code) => byCode.get(code)).filter((c): c is GridCriterion => !!c);
   const empty = grid.rule === "empty_file";
+  const weights = weightsOf(grid);
   const terms = empty
     ? []
-    : ordered.filter((c) => c.counted && c.score !== null).map((c) => ({ code: c.code, score: c.score!, weight: GRID_WEIGHTS[c.code] }));
+    : ordered.filter((c) => c.counted && c.score !== null).map((c) => ({ code: c.code, score: c.score!, weight: weights[c.code] }));
   const num = terms.reduce((s, x) => s + x.score * x.weight, 0);
   const den = terms.reduce((s, x) => s + x.weight, 0);
   const mean = den ? num / den : null;
@@ -85,7 +132,7 @@ export function gridMath(grid: Grid): GridMath {
   const raw = den ? Math.floor((20 * num * 2 + den * 2) / (2 * den * 2)) : null;
   const excluded = ordered
     .map((c) => ({ code: c.code, why: empty ? (excludedWhy(c) ?? "below") : excludedWhy(c) }))
-    .filter((x): x is { code: CriterionCode; why: ExcludedWhy } => x.why !== null && (!empty || x.why !== "below"));
+    .filter((x): x is { code: CriterionCode; why: ExcludedWhy } => x.why !== null && (!empty || (x.why !== "below" && x.why !== "level")));
   return {
     terms,
     num,

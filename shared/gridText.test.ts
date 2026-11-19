@@ -2,8 +2,8 @@
 // coefficients que data/grid.json, même arrondi que le moteur.
 import { describe, expect, it } from "vitest";
 import gridJson from "../data/grid.json";
-import { dec, excludedWhy, gridMath, GRID_WEIGHTS, usableGrid } from "./gridText";
-import type { CriterionCode, Grid, GridCriterion } from "./types";
+import { dec, excludedWhy, gridMath, GRID_WEIGHTS, LEGACY_GRID_WEIGHTS, SENIORITY_TEXT, seniorityLabel, usableGrid, weightsOf } from "./gridText";
+import { SENIORITY_CODES, type CriterionCode, type Grid, type GridCriterion } from "./types";
 
 const crit = (code: CriterionCode, score: number | null, over: Partial<GridCriterion> = {}): GridCriterion => ({
   code,
@@ -16,7 +16,7 @@ const crit = (code: CriterionCode, score: number | null, over: Partial<GridCrite
   ...over,
 });
 
-/** Le dossier de Jacques (docs/bareme-recrutement.md §7) : 57. */
+/** Le dossier de Jacques sous le barème 0.4.0 (une grille rangée sans coefficients) : 57. */
 const JACQUES: Grid = {
   overall: 57,
   criteria: [
@@ -43,6 +43,36 @@ describe("la note sur 100 tirée de la grille", () => {
     expect(m.raw).toBe(57);
     expect(m.terms.map((t) => t.code)).toEqual(["CODE", "STK", "XP", "EMP", "OWN", "ACT", "EDU", "OSS"]);
     expect(m.excluded).toEqual([]);
+  });
+
+  it("une grille 0.5.0 porte ses coefficients : l'expérience hors moyenne, « elle donne le niveau » ; une grille d'avant garde les siens", () => {
+    expect(weightsOf(JACQUES)).toEqual(LEGACY_GRID_WEIGHTS);
+    // Le même dossier, lu au niveau « Junior » : parcours 6 (2,5), ownership 6 (1,5), l'expérience sans poids.
+    const now: Grid = {
+      overall: 65,
+      weights: GRID_WEIGHTS,
+      seniority: { code: "junior", months: 13.5, source: "linkedin" },
+      criteria: JACQUES.criteria.map((c) => (c.code === "XP" ? { ...c, counted: false } : c.code === "EMP" ? { ...c, score: 6 } : c.code === "EDU" || c.code === "OSS" ? { ...c, counted: false } : c)),
+    };
+    const m = gridMath(now);
+    expect(m.terms.map((t) => `${t.code} ${t.score} × ${t.weight}`)).toEqual(["EMP 6 × 2.5", "CODE 7 × 2", "STK 6 × 1.5", "OWN 6 × 1.5", "ACT 8 × 1"]);
+    expect([m.num, m.den, m.raw]).toEqual([55, 8.5, 65]);
+    expect(m.excluded).toEqual([
+      { code: "EDU", why: "below" },
+      { code: "OSS", why: "below" },
+      { code: "XP", why: "level" },
+    ]);
+  });
+
+  it("le niveau d'expérience : cinq niveaux aux bornes de data/grid.json, une ligne courte à côté de la note", () => {
+    expect(gridJson.seniority.levels.map((l) => l.code).reverse()).toEqual(SENIORITY_CODES);
+    expect(gridJson.seniority.levels.map((l) => l.months)).toEqual([120, 72, 36, 12, 0]);
+    expect(SENIORITY_CODES.map((c) => SENIORITY_TEXT[c].range.fr)).toEqual(["moins d'un an", "de 1 à 3 ans", "de 3 à 6 ans", "de 6 à 10 ans", "10 ans et plus"]);
+    expect(seniorityLabel({ code: "student", months: 4, source: "linkedin" }, "fr")).toBe("Début de carrière · moins d'un an");
+    expect(seniorityLabel({ code: "junior", months: 13.5, source: "linkedin" }, "fr")).toBe("Junior · 1,1 an");
+    expect(seniorityLabel({ code: "junior", months: 24, source: "github" }, "fr")).toBe("Junior · 2 ans (estimé)");
+    expect(seniorityLabel({ code: "mid", months: 48, source: "linkedin", claimed: true }, "en")).toBe("Mid-level · 4 years (claimed)");
+    expect(seniorityLabel({ code: "expert", months: 150, source: "linkedin" }, "en")).toBe("Expert · 12.5 years");
   });
 
   it("dit pourquoi un critère sort de la moyenne", () => {

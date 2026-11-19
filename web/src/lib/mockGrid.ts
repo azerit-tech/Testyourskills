@@ -5,20 +5,21 @@
 // Des personnes inventées seulement : les fiches de personnes réelles (icon) n'ont pas de grille.
 //
 // Les états couverts, par pseudo de démo :
-//   kevin-dev42  GitHub seul, 44 : tout noté, l'open source sous la moyenne
-//   camroux      GitHub seul, 68 : l'open source au-dessus, il entre
-//   leamd        GitHub seul, 79 : maintient un projet
-//   nour-rs      GitHub seul, 64 : école lue sur un dépôt de hackathon, sous la moyenne
-//   jplefevre    GitHub seul, 64 : stack arrêtée par la fraîcheur
-//   ghost-coder  GitHub seul, 46 : « code non prouvé », plafond 85 (sans effet ici)
+// (barème 0.5.0 : l'expérience donne le niveau et ne pèse plus)
+//   kevin-dev42  GitHub seul, 45 : tout noté, l'open source sous la moyenne
+//   camroux      GitHub seul, 65 : l'open source au-dessus, il entre
+//   leamd        GitHub seul, 82 : maintient un projet
+//   nour-rs      GitHub seul, 70 : école lue sur un dépôt de hackathon, sous la moyenne
+//   jplefevre    GitHub seul, 62 : stack arrêtée par la fraîcheur
+//   ghost-coder  GitHub seul, 30 : « code non prouvé », plafond 85 (sans effet ici)
 //   x            dossier vide, 20
-//   linkedin.com/in/sans-github  LinkedIn seul, 75 : déclaré, non prouvé, plafond 85
-//   camille-ardent (ou un LinkedIn et un pseudo)  la comparaison et la note du dossier, 83
-//   un LinkedIn et le pseudo x  face à un GitHub vide : code non prouvé, dossier 75
+//   linkedin.com/in/sans-github  LinkedIn seul, 66 : déclaré, non prouvé, plafond 85
+//   camille-ardent (ou un LinkedIn et un pseudo)  la comparaison et la note du dossier, 76
+//   un LinkedIn et le pseudo x  face à un GitHub vide : code non prouvé, dossier 66
 
 import { GRID_WEIGHTS } from "../../../shared/gridText";
 import { EDU_NEXT, EDU_NEXT_GITHUB, SCHOOL_COUNTED, schoolCounted } from "../../../shared/schoolRank";
-import type { CriterionCode, Fact, Grid, GridCriterion, GridSource } from "../../../shared/types";
+import type { CriterionCode, Fact, Grid, GridCriterion, GridSeniority, GridSource } from "../../../shared/types";
 import { CRITERION_CODES } from "../../../shared/types";
 
 type Draft = Omit<GridCriterion, "counted">;
@@ -28,16 +29,21 @@ function c(code: CriterionCode, score: number | null, state: GridCriterion["stat
   return { code, score, state, source, reached, flags: [], ...more };
 }
 
-/** Les quatre règles du §4, comme le moteur : hors moyenne sans note ; école et open source seulement au-dessus ; plafond 85 sans code ; dossier vide 20. */
-export function finalizeMock(drafts: Draft[]): Grid {
+/**
+ * Les quatre règles du §4, comme le moteur : hors moyenne sans note ou sans coefficient (l'expérience, 0.5.0) ;
+ * école, open source et critère seulement déclaré seulement au-dessus ; plafond 85 sans code ; dossier vide 20.
+ */
+export function finalizeMock(drafts: Draft[], seniority?: GridSeniority): Grid {
   const byCode = new Map(drafts.map((d) => [d.code, d]));
   const ordered = CRITERION_CODES.map((code) => byCode.get(code)!).filter(Boolean);
   const w2 = (code: CriterionCode) => Math.round(GRID_WEIGHTS[code] * 2);
   const total2 = CRITERION_CODES.reduce((s, code) => s + w2(code), 0);
-  const scored = ordered.filter((d) => d.score !== null);
+  const scored = ordered.filter((d) => d.score !== null && w2(d.code) > 0);
+  const meta = { weights: { ...GRID_WEIGHTS }, ...(seniority ? { seniority } : {}) };
   if (scored.reduce((s, d) => s + w2(d.code), 0) < 0.25 * total2)
-    return { criteria: ordered.map((d) => ({ ...d, counted: false })), overall: 20, rule: "empty_file" };
-  const never = new Set<CriterionCode>(["EDU", "OSS"]);
+    return { criteria: ordered.map((d) => ({ ...d, counted: false })), overall: 20, rule: "empty_file", ...meta };
+  const neverCodes = new Set<CriterionCode>(["EDU", "OSS"]);
+  const never = { has: (code: CriterionCode) => neverCodes.has(code) || (byCode.get(code)!.state === "declared" && byCode.get(code)!.source === "linkedin") };
   const base = scored.filter((d) => !never.has(d.code));
   const n0 = base.reduce((s, d) => s + d.score! * w2(d.code), 0);
   const d0 = base.reduce((s, d) => s + w2(d.code), 0);
@@ -50,7 +56,7 @@ export function finalizeMock(drafts: Draft[]): Grid {
   const capped = byCode.get("CODE")?.score == null;
   if (capped) overall = Math.min(overall, 85);
   overall = Math.min(99, Math.max(1, overall));
-  return { criteria: ordered.map((d) => ({ ...d, counted: counted.has(d.code) })), overall, ...(capped ? { rule: "capped_unproven" as const } : {}) };
+  return { criteria: ordered.map((d) => ({ ...d, counted: counted.has(d.code) })), overall, ...(capped ? { rule: "capped_unproven" as const } : {}), ...meta };
 }
 
 // --- Les briques de la fiche GitHub ----------------------------------------------------
@@ -299,8 +305,7 @@ function declaredDrafts(src: "LinkedIn" | "CV", proof?: string, ghRepos?: number
       next: EDU_NEXT[8],
       evidence: { text: schoolCounted("École Halbrune"), publicText: SCHOOL_COUNTED, source: "linkedin", ...p },
     }),
-    c("XP", 9, "scored", "linkedin", f("8,4 ans comptés sur les postes datés : le palier « 8 ans ».", `8.4 years counted on the dated roles: the “8 years” step.`), {
-      next: f("Pour 10 : 10 ans comptés. Tu en as 8,4.", "For 10: 10 years counted. You have 8.4."),
+    c("XP", 9, "scored", "linkedin", f("8,4 ans comptés sur les postes datés : niveau « Senior » (de 6 à 10 ans).", `8.4 years counted on the dated roles: “Senior” level (6 to 10 years).`), {
       evidence: {
         text: f(
           "8,4 ans comptés, poste par poste. 14 mois de stage ou d'alternance comptés pour moitié. 41 mois à la tête de Stealth Startup. 55 mois chez Banque Orsay. Junior Halbrune est une association : non compté.",
@@ -314,8 +319,11 @@ function declaredDrafts(src: "LinkedIn" | "CV", proof?: string, ghRepos?: number
         ...p,
       },
     }),
-    c("EMP", 8, "scored", "linkedin", f("Stealth Startup fondée et tenue 3,4 ans.", "Stealth Startup founded and run for 3.4 years."), {
-      next: f("Pour 10 : deux ans chez un employeur à forte barre d'embauche, et une trajectoire qui monte ou une équipe encadrée.", "For 10: two years at a high-bar employer, and a rising path or a team led."),
+    c("EMP", 6, "scored", "linkedin", f("Stealth Startup fondée et tenue 3,4 ans.", "Stealth Startup founded and run for 3.4 years."), {
+      next: f(
+        "Pour 8 : 3 ans dans une équipe produit exigeante (startup, scale-up), avec une trajectoire qui monte ou une équipe encadrée, ou une entreprise fondée tenue 4 ans.",
+        "For 8: 3 years in a demanding product team (startup, scale-up), with a rising path or a team led, or a company founded and run for 4 years.",
+      ),
       flags: [f("Équipe encadrée : « recrutement et encadrement d'une équipe de six personnes chez Banque Orsay »", `Team led: “hired and led a team of six at Banque Orsay”`)],
       evidence: {
         text: f(
@@ -350,9 +358,12 @@ function declaredDrafts(src: "LinkedIn" | "CV", proof?: string, ghRepos?: number
   ];
 }
 
-/** La fiche LinkedIn seule, ou CV seul : 75, déclarée, plafond 85 sans code prouvé. */
+/** Le niveau d'expérience de la personne de démo : 8,4 ans comptés sur ses postes datés. */
+const DECLARED_SENIORITY: GridSeniority = { code: "senior", months: 101, source: "linkedin" };
+
+/** La fiche LinkedIn seule, ou CV seul : 66, déclarée, plafond 85 sans code prouvé (sans effet ici). */
 export function declaredGridMock(src: "LinkedIn" | "CV", proof?: string): Grid {
-  return finalizeMock(declaredDrafts(src, proof));
+  return finalizeMock(declaredDrafts(src, proof), DECLARED_SENIORITY);
 }
 
 /**
@@ -454,6 +465,7 @@ function caseOf(declared: Grid, proven: Grid, src: "LinkedIn" | "CV"): Grid {
       const { evidence: _e, ...rest } = strip(chosen);
       return { ...rest, source, declared: d.score, proven: p.score, flags, ...(evidence ? { evidence } : {}) };
     }),
+    declared.seniority ?? proven.seniority,
   );
 }
 
@@ -464,11 +476,11 @@ function caseOf(declared: Grid, proven: Grid, src: "LinkedIn" | "CV"): Grid {
  */
 export function comparisonGridsMock(src: "LinkedIn" | "CV", login: string, proof?: string, emptyGithub = false): { cv: Grid; github: Grid; grid: Grid } {
   if (emptyGithub) {
-    const cv = finalizeMock(declaredDrafts(src, proof));
+    const cv = finalizeMock(declaredDrafts(src, proof), DECLARED_SENIORITY);
     const github = GITHUB.unknownLang(login);
     return { cv, github, grid: caseOf(cv, github, src) };
   }
-  const cv = finalizeMock(crossChecked(declaredDrafts(src, proof, 31), src, login));
+  const cv = finalizeMock(crossChecked(declaredDrafts(src, proof, 31), src, login), DECLARED_SENIORITY);
   const github = GITHUB.gold(login);
   return { cv, github, grid: caseOf(cv, github, src) };
 }
