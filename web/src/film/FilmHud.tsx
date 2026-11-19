@@ -185,7 +185,7 @@ export function FilmHud({ plan, hud, lang }: { plan: FilmPlan; hud: Hud; lang: L
       </p>
 
       {stamp && (
-        <svg className="film-stamp" viewBox="0 0 24 24" style={{ opacity: stamp.opacity, "--fly": stamp.fly, "--slap": stamp.scale, "--slot": stamp.star - 3.5 } as CSSProperties}>
+        <svg className="film-stamp" viewBox="0 0 24 24" style={{ opacity: stamp.opacity, "--fly": stamp.fly, "--side": stamp.side, "--slap": stamp.scale, "--slot": stamp.star - 3.5 } as CSSProperties}>
           <path className="film-star-rim" d={STAR} />
           <path className="film-star-body" d={STAR} />
         </svg>

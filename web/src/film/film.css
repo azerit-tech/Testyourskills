@@ -314,8 +314,10 @@
 
 /* L'étoile qui tombe : le même dessin, trois fois plus grand, sur le ciel
    au-dessus de la berline. Elle claque (--slap, de 2,1 à 1), tient une
-   demi-seconde, puis vole vers sa place dans la rangée (--fly, de 0 à 1 ;
-   --slot, de -2,5 à 2,5) en reprenant sa taille. Ni éclair ni secousse. */
+   demi-seconde, puis vole vers sa place dans la rangée en reprenant sa taille :
+   elle monte au centre (--fly, de 0 à 1), puis glisse vers sa place (--side,
+   de 0 à 1 ; --slot, de -2,5 à 2,5), au-dessus du relevé des critères, sans
+   le couvrir (§18.95). Ni éclair ni secousse. */
 .film-stamp {
   position: absolute;
   top: var(--stamp-y);
@@ -325,7 +327,12 @@
   height: calc(var(--star) * var(--stamp-k));
   margin: calc(var(--star) * var(--stamp-k) / -2) 0 0 calc(var(--star) * var(--stamp-k) / -2);
   pointer-events: none;
-  transform: translate(calc(var(--fly) * var(--slot) * (var(--star) + var(--star-gap))), calc(var(--fly) * (var(--row-top) + var(--star) / 2 - var(--stamp-y))))
+  /* le claquement grandit l'étoile autour de la pointe de sa branche gauche (1,8 et 9 sur 24), pas de son centre :
+     en grand, elle ne déborde pas sur le relevé des critères (§18.95) ; à l'échelle 1, rien ne change */
+  transform: translate(
+      calc(var(--side) * var(--slot) * (var(--star) + var(--star-gap)) + (var(--slap) - 1) * var(--star) * var(--stamp-k) * 0.425),
+      calc(var(--fly) * (var(--row-top) + var(--star) / 2 - var(--stamp-y)) + (var(--slap) - 1) * var(--star) * var(--stamp-k) * 0.125)
+    )
     scale(calc(var(--slap) * (1 - var(--fly) * (1 - 1 / var(--stamp-k)))));
 }
 /* film de 700 px de haut ou moins (360 × 640, 375 × 667) : l'étoile qui tombe garde sa part de

@@ -27,6 +27,8 @@ import {
   LINE_TAIL,
   STAMP_FROM,
   STAMP_HOLD,
+  STAMP_RISE,
+  STAMP_SIDE,
   STAMP_SLAP,
   STAR_LAND,
   STAR_POP,
@@ -71,8 +73,13 @@ export interface StampHud {
   star: Stars;
   /** L'échelle du claquement : de 2,1 à 1 en trois images. */
   scale: number;
-  /** 0 : tenue au centre ; 1 : arrivée à sa place, à la taille de la rangée. */
+  /** 0 : tenue au centre ; 1 : montée à la hauteur de la rangée, à sa taille. */
   fly: number;
+  /**
+   * Le glissement vers sa place, de 0 (au centre) à 1 (sa place) : il part quand l'étoile est presque montée
+   * (§18.95). Elle monte d'abord, au centre, puis glisse au-dessus du relevé des critères, jamais par-dessus.
+   */
+  side: number;
   opacity: number;
 }
 
@@ -189,10 +196,13 @@ export function hudAt(plan: FilmPlan, t: number, lang: Lang): Hud {
       const age = f - s.frame;
       if (age < STAR_LAND) {
         stars.push({ on: true, scale: 1, flying: true, fill: 1 });
+        // le vol : la montée (et la réduction) sur les six premiers dixièmes, le glissement ensuite, fini à la dernière image en l'air
+        const t = age <= STAMP_HOLD ? 0 : (age - STAMP_HOLD) / (STAR_LAND - STAMP_HOLD);
         stamp = {
           star: s.star,
           scale: age < STAMP_SLAP ? STAMP_FROM - ((STAMP_FROM - 1) * age) / STAMP_SLAP : 1,
-          fly: age <= STAMP_HOLD ? 0 : easeInOut((age - STAMP_HOLD) / (STAR_LAND - STAMP_HOLD)),
+          fly: easeInOut(clamp01(t / STAMP_RISE)),
+          side: easeInOut(clamp01((t - STAMP_SIDE[0]) / (STAMP_SIDE[1] - STAMP_SIDE[0]))),
           opacity: clamp01(0.7 + 0.3 * age),
         };
       } else {

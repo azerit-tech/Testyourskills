@@ -107,6 +107,13 @@ export const STAMP_SLAP = 3;
 export const STAMP_FROM = 2.1;
 export const STAMP_HOLD = 11;
 /**
+ * Le vol, en deux temps (§18.95) : l'étoile monte au centre en reprenant sa taille sur les STAMP_RISE premiers
+ * dixièmes du vol, puis glisse vers sa place entre ces deux parts du vol (la dernière image en l'air : 7/8). Elle
+ * passe au-dessus du relevé des critères, à gauche, sans jamais le couvrir.
+ */
+export const STAMP_RISE = 0.6;
+export const STAMP_SIDE: readonly [number, number] = [0.35, 0.875];
+/**
  * La jauge : l'étoile suivante se remplit de bas en haut, en demi-teinte, jusqu'à
  * l'instant où elle tombe. La première commence à l'image GAUGE_OPEN, les autres
  * GAUGE_AFTER images après l'étoile d'avant. Lente au début, elle finit vite
