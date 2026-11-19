@@ -131,7 +131,7 @@ describe("weekTop", () => {
     expect(weekTop(store.db, { now: NOW }).entries[0]!.login).toBe("old");
   });
 
-  it("un dossier à deux pièces entre sur sa note, la seule ; ses pièces n'entrent jamais (SPEC §18.82)", () => {
+  it("un dossier à deux pièces entre sur sa note, la seule ; ses pièces n'entrent jamais (SPEC §18.84)", () => {
     const store = newStore();
     // Lignes d'avant 0.5.0 : la pièce GitHub portait 99 à elle. Le classement lit la note du dossier, 70.
     const rows = dossier("cmp00001", "duo", 70, W46 + H, { pieceNote: 99 });

@@ -1,4 +1,4 @@
-// Un dossier à deux pièces (SPEC §6.5, §18.36, §18.82) : une personne, un calcul, une note.
+// Un dossier à deux pièces (SPEC §6.5, §18.36, §18.84) : une personne, un calcul, une note.
 // Le moteur reçoit tout ce qu'on sait de la personne, la pièce déclarative (CV ou
 // LinkedIn) et la pièce GitHub, et sort UNE grille et UNE note (grid.ts, dossierGrid).
 // Il n'existe pas de note par source : les deux pièces rangées ne portent ni grille ni

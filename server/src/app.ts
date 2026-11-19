@@ -743,7 +743,7 @@ export function createApp(opts: AppOptions) {
         const completed = prevRoot && personOf(c, prevRoot, ownedBy(c, prevRoot)) ? prevRoot : null;
         void pipeline.wait(id).then(() => {
           const row = store.getCard(id);
-          // La fiche complétée devient ce dossier : une personne, une note (SPEC §18.82).
+          // La fiche complétée devient ce dossier : une personne, une note (SPEC §18.84).
           if (row && completed) store.completedBy(completed, row);
           if (row) autoJoinBands(store, row, { from: completed });
         });
@@ -763,7 +763,7 @@ export function createApp(opts: AppOptions) {
     c.header("Cache-Control", "no-store");
     const id = c.req.param("id");
     if (!ID_RE.test(id)) return c.json(errorBody("internal", MESSAGES.not_found), 404);
-    // Une personne, une note (SPEC §18.82) : l'adresse d'une pièce, ou d'une fiche remplacée, sert le dossier.
+    // Une personne, une note (SPEC §18.84) : l'adresse d'une pièce, ou d'une fiche remplacée, sert le dossier.
     const row = store.fileRow(id);
     if (row && hiddenFrom(c, store.loginOf(row))) return c.json(errorBody("gone", MESSAGES.withdrawn), 410);
     const live = pipeline.jobState(id);
@@ -865,7 +865,7 @@ export function createApp(opts: AppOptions) {
     const id = m[1]!;
     // Un dossier à deux pièces : les images de sa fiche (render/index.ts).
     const format: RenderInput["format"] = OG_FORMATS[m[2] ?? ""] ?? "og";
-    // L'image d'une pièce, ou d'une fiche remplacée, est celle du dossier : une seule note (SPEC §18.82).
+    // L'image d'une pièce, ou d'une fiche remplacée, est celle du dossier : une seule note (SPEC §18.84).
     const row = store.fileRow(id);
     // Fiche masquée : aucune image, pour personne (les robots n'ont pas de session).
     if (!row || store.isHidden(store.loginOf(row))) return c.notFound();
@@ -934,7 +934,7 @@ export function createApp(opts: AppOptions) {
       c.header("Cache-Control", "private, no-store");
       return c.html(injectMeta(page, generic), mine ? 200 : 410);
     }
-    // L'adresse d'une pièce, ou d'une fiche remplacée, mène à celle du dossier : une seule note (SPEC §18.82).
+    // L'adresse d'une pièce, ou d'une fiche remplacée, mène à celle du dossier : une seule note (SPEC §18.84).
     if (row && row.id !== id) {
       const query = new URL(c.req.url).search;
       c.header("Cache-Control", "no-store");

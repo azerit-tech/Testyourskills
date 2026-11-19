@@ -54,7 +54,7 @@ export interface CardRow {
   denounceBorn: boolean;
   /** Login du dénonciateur, posé seulement s'il était connecté comme propriétaire de sa fiche ; sinon anonyme. */
   denouncerLogin: string | null;
-  /** Le dossier plus complet de la même personne qui remplace cette fiche (SPEC §18.82), sinon null. */
+  /** Le dossier plus complet de la même personne qui remplace cette fiche (SPEC §18.84), sinon null. */
   supersededBy: string | null;
 }
 
@@ -241,7 +241,7 @@ export function stripToken<T extends CardData | ComparisonData>(data: T): T {
 export function migrate(db: Database.Database) {
   const cols = new Set((db.prepare(`PRAGMA table_info(cards)`).all() as { name: string }[]).map((c) => c.name));
   if (!cols.has("ref_card_id")) db.exec(`ALTER TABLE cards ADD COLUMN ref_card_id TEXT`);
-  // Une personne, un dossier, une note (SPEC §18.82) : la lecture du code rangée brute, et la
+  // Une personne, un dossier, une note (SPEC §18.84) : la lecture du code rangée brute, et la
   // fiche que remplace un dossier plus complet de la même personne. Deux colonnes ajoutées, rien de réécrit.
   if (!cols.has("ai_json")) db.exec(`ALTER TABLE cards ADD COLUMN ai_json TEXT`);
   if (!cols.has("superseded_by")) db.exec(`ALTER TABLE cards ADD COLUMN superseded_by TEXT`);
@@ -351,7 +351,7 @@ export class Store {
   }
 
   /**
-   * Une personne, un dossier, une note (SPEC §18.82) : un dossier à deux pièces dont le
+   * Une personne, un dossier, une note (SPEC §18.84) : un dossier à deux pièces dont le
    * lien est prouvé remplace les fiches plus anciennes de la même personne, sa fiche
    * GitHub seule, sa fiche LinkedIn seule et ses dossiers d'avant. Rien n'est réécrit
    * ni supprimé : les anciennes lignes pointent le dossier (`superseded_by`), et leurs

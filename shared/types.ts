@@ -97,7 +97,7 @@ export type CriterionCode = "EDU" | "XP" | "EMP" | "STK" | "CODE" | "ACT" | "OWN
 export const CRITERION_CODES: CriterionCode[] = ["EDU", "XP", "EMP", "STK", "CODE", "ACT", "OWN", "OSS"];
 
 /**
- * Le niveau d'expérience auquel le dossier est lu (barème 0.5.0, SPEC §18.82) : la note
+ * Le niveau d'expérience auquel le dossier est lu (barème 0.5.0, SPEC §18.84) : la note
  * dit « quel niveau pour cette expérience », plus « combien d'années ». Moins d'un an
  * compté, de 1 à 3 ans, de 3 à 6, de 6 à 10, 10 et plus (data/grid.json, `seniority`).
  */

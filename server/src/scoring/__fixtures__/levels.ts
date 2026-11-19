@@ -1,4 +1,4 @@
-// Les dossiers de référence du barème 0.5.0 (SPEC §18.82) : la note dit « quel
+// Les dossiers de référence du barème 0.5.0 (SPEC §18.84) : la note dit « quel
 // niveau pour cette expérience ». Personnes inventées, au 19 novembre 2026.
 //
 //   (a) un début de carrière : un stage de 6 mois chez un employeur très sélectif

@@ -342,7 +342,7 @@ function unionMonths(infos: RoleInfo[]): number {
 
 const levelFor = (y: number) => GRID.XP.levels.find((l) => y >= l.years) ?? GRID.XP.levels[GRID.XP.levels.length - 1];
 
-// --- Le niveau d'expérience (0.5.0, SPEC §18.82) ------------------------------------
+// --- Le niveau d'expérience (0.5.0, SPEC §18.84) ------------------------------------
 //
 // La note dit « quel niveau pour cette expérience » : les mois comptés ne sont plus
 // une note dans la moyenne, ils donnent le niveau auquel le dossier est lu, et les
@@ -1641,7 +1641,7 @@ export function finalize(drafts: Draft[], seniority?: GridSeniority): Grid {
   return { criteria: ordered.map((d) => ({ ...d, counted: counted.has(d.code) })), overall, ...(rule ? { rule } : {}), ...meta };
 }
 
-// --- Un dossier, un calcul (§4, SPEC §18.82) -----------------------------------------------
+// --- Un dossier, un calcul (§4, SPEC §18.84) -----------------------------------------------
 
 /** Ce que GitHub prouve, critère par critère, lu au niveau d'expérience du dossier. Aucune note. */
 function githubDrafts(g: GithubInput, seniority: GridSeniority | undefined): Draft[] {

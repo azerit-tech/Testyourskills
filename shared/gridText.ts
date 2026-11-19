@@ -8,7 +8,7 @@ import type { CriterionCode, Fact, Grid, GridCriterion, GridSeniority, Lang, Sen
 
 /**
  * Les coefficients de data/grid.json (un test vérifie qu'ils n'ont pas dérivé). Depuis
- * 0.5.0 (SPEC §18.82) l'expérience ne pèse plus : les années comptées donnent le
+ * 0.5.0 (SPEC §18.84) l'expérience ne pèse plus : les années comptées donnent le
  * niveau auquel le dossier est lu, et son poids est passé au parcours et à l'ownership.
  */
 export const GRID_WEIGHTS: Record<CriterionCode, number> = { EDU: 1, XP: 0, EMP: 2.5, STK: 1.5, CODE: 2, ACT: 1, OWN: 1.5, OSS: 0.5 };

@@ -1,4 +1,4 @@
-// Le top de la semaine (SPEC §18.22, §18.82). Semaine du lundi 00:00 UTC au dimanche
+// Le top de la semaine (SPEC §18.22, §18.84). Semaine du lundi 00:00 UTC au dimanche
 // 23:59 UTC. Le top classe des personnes, une ligne par personne, sur leur seule
 // note : celle de leur dossier. Entrent les fiches racines de la semaine, sorties
 // avec la lecture IA, encore en ligne, pas remplacées par un dossier plus complet :

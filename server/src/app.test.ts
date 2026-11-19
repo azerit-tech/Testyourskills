@@ -823,7 +823,7 @@ describe("CV et comparaison", () => {
     expect(cmp.id).toBe(json.id);
     expect(new Set([cmp.id, cmp.cv.id, cmp.github.id]).size).toBe(3);
     expect(ctx.calls.scoreCvGithub[0]).toMatchObject({ login: "leamd" });
-    // Une personne, une note (SPEC §18.82) : l'adresse d'une pièce sert le dossier, jamais la pièce seule.
+    // Une personne, une note (SPEC §18.84) : l'adresse d'une pièce sert le dossier, jamais la pièce seule.
     for (const piece of [cmp.cv.id, cmp.github.id]) {
       expect((await getState(ctx, piece)).state).toMatchObject({ state: "done", kind: "comparison", comparison: { id: cmp.id } });
       const page = await ctx.app.request(`/c/${piece}`);

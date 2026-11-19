@@ -1,10 +1,10 @@
 {
-  "_doc": "Barème de recrutement (docs/bareme-recrutement.md §3 et §4, SPEC §18.37 et §18.82). Depuis 0.5.0 la note dit « quel niveau pour cette expérience » : les années comptées donnent le niveau d'expérience (seniority) et sortent de la moyenne (coefficient 0), et le parcours se lit dans la table de ce niveau. Chaque critère est une note entière sur 10 lue dans sa table : le niveau le plus haut dont toute la ligne est remplie, sans base, sans ajout, sans retrait. Les lignes de chaque table vont du niveau le plus haut au plus bas. Changer un seuil ou un coefficient = une ligne ici, et la version de data/scoring.json.",
+  "_doc": "Barème de recrutement (docs/bareme-recrutement.md §3 et §4, SPEC §18.37 et §18.84). Depuis 0.5.0 la note dit « quel niveau pour cette expérience » : les années comptées donnent le niveau d'expérience (seniority) et sortent de la moyenne (coefficient 0), et le parcours se lit dans la table de ce niveau. Chaque critère est une note entière sur 10 lue dans sa table : le niveau le plus haut dont toute la ligne est remplie, sans base, sans ajout, sans retrait. Les lignes de chaque table vont du niveau le plus haut au plus bas. Changer un seuil ou un coefficient = une ligne ici, et la version de data/scoring.json.",
 
   "weights": { "EDU": 1, "XP": 0, "EMP": 2.5, "STK": 1.5, "CODE": 2, "ACT": 1, "OWN": 1.5, "OSS": 0.5 },
 
   "seniority": {
-    "_doc": "Le niveau d'expérience auquel le dossier est lu (SPEC §18.82) : les mois comptés sur les postes datés (stage et alternance pour moitié, XP.share), du plus haut au plus bas. Sans LinkedIn ni CV : les années actives de GitHub × 12, « estimé ». Inconnu (aucun poste daté, aucune année active) : les tables du niveau `default`, et aucun niveau affiché.",
+    "_doc": "Le niveau d'expérience auquel le dossier est lu (SPEC §18.84) : les mois comptés sur les postes datés (stage et alternance pour moitié, XP.share), du plus haut au plus bas. Sans LinkedIn ni CV : les années actives de GitHub × 12, « estimé ». Inconnu (aucun poste daté, aucune année active) : les tables du niveau `default`, et aucun niveau affiché.",
     "levels": [
       { "code": "expert", "months": 120 },
       { "code": "senior", "months": 72 },

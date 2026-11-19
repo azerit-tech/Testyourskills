@@ -73,7 +73,7 @@ export interface Deps {
     opts: { lang: Lang; judgedInSeconds: number; github?: unknown; linkedin?: unknown; now?: string; highBar?: HighBarList },
   ): CardBody;
   /**
-   * Le dossier d'une personne dont on a les deux pièces (SPEC §18.82) : UNE grille et UNE
+   * Le dossier d'une personne dont on a les deux pièces (SPEC §18.84) : UNE grille et UNE
    * note, calculées une fois sur les données brutes. Les deux pièces rendues n'ont ni
    * grille ni note à elles (`overall` y est la note du dossier).
    */
@@ -86,7 +86,7 @@ export interface Deps {
 }
 
 /**
- * Les deux pièces d'un dossier telles qu'on les range (SPEC §18.82) : ni grille ni rang à
+ * Les deux pièces d'un dossier telles qu'on les range (SPEC §18.84) : ni grille ni rang à
  * elles, et pour toute note celle du dossier. Posé ici, quel que soit le moteur branché :
  * rien de ce qui est écrit en base ne peut donner deux chiffres pour la même personne.
  */
@@ -805,7 +805,7 @@ export class Pipeline {
     const vouchedLink = !!vouched && linkedinAsked === vouched.linkedinUrl;
     const linkedinProven = !!li && !!linkedinUrl && (li.proven || vouchedLink || identityProven || githubShowsLinkedin(gh.facts, linkedinUrl));
 
-    // Le dossier : un seul calcul sur les deux pièces, une grille, une note (SPEC §18.82).
+    // Le dossier : un seul calcul sur les deux pièces, une grille, une note (SPEC §18.84).
     // Trois lignes : le dossier, qui porte la note, et ses deux pièces, qui n'en ont pas à elles.
     ctx.emit("compare");
     const scored = deps.scoreDossier({ reading, counts: declared.counts, ...declaredOpts }, { facts: gh.facts, ai: gh.ai }, { lang, judgedInSeconds });

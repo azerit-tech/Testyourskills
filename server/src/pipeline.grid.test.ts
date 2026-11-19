@@ -217,7 +217,7 @@ describe("la liste des employeurs à forte barre, lue dans son fichier, va au sc
     const ctx = setup({ forGithub: async () => ({ profile: HIGH_BAR_PROFILE, proven: true }) }, { realScore: true });
     const s = await run(ctx, { login: "camille-ardent" });
     if (s.state !== "done" || s.kind !== "comparison") throw new Error(`pas une comparaison : ${JSON.stringify(s)}`);
-    // Un dossier, un calcul (SPEC §18.82) : la grille est celle du dossier, ses pièces n'en ont pas.
+    // Un dossier, un calcul (SPEC §18.84) : la grille est celle du dossier, ses pièces n'en ont pas.
     expect(s.comparison.grid!.criteria.find((c) => c.code === "EMP")!.score).toBe(10);
     expect([s.comparison.cv.grid, s.comparison.github.grid]).toEqual([undefined, undefined]);
     expect([s.comparison.cv.overall, s.comparison.github.overall]).toEqual([s.comparison.grid!.overall, s.comparison.grid!.overall]);
@@ -350,7 +350,7 @@ describe("la page partagée : le serveur ne rend la grille entière qu'à la per
   });
 });
 
-describe("garde-fou : une personne, un dossier, une note, partout (SPEC §18.82)", () => {
+describe("garde-fou : une personne, un dossier, une note, partout (SPEC §18.84)", () => {
   it("LinkedIn seul puis GitHub : un seul dossier, un seul chiffre en base, à l'API, au top, aux bandes, aux primes, dans l'aperçu et l'image", async () => {
     const ctx = setup(
       { forUrl: async (url) => ({ status: "found", profile: { ...PROFILE, url }, githubLogin: null }), forGithub: async () => ({ profile: PROFILE, proven: true }) },

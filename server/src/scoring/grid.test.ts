@@ -610,7 +610,7 @@ describe("données de la tâche 1, facultatives", () => {
   });
 });
 
-describe("des débuts de carrière différents n'ont plus la même note (les trois « 38 » du 19 novembre, SPEC §18.82)", () => {
+describe("des débuts de carrière différents n'ont plus la même note (les trois « 38 » du 19 novembre, SPEC §18.84)", () => {
   // Sous 0.4.0, ces cinq profils LinkedIn valaient tous 38 : expérience 2 (moins d'un an, quel que
   // soit le poste), parcours 4 (deux stages comme dix mois de CDI), école 6 (hors liste, arrêtée là) ;
   // la stack et l'ownership déclarés, à 4, ne déplaçaient pas l'arrondi (3,75 ; 3,82 ; 3,85).

@@ -52,7 +52,7 @@ describe("les fiches prennent la note de la grille", () => {
     expect(own.source).toBe("both");
     expect(own.declared).toBe(4);
     expect(own.proven).toBe(8);
-    // Les pièces n'ont pas de grille à elles : leur note est celle du dossier (SPEC §18.82).
+    // Les pièces n'ont pas de grille à elles : leur note est celle du dossier (SPEC §18.84).
     expect([cmp.cv.grid, cmp.github.grid]).toEqual([undefined, undefined]);
     expect([cmp.cv.overall, cmp.github.overall]).toEqual([cmp.grid!.overall, cmp.grid!.overall]);
   });

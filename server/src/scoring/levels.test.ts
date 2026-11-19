@@ -1,4 +1,4 @@
-// Barème 0.5.0 (SPEC §18.82) : la note dit « quel niveau pour cette expérience ».
+// Barème 0.5.0 (SPEC §18.84) : la note dit « quel niveau pour cette expérience ».
 // Les dossiers de référence (__fixtures__/levels.ts), de bout en bout : la fiche
 // LinkedIn seule, la fiche GitHub seule, et le dossier à deux pièces : un seul calcul
 // (dossierGrid), au niveau d'expérience des postes datés.

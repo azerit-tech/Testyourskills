@@ -1,4 +1,4 @@
-// Une personne, un dossier, un calcul, une note (§6.5, §18.36, SPEC §18.82). Le garde-fou
+// Une personne, un dossier, un calcul, une note (§6.5, §18.36, SPEC §18.84). Le garde-fou
 // du moteur : un dossier à deux pièces sort UNE grille et UNE note, ses pièces n'en ont
 // aucune à elles, et tout ce qui peut se lire d'un dossier donne le même chiffre.
 

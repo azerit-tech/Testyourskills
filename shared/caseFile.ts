@@ -48,7 +48,7 @@ export const codeJudged = (cmp: Pick<ComparisonData, "github">): boolean =>
   !cmp.github.unjudged && cmp.github.grid?.rule !== "empty_file" && !cmp.github.sealed;
 
 /**
- * Une personne, une note (SPEC §18.82), à la lecture des dossiers rangés avant 0.5.0, où
+ * Une personne, une note (SPEC §18.84), à la lecture des dossiers rangés avant 0.5.0, où
  * chaque pièce portait sa grille et sa note : les pièces rendues n'ont plus que la note du
  * dossier, et ce que leur grille disait du code (« dossier vide ») reste dans `unjudged`.
  * Sans migration : rien n'est réécrit. Un dossier sans grille (avant 0.4.0) reste tel quel.

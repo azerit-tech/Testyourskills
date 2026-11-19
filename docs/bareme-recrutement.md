@@ -1,6 +1,71 @@
 # Le barème de recrutement
 
-*Proposition du 10 novembre 2026. Document de conception : rien n'est construit. Une fois construit, il devient le barème 0.4.0 et retire le bonus d'école posé sur TEC (barème 0.3.0, SPEC §18.35).*
+*Proposition du 10 novembre 2026, construite depuis (barème 0.4.0, SPEC §18.37). Le barème qui tourne est le 0.5.0 du 19 novembre : sa section, juste dessous, décrit ce qui est construit et fait foi là où elle contredit la proposition.*
+
+## Barème 0.5.0 : ce qui est construit (19 novembre 2026)
+
+*Cette section décrit le moteur tel qu'il tourne (`data/grid.json`, `server/src/scoring/grid.ts`, SPEC §18.84). Là où elle contredit la suite du document (la proposition du 10 novembre, barème 0.4.0), c'est elle qui fait foi : l'expérience (§3.2), les tables du parcours, de la stack et de l'ownership (§3.3, §3.4, §3.7), les coefficients (§4), le top de la semaine (§9, question 7).*
+
+**La note dit « quel niveau pour cette expérience ».** Sous 0.4.0, un étudiant avec 8 à 18 mois de stage recevait 2/10 en expérience (coefficient 1,5) et 4/10 en parcours, et finissait à 38 quoi que valent ses stages. Depuis 0.5.0 :
+
+1. **Les années donnent un niveau, elles ne se notent plus.** Le code compte les mois sur les postes datés (stage et alternance pour moitié), et range la personne :
+
+   | Niveau | Mois comptés |
+   |---|---|
+   | Début de carrière | moins de 12 |
+   | Junior | de 12 à 36 |
+   | Confirmé | de 36 à 72 |
+   | Senior | de 72 à 120 |
+   | Expert | 120 et plus |
+
+   Sans postes datés : les années déclarées (« affirmé ») ; fiche GitHub seule : les années actives (50 contributions ou plus sur douze mois), une année pour douze mois (« estimé ») ; rien du tout : la table « Junior ». La fiche le dit en une ligne : « Jugé au niveau Junior · 1,1 an ».
+
+2. **L'expérience sort de la moyenne** (coefficient 0). Le parcours mesure déjà ce que vaut l'expérience ; noter en plus sa durée faisait payer deux fois le fait d'être jeune. Les coefficients :
+
+   | Critère | 0.4.0 | 0.5.0 |
+   |---|---|---|
+   | Parcours et employeurs | 1,5 | 2,5 |
+   | Niveau du code | 2 | 2 |
+   | Stack technique | 1,5 | 1,5 |
+   | Ownership et production | 1 | 1,5 |
+   | Activité | 1 | 1 |
+   | École et sélection | 1 | 1 |
+   | Open source | 0,5 | 0,5 |
+   | Expérience | 1,5 | 0 |
+
+3. **Le parcours se lit dans la table du niveau** (`EMP.tables`). Un niveau s'ouvre dès qu'une de ses conditions est remplie.
+
+   | Note | Début de carrière | Junior | Confirmé | Senior | Expert |
+   |---|---|---|---|---|---|
+   | 10 | un stage de 4 mois, ou un poste de 6 mois, chez un employeur très sélectif à l'embauche | un an chez un employeur très sélectif | 2 ans chez un employeur très sélectif, et une progression ou une équipe | 3 ans, idem | 4 ans, une progression et une équipe |
+   | 8 | deux stages en équipe produit exigeante ; un poste de 6 mois en équipe produit ; une entreprise fondée, 6 mois | un an en équipe produit ; une entreprise fondée, un an | 2 ans en équipe produit ; fondée, 3 ans | 3 ans en équipe produit avec progression ou équipe ; fondée, 4 ans | 4 ans, idem ; fondée, 5 ans |
+   | 7 | un stage de 4 mois en équipe produit ; 12 mois de stages cumulés | | | | |
+   | 6 | deux stages ; un poste ; une entreprise fondée | 6 mois en équipe produit ; fondée, 6 mois ; un poste de 2 ans | un an en équipe produit ; fondée, un an ; 2 ans avec progression ou équipe | 3 ans en équipe produit ; fondée, 2 ans ; 3 ans avec progression ou équipe | 4 ans en équipe produit ; fondée, 3 ans ; 4 ans avec progression ou équipe |
+   | 5 | un stage de 4 mois | un poste d'un an | un poste de 2 ans | un poste de 3 ans | un poste de 4 ans |
+   | 4 | | un poste, ou une entreprise fondée | idem | idem | idem |
+   | 3 ou 2 | un stage (3) | un stage (3) | un stage (2) | un stage (2) | un stage (2) |
+
+4. **La stack et l'ownership prouvés ont une table pour qui débute** (`STK.byLevel`, `OWN.byLevel`, début de carrière et junior) ; à partir du niveau confirmé, la table commune du §3.4 et du §3.7, inchangée. Exemple, la stack d'un début de carrière : 10 pour 400 commits dans le langage principal depuis un an avec une autre famille de langages, 8 pour 200 commits depuis un an, 6 pour 100 commits, 4 pour 25. Le code, l'activité, l'école et l'open source restent absolus : un code propre est propre à tout âge.
+
+5. **Ce qui n'est que déclaré ne fait jamais baisser la note** (`final.declaredNeverLower`), comme l'école et l'open source : une stack ou un ownership lus sur LinkedIn n'entrent dans la moyenne que s'ils sont au-dessus de celle des autres critères.
+
+6. **Un GitHub trop mince ne prouve rien, ni en bien ni en mal** (`thinGithub`) : moins de 3 dépôts publics et aucun de 10 commits, ou moins de 50 commits publics en tout. Ses critères sont non prouvés, stack et code compris : quelques commits de cours ne font pas baisser un dossier.
+
+7. **Les règles finales tiennent** : un critère sans note sort de la moyenne ; plafond à 85 sans code prouvé ; 20 pour un dossier dont moins d'un quart des coefficients est noté ; une note par critère, lue dans une table, aucun « + n ».
+
+**Une personne, un dossier, un calcul, une note.** Le moteur reçoit tout ce qu'on sait de la personne (LinkedIn ou CV, GitHub, ou les deux) et sort une grille et une note (`dossierGrid`). Il n'existe pas de note GitHub ni de note LinkedIn : une fiche à une seule source est un dossier à une pièce. Au dossier à deux pièces, le niveau est celui des postes datés, et la stack et l'ownership de GitHub se lisent à ce niveau. Le top de la semaine, les bandes, les primes, le partage et les images lisent cette note-là (question 7 du §9 : tranchée, la note du dossier).
+
+**Les dossiers de référence** (`server/src/scoring/levels.test.ts`), note du dossier sous 0.4.0 → 0.5.0, l'avant mesuré en faisant tourner le moteur 0.4.0 sur les mêmes dossiers :
+
+| Dossier | 0.4.0 | 0.5.0 |
+|---|---|---|
+| Un stage de 6 mois chez un employeur très sélectif, GitHub correct | 38 (2★) | 69 (4★) |
+| Le même stage dans une entreprise que rien ne distingue | 38 (2★) | 55 (3★) |
+| Douze ans dans le même poste, sans progression, GitHub médiocre | 53 (3★) | 43 (2★) |
+| École d'ingénieurs, 6 mois de stage en startup de produit et 2 mois ailleurs, 28 commits de cours | 32 (2★) | 70 (4★) |
+| La même, deux stages que rien ne distingue | 32 (2★) | 60 (3★) |
+| Jacques (dossier) | 57 | 72 |
+| Lumine (dossier) | 45 | 66 |
 
 ## 0. En bref
 
@@ -106,6 +171,8 @@ Les huit critères, leurs noms et leurs coefficients :
 **Données** : le rang existe (0.3.0). À ajouter : les signaux de sélection (lecture IA avec extrait ; dépôts GitHub par mot-clé, en code), la section des distinctions.
 
 ### 3.2 Expérience (XP)
+
+*Depuis 0.5.0, ce critère ne pèse plus : les années comptées donnent le niveau auquel le reste se lit (voir « Barème 0.5.0 »). La table ci-dessous ne sert plus qu'à la barre XP de la fiche.*
 
 **Ce que ça mesure** : les années de métier.
 
@@ -315,7 +382,7 @@ Déclaré sur LinkedIn, sans GitHub pour le prouver (la table s'arrête à 6) :
 | École et sélection | 1 | 10 % | Un signal réel, qui pèse surtout en début de carrière. |
 | Open source | 0,5 | 5 % | Un plus, rare. |
 
-LinkedIn porte 40 % de la note (école, expérience, parcours), GitHub 50 % (stack, code, activité, open source), et l'ownership, 10 %, se lit sur les deux.
+*Coefficients du 0.4.0. Depuis 0.5.0 : parcours 2,5, code 2, stack 1,5, ownership 1,5, activité 1, école 1, open source 0,5, expérience 0 (voir « Barème 0.5.0 »). LinkedIn porte 35 % de la note (école, parcours), GitHub 50 % (stack, code, activité, open source), et l'ownership, 15 %, se lit sur les deux.*
 
 **Quatre règles sur la note finale**, et pas une de plus :
 
@@ -535,4 +602,4 @@ Seulement celles où son jugement de recruteur est nécessaire. Chacune a une va
 4. **L'école et l'open source ne peuvent pas faire baisser la note** (règle 2 du §4). L'autre choix, plus simple : une moyenne pure, où une école de rang C pèse comme n'importe quelle note. *Par défaut* : la règle, pour qu'une école modeste ne coûte jamais plus qu'une absence d'école.
 5. **Les noms sur une page partagée.** Les pièces citent l'école et d'anciens employeurs, et une fiche peut être faite sur quelqu'un d'autre. *Par défaut* : pièces complètes pour la personne qui a lancé la fiche ou qui l'a revendiquée ; sur la page partagée, le rang de l'école et les comptes (« deux stages, une entreprise fondée »), sans nom d'ancien employeur.
 6. **Les coefficients, et le poids des stages** : 40 % LinkedIn, 50 % GitHub, 10 % les deux ; stage et alternance à 50 %, entreprise fondée à 100 %, association à 0 %. *Par défaut* : ces valeurs, à recaler quand la référence des rangs aura tourné.
-7. **Le top de la semaine** : note de la fiche GitHub, ou note du dossier ? Depuis « un dossier, une fiche, une note » (SPEC §18.36), la page d'un dossier ne montre qu'une note, celle du dossier ; le top, lui, classe encore sur la note de la fiche GitHub, et peut donc afficher une autre note que la page. *En attente de Jacques* : rien n'est tranché ; d'ici là, le top garde la note de la fiche GitHub.
+7. **Le top de la semaine** : note de la fiche GitHub, ou note du dossier ? *Tranché le 19 novembre 2026 (SPEC §18.84)* : la note du dossier, la seule. Le top classe des personnes, une ligne chacune ; une pièce d'un dossier n'a plus de note à elle.

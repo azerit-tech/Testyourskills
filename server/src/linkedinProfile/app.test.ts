@@ -447,7 +447,7 @@ describe("entrée LinkedIn (le champ unique)", () => {
     const s = await state(ctx, json.id);
     expect(s).toMatchObject({ state: "done", kind: "card", card: { source: "cv", declaredSource: "linkedin", linkedinUrl: URL_ } });
     expect(ctx.store.getCard(json.id)).toMatchObject({ source: "linkedin", login: null, facts: { linkedinUrl: URL_ } });
-    // Le top classe des personnes (SPEC §18.82) : la fiche LinkedIn seule y entre, sans rien qui la nomme.
+    // Le top classe des personnes (SPEC §18.84) : la fiche LinkedIn seule y entre, sans rien qui la nomme.
     expect(weekRank(ctx.store.db, json.id)).toMatchObject({ rank: 1, total: 1 });
     expect(JSON.stringify(weekTop(ctx.store.db).entries)).not.toMatch(new RegExp(`${json.id}|Camille|camille`));
     expect(ctx.calls.collect).toHaveLength(0);

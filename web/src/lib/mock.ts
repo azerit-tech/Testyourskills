@@ -293,7 +293,7 @@ function buildComparison(id: string, job: MockJob | null, mg: MockGrids, linkedi
     cmp.cv = { ...cmp.cv, avatarUrl: MOCK_PHOTO };
     cmp.github = { ...cmp.github, avatarUrl: MOCK_PHOTO };
   }
-  // Comme le serveur (SPEC §18.83) : les pièces rendues ne portent que la note du dossier, sans grille à elles.
+  // Comme le serveur (SPEC §18.84) : les pièces rendues ne portent que la note du dossier, sans grille à elles.
   return oneNote(cmp);
 }
 

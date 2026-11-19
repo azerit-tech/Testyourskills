@@ -297,7 +297,7 @@ describe("un dossier à deux pièces : une personne, une entrée", () => {
       { person: "gh:leamd", kind: "ecole", band: "epita", card: dossier.id, stars },
     ]);
     expect(bandStanding(ctx.store.db, "boite", "doctolib")).toMatchObject({ members: 1, score: stars });
-    // Une personne, une note (SPEC §18.82) : l'adresse de sa fiche LinkedIn sert maintenant son dossier.
+    // Une personne, une note (SPEC §18.84) : l'adresse de sa fiche LinkedIn sert maintenant son dossier.
     expect(ctx.store.fileRow(li.id)!.id).toBe(dossier.id);
     // Sa fiche GitHub refaite seule ne prend pas la place du dossier.
     const alone = insert(ctx.store, { login: "leamd", overall: 20 });

@@ -1,4 +1,4 @@
-// Les dossiers des deux fondateurs, tels que le pipeline les range (SPEC §18.82) :
+// Les dossiers des deux fondateurs, tels que le pipeline les range (SPEC §18.84) :
 // un calcul sur les deux pièces (scoreDossier), une grille, une note, et deux pièces
 // sans note à elles (asPieces). À côté, pour comparer : la même personne avec une seule
 // de ses pièces, qui est alors un dossier à une pièce.
