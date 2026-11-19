@@ -1,4 +1,4 @@
-// « Dénonce un complice » (§18.6, §18.48, §18.82), le premier bloc sous le verdict. Rien
+// « Dénonce un complice » (§18.6, §18.48, §18.83), le premier bloc sous le verdict. Rien
 // à coller : on tape un nom, des comptes GitHub et des profils LinkedIn sortent sous le
 // champ, on touche la personne et la dénonciation part. Un lien LinkedIn collé ou un
 // pseudo GitHub tapé en entier marchent toujours. La fiche du complice sort par le moteur

@@ -28,9 +28,11 @@ interface Props {
   strong?: boolean;
   /** Le nom public de la fiche : s'il a un prénom et un nom, le champ en part. */
   name?: string;
+  /** La fiche que le LinkedIn complète : ses bandes suivent le dossier (§18.82). */
+  cardId?: string;
 }
 
-export function AddLinkedin({ login, strong = false, name = "" }: Props) {
+export function AddLinkedin({ login, strong = false, name = "", cardId }: Props) {
   const { t, lang } = useT();
   const p = t.result.addLinkedin;
   const uid = useId().replace(/:/g, "");
@@ -60,7 +62,7 @@ export function AddLinkedin({ login, strong = false, name = "" }: Props) {
     setBusy(true);
     setError(null);
     try {
-      const res = await api.createCard({ login, linkedin: url, lang });
+      const res = await api.createCard({ login, linkedin: url, lang, from: cardId });
       if (res.deleteToken) tokens.set(res.id, res.deleteToken);
       rememberInput({ login, file: null });
       markFresh(res.id, login);

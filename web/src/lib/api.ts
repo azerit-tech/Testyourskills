@@ -22,6 +22,8 @@ export interface CreateInput {
   linkedin?: string;
   /** « Dénonce un complice » (§18.6) : l'id de la fiche du dénonciateur. */
   denouncedBy?: string;
+  /** La fiche que celle-ci complète (« Ajoute ton GitHub », « Ajoute ton LinkedIn ») : ses bandes suivent (§18.82). */
+  from?: string;
 }
 
 export type Verdict = "guilty" | "cleared";
@@ -344,10 +346,12 @@ async function createCard(input: CreateInput): Promise<CreateResult> {
       if (ref) fd.append("ref", ref);
       res = await fetch("/api/card", { method: "POST", headers: browser, body: fd });
     } else {
+      // Le jeton de la fiche complétée prouve que c'est le même navigateur : une personne, une entrée dans ses bandes.
+      const held = input.from ? tokens.get(input.from) : null;
       res = await fetch("/api/card", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...browser },
-        body: JSON.stringify({ login: input.login, linkedin: input.linkedin, lang: input.lang, ref, denouncedBy: input.denouncedBy }),
+        headers: { "Content-Type": "application/json", ...browser, ...(held ? { "X-Card-Token": held } : {}) },
+        body: JSON.stringify({ login: input.login, linkedin: input.linkedin, lang: input.lang, ref, denouncedBy: input.denouncedBy, from: input.from }),
       });
     }
   } catch {

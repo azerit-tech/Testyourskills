@@ -161,7 +161,7 @@ describe("bloc de partage selon l'appareil (§18.27)", () => {
 describe("barre du pouce (§18.27)", () => {
   const phone: Env = { ua: IPHONE, touch: true, share: true, narrow: true };
 
-  it("écran étroit, fiche posée : « Dénonce un complice » en tête, « Partager » dessous, cachée tant qu'on ne sait pas où est le bloc de partage (§18.82)", () => {
+  it("écran étroit, fiche posée : « Dénonce un complice » en tête, « Partager » dessous, cachée tant qu'on ne sait pas où est le bloc de partage (§18.83)", () => {
     const html = renderDock(phone, true);
     expect(html).toMatch(/^<div class="dock"[^>]* inert=""/);
     // Deux rangs : le champ à toucher, puis le seul rose de la barre. Plus de bouton « Dénoncer ».
@@ -188,7 +188,7 @@ describe("barre du pouce (§18.27)", () => {
     expect(src).toMatch(/const who = !denounceSeen && \(\s*<button type="button" className="dock-who"/);
   });
 
-  it("sous trois étoiles, une source à ajouter : « Ajouter mon LinkedIn » en rose, « Partager » en contour, « Dénonce un complice » au-dessus (§18.52, §18.82)", () => {
+  it("sous trois étoiles, une source à ajouter : « Ajouter mon LinkedIn » en rose, « Partager » en contour, « Dénonce un complice » au-dessus (§18.52, §18.83)", () => {
     for (const [add, label] of [["linkedin", "Ajouter mon LinkedIn"], ["github", "Ajouter mon GitHub"]] as const) {
       const item = stub(phone, "AbCdEf1234");
       const html = renderToStaticMarkup(createElement(LangProvider, null, createElement(ShareDock, { item, ready: true, toast: () => undefined, add })));

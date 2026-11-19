@@ -1,4 +1,4 @@
-// La barre du pouce (§18.27, §18.82) : sur téléphone, dès que la fiche est posée, deux rangs
+// La barre du pouce (§18.27, §18.83) : sur téléphone, dès que la fiche est posée, deux rangs
 // sous le pouce. En haut, « Dénonce un complice », dessiné comme un champ : un toucher mène au
 // champ du bloc, juste sous la fiche, clavier ouvert. Dessous, « Partager », le rose.
 // Elle s'efface quand le bouton rose du bloc de partage ou la fiche d'un complice prête à

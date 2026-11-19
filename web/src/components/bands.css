@@ -95,7 +95,17 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 4px 16px;
+  gap: 4px 12px;
+}
+/* « Changer » et « Sortir », discrets, à droite du partage, sur sa ligne à 390 px (197 + 12 + 106 sur 318) ;
+   à la ligne ensemble s'ils ne tiennent pas (320 px) */
+.bp-quiet {
+  display: inline-flex;
+  gap: 16px;
+}
+/* l'écart entre les étoiles et la suite de la phrase : une marge, pas une deuxième espace */
+.bp-line .stars {
+  margin-right: 0.3em;
 }
 
 /* ---------- une bande sur une ligne (BandRow) ---------- */

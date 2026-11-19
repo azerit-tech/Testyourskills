@@ -1,12 +1,24 @@
-// Les bandes (SPEC §18.38) : le classement par école et par boîte.
+// Les bandes (SPEC §18.38, entrée d'office §18.82) : le classement par école et par boîte.
 //
 // Qui joue : toute fiche (GitHub, LinkedIn seule, CV, dossier à deux pièces, sa
 // note du dossier), sauf les fiches sorties sans lecture IA, expirées ou
-// masquées. Rien n'est compté sans le toucher de la personne : seul le navigateur
-// qui a créé la fiche (son jeton) ou la personne connectée comme propriétaire la
-// fait entrer ; une fiche née d'une dénonciation n'entre qu'une fois revendiquée.
-// Une personne (login GitHub, sinon adresse LinkedIn, sinon la fiche), une école
-// et une boîte au plus ; trois entrées par jour et par IP.
+// masquées. Une personne (login GitHub, sinon adresse LinkedIn, sinon la fiche),
+// une école et une boîte au plus.
+//
+// L'entrée d'office (autoJoinBands, §18.82) : dès que la fiche est posée, sa
+// personne entre dans la bande de l'école lue sur son profil (LinkedIn, CV) et
+// dans celle de son employeur actuel (LinkedIn, sinon CV, sinon le champ
+// « company » du profil GitHub), si le nom passe les mêmes contrôles qu'un nom
+// tapé. Elle ne vaut que pour une fiche faite par sa personne (le navigateur qui
+// l'a créée tient son jeton) ; une fiche née d'une dénonciation n'entre qu'à la
+// revendication (auth.ts). Elle ne remplace jamais une bande déjà tenue, ne
+// rouvre pas une ligue quittée (band_optouts), et ne prend rien à la limite par
+// IP. Un dossier à deux pièces est une seule personne : la nouvelle fiche reprend
+// l'entrée de la pièce qu'elle complète, avec les étoiles du dossier.
+//
+// À la main : seul le navigateur qui a créé la fiche (son jeton) ou la personne
+// connectée comme propriétaire change de bande ou en sort ; trois entrées par
+// jour et par IP, l'entrée d'office non comptée.
 //
 // Le score d'une bande : la somme des étoiles de ses vingt meilleurs dossiers. À
 // égalité : le plus de dossiers, puis la bande la plus ancienne (son premier
@@ -18,10 +30,11 @@
 // jamais un nom : le profil criminel et les étoiles, le @pseudo seulement pour
 // une fiche revendiquée.
 //
-// Le nom d'une boîte hors alias est tapé par son premier membre : refusé s'il
-// porte une insulte, une adresse, un @ ou un numéro, toujours nettoyé, et sans
-// page publique, image ni place au tableau avant trois dossiers (hasPage). Une
-// bande fermée à la main (data/bands.json, blocked) n'existe plus pour personne.
+// Le nom d'une boîte hors alias vient de son premier membre (tapé, ou lu sur son
+// profil) : refusé s'il porte une insulte, une adresse, un @ ou un numéro,
+// toujours nettoyé, et sans page publique, image ni place au tableau avant trois
+// dossiers (hasPage). Une bande fermée à la main (data/bands.json, blocked)
+// n'existe plus pour personne.
 
 import type Database from "better-sqlite3";
 import type { Context, Hono } from "hono";
@@ -98,14 +111,27 @@ export function ensureBandTables(db: Database.Database): void {
     PRIMARY KEY (person_key, kind)
   );
   CREATE INDEX IF NOT EXISTS band_members_band ON band_members(kind, band_id);
-  CREATE INDEX IF NOT EXISTS band_members_card ON band_members(card_id);`);
+  CREATE INDEX IF NOT EXISTS band_members_card ON band_members(card_id);
+  -- Une ligue quittée à la main : l'entrée d'office ne la rouvre pas (§18.82). Part avec la fiche.
+  CREATE TABLE IF NOT EXISTS band_optouts (
+    person_key TEXT NOT NULL,
+    kind       TEXT NOT NULL CHECK (kind IN ('ecole', 'boite')),
+    card_id    TEXT NOT NULL,              -- la fiche d'où la personne est sortie
+    at         INTEGER NOT NULL,           -- ms epoch
+    PRIMARY KEY (person_key, kind)
+  );
+  CREATE INDEX IF NOT EXISTS band_optouts_card ON band_optouts(card_id);`);
 }
 
 /** Supprime les membres portés par ces fiches (fiche supprimée ou purgée). */
 export function removeBandMembers(db: Database.Database, cardIds: string[]): void {
   if (!cardIds.length) return;
   const stmt = db.prepare(`DELETE FROM band_members WHERE card_id = ?`);
-  for (const id of cardIds) stmt.run(id);
+  const out = db.prepare(`DELETE FROM band_optouts WHERE card_id = ?`);
+  for (const id of cardIds) {
+    stmt.run(id);
+    out.run(id);
+  }
   forgetBands(db);
 }
 
@@ -349,15 +375,128 @@ export function joinBand(store: Store, root: CardRow, ref: BandRef, now = Date.n
          card_id = excluded.card_id, login = excluded.login, stars = excluded.stars, joined_at = excluded.joined_at`,
     )
     .run(key, ref.type, ref.id, ref.label.slice(0, BAND_ID_MAX), root.id, login, stars, now);
+  // Entrer efface la sortie d'avant : la ligue n'est plus quittée.
+  store.db.prepare(`DELETE FROM band_optouts WHERE person_key = ? AND kind = ?`).run(key, ref.type);
   forgetBands(store.db);
   return { changed: true };
 }
 
-/** La personne de cette fiche quitte sa bande de cette ligue. false si elle n'en avait pas. */
-export function leaveBand(store: Store, root: CardRow, type: BandType): boolean {
-  const r = store.db.prepare(`DELETE FROM band_members WHERE person_key = ? AND kind = ?`).run(personKey(store, root), type);
+/**
+ * La personne de cette fiche quitte sa bande de cette ligue. false si elle n'en
+ * avait pas. La sortie est retenue : l'entrée d'office ne rouvre pas cette ligue
+ * (§18.82), seule une entrée à la main le fait.
+ */
+export function leaveBand(store: Store, root: CardRow, type: BandType, now = Date.now()): boolean {
+  const key = personKey(store, root);
+  const r = store.db.prepare(`DELETE FROM band_members WHERE person_key = ? AND kind = ?`).run(key, type);
+  if (r.changes > 0) {
+    store.db
+      .prepare(
+        `INSERT INTO band_optouts (person_key, kind, card_id, at) VALUES (?, ?, ?, ?)
+         ON CONFLICT(person_key, kind) DO UPDATE SET card_id = excluded.card_id, at = excluded.at`,
+      )
+      .run(key, type, root.id, now);
+  }
   forgetBands(store.db);
   return r.changes > 0;
+}
+
+// --- L'entrée d'office (§18.82) ---------------------------------------------------
+
+/** La fiche compte encore : en base, lue par l'IA, pas expirée. */
+function counts(row: CardRow | null, now: number): row is CardRow {
+  return !!row && !row.degraded && (row.expiresAt === null || row.expiresAt > now);
+}
+
+/** L'adresse LinkedIn d'une fiche racine (ses faits, sinon la fiche), ou null. */
+function linkedinOf(root: CardRow): string | null {
+  const facts = root.facts as { linkedinUrl?: unknown } | null;
+  const url = typeof facts?.linkedinUrl === "string" ? facts.linkedinUrl : root.kind === "card" ? (root.data as CardData).linkedinUrl : undefined;
+  return typeof url === "string" && url ? url : null;
+}
+
+/**
+ * La nouvelle fiche complète-t-elle celle-ci (« Ajoute ton GitHub », « Ajoute ton
+ * LinkedIn ») ? Même login, ou même adresse LinkedIn. Le navigateur a déjà prouvé
+ * qu'il tient le jeton de l'ancienne (app.ts).
+ */
+function samePerson(store: Store, root: CardRow, from: CardRow): boolean {
+  const a = store.loginOf(root)?.toLowerCase();
+  const b = store.loginOf(from)?.toLowerCase();
+  if (a && b) return a === b;
+  const la = linkedinOf(root);
+  return !!la && la === linkedinOf(from);
+}
+
+/** Les entrées et les sorties tenues sous l'ancienne clé passent sous la nouvelle ; la nouvelle garde les siennes. */
+function adoptKey(db: Database.Database, from: string, to: string): void {
+  for (const table of ["band_members", "band_optouts"] as const) {
+    db.prepare(`UPDATE OR IGNORE ${table} SET person_key = ? WHERE person_key = ?`).run(to, from);
+    db.prepare(`DELETE FROM ${table} WHERE person_key = ?`).run(from);
+  }
+}
+
+export interface AutoJoinOptions {
+  now?: number;
+  /**
+   * La fiche que celle-ci complète, faite par le même navigateur (son jeton
+   * vérifié par l'appelant) : ses bandes suivent, une personne reste une entrée.
+   */
+  from?: CardRow | null;
+}
+
+/**
+ * L'entrée d'office (§18.82) : la personne de cette fiche entre dans la bande de
+ * l'école lue sur son profil et dans celle de son employeur actuel. Rend les
+ * ligues où elle vient d'entrer.
+ *
+ * - Jamais pour une fiche sans lecture IA, expirée, masquée, ni pour une fiche née
+ *   d'une dénonciation tant qu'elle n'est pas revendiquée.
+ * - Une ligue déjà tenue n'est pas remplacée : la fiche neuve y rapporte seulement
+ *   ses étoiles (celles du dossier pour deux pièces ; une pièce seule ne prend pas
+ *   la place d'un dossier qui compte encore).
+ * - Une ligue quittée à la main reste quittée ; une bande fermée reste fermée.
+ * - Rien n'est pris à la limite par IP : elle ne garde que les entrées à la main.
+ */
+export function autoJoinBands(store: Store, row: CardRow, o: AutoJoinOptions = {}): BandType[] {
+  const now = o.now ?? Date.now();
+  const root = rootOf(store, row);
+  if (!counts(root, now)) return [];
+  const login = store.loginOf(root);
+  if (login && store.isHidden(login)) return [];
+  if (root.denounceBorn && !(login && store.getOwner(login))) return [];
+
+  const key = personKey(store, root);
+  const from = o.from ? rootOf(store, o.from) : null;
+  if (from && from.id !== root.id && !from.denounceBorn && samePerson(store, root, from)) {
+    const old = personKey(store, from);
+    if (old !== key) adoptKey(store.db, old, key);
+  }
+
+  const suggest = suggestions(root);
+  const stars = starsOfRow(root);
+  const joined: BandType[] = [];
+  for (const type of ["ecole", "boite"] as const) {
+    const held = membership(store.db, key, type);
+    if (held) {
+      if (held.card_id === root.id) continue;
+      const before = store.getCard(held.card_id);
+      // Le dossier porte la note de la personne : une pièce seule refaite après lui ne la rabaisse pas.
+      if (counts(before, now) && before.kind === "comparison" && root.kind !== "comparison") continue;
+      store.db
+        .prepare(`UPDATE band_members SET card_id = ?, stars = ?, login = ? WHERE person_key = ? AND kind = ?`)
+        .run(root.id, stars, login?.toLowerCase() ?? null, key, type);
+      continue;
+    }
+    const left = store.db.prepare(`SELECT 1 FROM band_optouts WHERE person_key = ? AND kind = ?`).get(key, type);
+    const ref = suggest[type];
+    if (left || !ref || isBlockedBand(type, ref.id, ref.label)) continue;
+    joinBand(store, root, ref, now);
+    store.recordEvent("band_join", root.id, { type, auto: true });
+    joined.push(type);
+  }
+  forgetBands(store.db);
+  return joined;
 }
 
 // --- API -------------------------------------------------------------------------

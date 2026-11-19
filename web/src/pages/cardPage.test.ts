@@ -180,7 +180,7 @@ describe("page partagée, vue par un visiteur", () => {
 describe("après-fiche, vue par qui a fait la fiche (§18.27)", () => {
   const mine = (id: string) => card({ id });
 
-  it("le verdict (pari, jury) en une ligne, la dénonciation, le partage, puis le reste en lignes (§18.48, §18.76, §18.82)", () => {
+  it("le verdict (pari, jury) en une ligne, la dénonciation, le partage, puis le reste en lignes (§18.48, §18.76, §18.83)", () => {
     const html = renderResult(mine("OwnCard0001"), { owner: true, token: "tok", plea: 6 });
     const order = at(html, ['class="after-head"', 'class="plea-verdict"', 'class="jury-line"', 'class="after-block denounce"', 'class="after-block out"', 'class="rest"', 'class="after-foot"']);
     expect(ascending(order), JSON.stringify(order)).toBe(true);
@@ -417,7 +417,7 @@ describe("la lecture du recruteur (§18.37)", () => {
     expect(html).not.toContain("lit @");
   });
 
-  it("la ligne du recruteur et les huit tuiles : le premier des plis, après le verdict, la dénonciation et le partage (§18.48, §18.76, §18.82)", () => {
+  it("la ligne du recruteur et les huit tuiles : le premier des plis, après le verdict, la dénonciation et le partage (§18.48, §18.76, §18.83)", () => {
     const html = renderResult(card({ grid, overall: grid.overall }), { owner: true, token: "tok", plea: 4 });
     const order = at(html, ['class="result-stage"', 'class="after-head"', 'class="after-block denounce"', 'class="after-block out"', 'add-linkedin', 'class="rest"', 'class="fold rr"', 'class="fold email"']);
     expect(ascending(order), JSON.stringify(order)).toBe(true);

@@ -331,11 +331,11 @@ const fr = {
         h: "Les bandes",
         blocks: [
           [
-            "Rien n'y entre sans ton accord : tu choisis une école et une boîte au plus, sous ta fiche ou sur la page d'une bande. Une fiche faite depuis la page d'une bande y entre dès qu'elle est posée, comme la page l'annonce.",
-            "On garde ce choix avec l'identifiant de la fiche et ses étoiles.",
-            "L'école lue sur ton profil reste privée tant que tu ne la choisis pas.",
+            "La fiche que tu fais entre d'office dans la bande de l'école et de la boîte lues sur ton profil, une de chaque au plus ; faite depuis la page d'une bande, elle entre dans celle-là. Une fiche faite par quelqu'un d'autre pour te dénoncer n'y entre pas tant que tu ne l'as pas revendiquée.",
+            "On garde cette entrée avec l'identifiant de la fiche et ses étoiles ; si tu sors, on retient ta sortie pour ne pas t'y remettre.",
+            "L'école lue sur ton profil ne s'affiche pas sur ta fiche : elle ne sert qu'à ta bande.",
             "La page d'une bande ne montre jamais un nom : ton pseudo GitHub seulement si ta fiche est revendiquée, les autres fiches sont comptées sans être montrées.",
-            "Pour en sortir : « Sortir », sous ta fiche. Supprimer ta fiche t'en retire aussi, la masquer la retire du compte.",
+            "Pour changer ou en sortir : « Changer » ou « Sortir », sous ta fiche. Supprimer ta fiche t'en retire aussi, la masquer la retire du compte.",
           ],
         ],
       },
@@ -527,11 +527,11 @@ const en: PagesDict = {
         h: "Crews",
         blocks: [
           [
-            "Nothing goes in without your say-so: you pick one school and one company at most, under your sheet or on a crew's page. A sheet made from a crew's page joins it as soon as it lands, as the page says.",
-            "We keep that choice with the sheet's ID and its stars.",
-            "The school read from your profile stays private until you pick it.",
+            "The sheet you make joins the crew of the school and of the company read from your profile, one of each at most; made from a crew's page, it joins that one. A sheet someone else made to tip you off stays out until you claim it.",
+            "We keep that entry with the sheet's ID and its stars; if you leave, we remember it so you aren't put back in.",
+            "The school read from your profile isn't shown on your sheet: it only serves your crew.",
             "A crew's page never shows a name: your GitHub username only if your sheet is claimed, the other sheets are counted without being shown.",
-            "To leave: “Leave”, under your sheet. Deleting your sheet removes you too, hiding it takes it out of the count.",
+            "To switch or leave: “Switch” or “Leave”, under your sheet. Deleting your sheet removes you too, hiding it takes it out of the count.",
           ],
         ],
       },

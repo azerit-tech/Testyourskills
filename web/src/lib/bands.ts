@@ -265,6 +265,8 @@ const mock = {
     return { band, members };
   },
   mine(cardId: string): MyBands {
+    // Comme le serveur (§18.82) : la fiche posée est déjà dans la bande de son école et de sa boîte.
+    if (!mockJoined.has(cardId)) mockJoined.set(cardId, { ecole: { id: "centralesupelec", label: "CentraleSupélec" }, boite: { id: "doctolib", label: "Doctolib" } });
     const joined = mockJoined.get(cardId) ?? {};
     const find = (t: BandType) => (joined[t] ? (mockStandings(t).find((b) => b.id === joined[t]!.id) ?? null) : null);
     return {

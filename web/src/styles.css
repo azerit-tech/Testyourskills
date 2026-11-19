@@ -3300,7 +3300,7 @@ a.dossier-item:hover {
   color: var(--c-emphasis);
 }
 
-/* la barre du pouce (§18.27, §18.82) : téléphone seulement (ShareDock ne la rend pas au-delà de 640 px), fond d'encre plat.
+/* la barre du pouce (§18.27, §18.83) : téléphone seulement (ShareDock ne la rend pas au-delà de 640 px), fond d'encre plat.
    Deux rangs : « Dénonce un complice », dessiné comme un champ, puis le partage.
    Elle sort par le bas quand le bloc de partage est à l'écran ou qu'un champ a le focus. */
 .dock {

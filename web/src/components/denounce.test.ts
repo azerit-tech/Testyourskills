@@ -80,7 +80,7 @@ describe("Dénoncer : la fiche du complice", () => {
     expect(DICTS.fr.denounce.githubOnly).toBe("Pour l'instant, par pseudo GitHub seulement.");
   });
 
-  it("rien à coller (§18.82) : le champ propose des personnes, comptes GitHub et profils LinkedIn mêlés, un toucher dénonce", () => {
+  it("rien à coller (§18.83) : le champ propose des personnes, comptes GitHub et profils LinkedIn mêlés, un toucher dénonce", () => {
     vi.stubGlobal("localStorage", { getItem: () => "fr", setItem: () => undefined });
     const html = renderToStaticMarkup(createElement(LangProvider, null, createElement(Denounce, { cardId: "AbCdEf1234", selfLogin: "leamd", toast: () => undefined })));
     // Le titre, une ligne, le champ à suggestions (combobox), « Dénoncer » en contour. Plus de préfixe « @ ».
@@ -100,7 +100,7 @@ describe("Dénoncer : la fiche du complice", () => {
     expect(src).toContain("if (people.length) return box.show();");
   });
 
-  it("« @x est dans le viseur » tout de suite, avec sa barre qui avance, dans le bloc (§18.82)", () => {
+  it("« @x est dans le viseur » tout de suite, avec sa barre qui avance, dans le bloc (§18.83)", () => {
     const src = readFileSync(join(__dirname, "Denounce.tsx"), "utf8");
     // L'attente porte déjà le titre de la fiche prête : la personne, « est dans le viseur », puis la barre.
     expect(src).toMatch(/<section className="after-block denounce is-pending" aria-busy>\s*<h2 className="denounce-head">\s*<span className="denounce-who-name">\{state\.who\}<\/span> \{d\.inSights\}\s*<\/h2>/);
