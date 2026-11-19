@@ -9,14 +9,14 @@
 // Variante « inline » : la même entrée, dans le bandeau d'une carte partagée.
 // Raccourcis : coller une URL GitHub ou LinkedIn, ou déposer un PDF, n'importe où sur
 // la page lance la carte.
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { detectEntry, normalizeLinkedinUrl, parseGithubLogin, resolveDoor } from "../../../shared/entry";
-import type { Door, LinkedinSuggestion } from "../../../shared/entry";
+import type { Door } from "../../../shared/entry";
 import { pick, useT } from "../i18n";
 import { api, ApiError, tokens } from "../lib/api";
-import { entryGithub, entryLinkedin, startGithubLogin, startLinkedinLogin, takeReturn } from "../lib/entryApi";
+import { doneReturn, findPct, getReturn, leadReturn, releaseReturn, startGithubLogin, startLinkedinLogin, subscribeReturn } from "../lib/entryApi";
 import { errorFact } from "../lib/errors";
 import { navigate } from "../lib/router";
 import { loadCardPage } from "../pages/cardPageLoader";
@@ -103,6 +103,43 @@ function initialEntry(raw: string | undefined): { open: Open | null; login: stri
   return { open: s ? "link" : null, login: s };
 }
 
+/**
+ * Au retour de LinkedIn, le temps de retrouver le profil (§18.85) : une ligne, la barre de
+ * l'attente et sa durée, à la place des deux boutons. Jamais un bloc qui revient tel quel.
+ */
+function FindWait({ since }: { since: number }) {
+  const { t } = useT();
+  const ref = useRef<HTMLDivElement>(null);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 400);
+    return () => window.clearInterval(id);
+  }, []);
+  // Sous une fiche, « À ton tour » est plus bas que l'écran : l'attente y vient.
+  useEffect(() => intoView(ref.current), []);
+  return (
+    <div ref={ref} className="entry-find" role="status" aria-live="polite">
+      <p className="entry-find-line">
+        <IconLinkedIn />
+        {t.home.finding}
+      </p>
+      {/* La barre de l'attente du jugement (Waiting.tsx), la même. */}
+      <div className="load-bar" aria-hidden>
+        <span style={{ width: `${findPct(now - since)}%` }} />
+      </div>
+      <p className="entry-find-note">{t.home.findingNote}</p>
+    </div>
+  );
+}
+
+/** Amène à l'écran ce qui n'y est pas en entier. */
+function intoView(el: HTMLElement | null) {
+  if (!el) return;
+  const r = el.getBoundingClientRect();
+  if (r.top >= 0 && r.bottom <= window.innerHeight) return;
+  el.scrollIntoView({ block: "center", behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+}
+
 export function EntryForm({ inputRef, variant = "full", note, secondary = false, onCreated }: Props) {
   const inline = variant === "inline";
   const { t, lang } = useT();
@@ -118,10 +155,34 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
   /** La dernière connexion partie ou revenue : son bouton porte les points d'attente. */
   const [via, setVia] = useState<Door>("linkedin");
   const [login, setLogin] = useState(first.login);
-  /** Au retour de LinkedIn, rien de sûr : « C'est toi ? », trois profils au plus (§18.80). */
-  const [picker, setPicker] = useState<LinkedinSuggestion[] | null>(null);
-  /** Parti chez LinkedIn ou GitHub, ou revenu et en train de retrouver la personne. */
+  /** Parti chez LinkedIn ou GitHub : son bouton attend. */
   const [signing, setSigning] = useState<Door | null>(null);
+  /** La connexion est revenue sans personne (§18.85) : la phrase le dit, le champ est ouvert sur un lien à coller. */
+  const [lost, setLost] = useState<Door | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  // Le retour de « Se connecter avec LinkedIn » ou « avec GitHub » (§18.80, §18.85) : son état vit hors
+  // du composant (entryApi.ts). Un seul formulaire de la page le porte, jamais le second de l'accueil ;
+  // s'il se démonte, le suivant le reprend où il en est.
+  const self = useRef({});
+  const returned = useSyncExternalStore(subscribeReturn, getReturn, () => null);
+  const [lead, setLead] = useState(false);
+  useEffect(() => {
+    if (secondary) return;
+    const me = self.current;
+    const claim = () => setLead(leadReturn(me));
+    claim();
+    const off = subscribeReturn(claim);
+    return () => {
+      off();
+      releaseReturn(me);
+    };
+  }, [secondary]);
+  const back = lead ? returned : null;
+  /** LinkedIn cherche encore : l'attente prend la place des boutons. */
+  const finding = back?.s === "finding" && back.via === "linkedin" ? back : null;
+  /** Au retour de LinkedIn, rien de sûr : « C'est toi ? », trois profils au plus (§18.80). */
+  const picking = back?.s === "pick" ? back : null;
   const [file, setFile] = useState<File | null>(init?.file ?? null);
   const [error, setError] = useState<string | null>(init?.error ? (typeof init.error === "string" ? init.error : pick(init.error, lang)) : null);
   /** Une limite atteinte : le même toucher échouerait encore (§18.48, un seul rose qui sert). */
@@ -161,9 +222,11 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
   const doorsOn = liOn && !showCv;
   /** L'entrée simple, sans CV : les deux boutons, ou le champ une fois ouvert. */
   const simple = inline || (mode === "single" && tab === "github");
+  /** L'attente du retour de LinkedIn est à l'écran : ni boutons, ni champ. */
+  const hold = !!finding && simple;
   /** Les deux boutons de connexion à l'écran, le champ fermé. */
-  const buttonsOn = simple && open === null;
-  const fieldOn = showGithub && !buttonsOn;
+  const buttonsOn = simple && open === null && !hold;
+  const fieldOn = showGithub && !buttonsOn && !hold;
   /** Ce que le champ lit d'abord : LinkedIn s'il s'est ouvert sur LinkedIn, GitHub sinon. */
   const fieldDoor: Door = doorsOn && simple && open === "linkedin" ? "linkedin" : "github";
   /** « colle un lien » : le champ prend tout, ses suggestions mêlent les deux sources. */
@@ -377,50 +440,29 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Le retour de « Se connecter avec LinkedIn » ou « avec GitHub » (§18.80) : ?li= ou ?gh= dans
-  // l'adresse. Un seul formulaire de la page le prend : le premier, jamais le second de l'accueil.
-  const self = useRef({});
+  // Ce que le retour a donné. Le profil est sûr, ou GitHub a rendu le pseudo : la fiche part sans
+  // rien demander. Personne, ou la connexion n'a pas abouti : jamais les deux boutons revenus tels
+  // quels, mais une phrase qui le dit et le champ ouvert, prêt pour un lien collé.
   useEffect(() => {
-    if (secondary) return;
-    const back = takeReturn(self.current);
-    if (!back) return;
-    setVia(back.via);
-    // Annulé, ou la connexion n'a pas abouti : les deux boutons attendent, rien d'autre.
-    if (!back.ok) return;
-    let alive = true;
-    setSigning(back.via);
-    if (back.via === "github") {
-      void entryGithub().then((gh) => {
-        if (!alive) return;
-        setSigning(null);
-        if (!gh) return;
-        setLogin(gh);
-        void startRef.current({ login: gh });
-      });
+    if (!back || back.s === "finding" || back.s === "pick") return;
+    doneReturn();
+    if (back.s === "auto") {
+      setLogin(back.name);
+      void startRef.current({ linkedin: back.url });
+    } else if (back.s === "github") {
+      setVia("github");
+      setLogin(back.login);
+      void startRef.current({ login: back.login });
     } else {
-      void entryLinkedin().then((r) => {
-        if (!alive) return;
-        setSigning(null);
-        if (!r) return;
-        // Le profil est sûr (email ou photo) : la fiche part sans rien demander.
-        if (r.auto) {
-          setLogin(r.auto.name);
-          void startRef.current({ linkedin: r.auto.url });
-        } else if (r.candidates.length) {
-          setLogin(r.name);
-          setPicker(r.candidates);
-        } else {
-          // Personne à ce nom : le champ s'ouvre sur le nom, un lien s'y colle.
-          setLogin(r.name);
-          setOpen("linkedin");
-        }
-      });
+      setVia(back.via);
+      setLost(back.via);
+      setLogin("");
+      setOpen(back.via);
+      setError(back.via === "github" ? h.lostGithub : back.why === "none" ? h.lostNone : h.lostError);
+      intoView(formRef.current);
     }
-    return () => {
-      alive = false;
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [back]);
   // Revenu par « Précédent » depuis LinkedIn ou GitHub : le bouton n'attend plus.
   useEffect(() => {
     const back = (e: PageTransitionEvent) => {
@@ -434,7 +476,7 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
   const suggestions = useSuggestions(
     login,
     fieldDoor === "linkedin" ? { linkedin: can.search } : { github: true, linkedin: anyField && doorsOn && can.search },
-    busy || !!signing || !!picker || !fieldOn,
+    busy || !!signing || !!picking || !fieldOn,
   );
   const pickSuggestion = (item: Suggestion) => {
     if (busyRef.current) return;
@@ -560,7 +602,7 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
       autoCorrect="off"
       spellCheck={false}
       // Sans recherche de profils, le champ LinkedIn dit ce qu'il prend : un lien.
-      placeholder={fieldDoor === "linkedin" ? (can.search ? h.linkedinPlaceholder : h.linkedinLinkPlaceholder) : anyField && doorsOn ? h.linkPlaceholder : h.loginPlaceholder}
+      placeholder={fieldDoor === "linkedin" ? (can.search && !lost ? h.linkedinPlaceholder : h.linkedinLinkPlaceholder) : anyField && doorsOn ? h.linkPlaceholder : h.loginPlaceholder}
       value={login}
       onChange={(e) => {
         setLogin(e.target.value);
@@ -602,14 +644,22 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
       {document.getElementById(WEEK_ID) ? h.meanwhileTop : h.meanwhileBands}
     </button>
   );
-  /** La fiche part, ou la personne revient de LinkedIn ou de GitHub : le bouton attend. */
-  const working = busy || !!signing;
+  /** GitHub vient de rendre la main : un aller-retour, son bouton attend. */
+  const ghBack = back?.s === "finding" && back.via === "github";
+  /** La fiche part, ou la personne part chez LinkedIn ou GitHub, ou en revient : le bouton attend. */
+  const working = busy || !!signing || ghBack;
   const submitCls = `pill pill-big entry-submit${working ? " is-busy" : ""}${blocked && error && !working ? " pill-ghost" : ""}`;
 
   /** Sous le champ seul, tant qu'il n'y a pas d'erreur (elle prend sa place) : ce que la source sait lire. */
-  const hintLine = fieldOn && simple && !inline && !error && (
+  const hintLine = fieldOn && simple && !inline && !error && !lost && (
     <p id={`${uid}-note`} className="entry-hint">
       {fieldDoor === "linkedin" ? h.linkedinHint : h.githubHint}
+    </p>
+  );
+  /** LinkedIn ne l'a pas retrouvé : où prendre le lien à coller. */
+  const helpLine = lost === "linkedin" && fieldOn && fieldDoor === "linkedin" && (
+    <p id={`${uid}-note`} className="entry-hint entry-help">
+      {h.linkHelp}
     </p>
   );
 
@@ -632,7 +682,7 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
 
   /** Un bouton de connexion. Sans connexion réglée côté serveur, il ouvre le champ sur sa source : jamais de bouton mort. */
   const loginBtn = (d: Door, primary: boolean) => {
-    const waits = working && via === d;
+    const waits = working && (ghBack ? d === "github" : via === d);
     return (
       <button
         key={d}
@@ -693,6 +743,7 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
       className="link-alt"
       onClick={() => {
         setOpen(null);
+        setLost(null);
         setError(null);
       }}
     >
@@ -702,12 +753,13 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
 
   /** « C'est toi ? » : au retour de LinkedIn, quand ni l'email ni la photo ne désignent un seul profil. */
   const closePicker = () => {
-    setPicker(null);
     // Aucun des trois : le champ s'ouvre sur le nom, à chercher, ou sur un lien à coller.
+    if (picking) setLogin(picking.name);
+    doneReturn();
     openField("linkedin");
   };
   const pickerSheet =
-    picker &&
+    picking &&
     createPortal(
       <div className="pick-veil" onClick={closePicker} onKeyDown={(e) => e.key === "Escape" && closePicker()}>
         <section className="pick" role="dialog" aria-modal="true" aria-labelledby={`${uid}-pick`} onClick={(e) => e.stopPropagation()}>
@@ -718,13 +770,13 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
             </button>
           </header>
           <ul className="pick-list">
-            {picker.map((p, i) => (
+            {picking.candidates.map((p, i) => (
               <li key={p.url}>
                 <button
                   type="button"
                   autoFocus={i === 0 && !isTouch()}
                   onClick={() => {
-                    setPicker(null);
+                    doneReturn();
                     setLogin(p.name);
                     void start({ linkedin: p.url });
                   }}
@@ -741,7 +793,8 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
 
   /** L'envoi en pilule, sous le champ ou le dépôt : pas avec les deux boutons, qui lancent eux-mêmes. */
   const submitBtn = (label: string) =>
-    !buttonsOn && (
+    !buttonsOn &&
+    !hold && (
       <button type="submit" className={submitCls} disabled={working}>
         {working ? busyLabel(h.submitting) : label}
         {working && <BusyDots />}
@@ -750,14 +803,16 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
 
   if (inline) {
     return (
-      <form className="entry entry-inline is-stack" onSubmit={submit} onInput={prefetchReveal} onPointerDown={prefetchReveal} onFocus={onFocus} noValidate>
+      <form ref={formRef} className="entry entry-inline is-stack" onSubmit={submit} onInput={prefetchReveal} onPointerDown={prefetchReveal} onFocus={onFocus} noValidate>
+        {hold && finding && <FindWait since={finding.since} />}
         {loginBtns}
         {fieldOn && loginField}
         {errorLine}
+        {helpLine}
         {meanwhile}
         {submitBtn(h.submit)}
         {orLine}
-        {!buttonsOn && (
+        {!buttonsOn && !hold && (
           <div className="entry-foot" id={`${uid}-hint`}>
             {backLink}
           </div>
@@ -771,9 +826,10 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
   // Un seul chemin à l'écran : se connecter d'abord ; le CV et le champ à un lien de là, un seul
   // niveau. Les deux sources ensemble : en déposant un PDF avec un pseudo saisi, ou depuis une fiche.
   return (
-    <form className={`entry mode-${mode}${simple ? " is-stack" : ""}`} onSubmit={submit} onInput={prefetchReveal} onPointerDown={prefetchReveal} onFocus={onFocus} onDragEnter={prefetchReveal} noValidate>
+    <form ref={formRef} className={`entry mode-${mode}${simple ? " is-stack" : ""}`} onSubmit={submit} onInput={prefetchReveal} onPointerDown={prefetchReveal} onFocus={onFocus} onDragEnter={prefetchReveal} noValidate>
       {mode === "both" && <p className="entry-both-head">{h.bothActive}</p>}
 
+      {hold && finding && <FindWait since={finding.since} />}
       {loginBtns}
       {fieldOn && loginField}
 
@@ -818,6 +874,7 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
 
       {errorLine}
       {hintLine}
+      {helpLine}
       {meanwhile}
 
       {submitBtn(mode === "both" ? h.submitBoth : h.submit)}
@@ -827,7 +884,7 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
       {orLine}
       <div className="entry-foot" id={buttonsOn ? undefined : `${uid}-hint`}>
         {showCv && <span className="entry-reassure">{h.reassure}</span>}
-        {simple && !buttonsOn && backLink}
+        {simple && !buttonsOn && !hold && backLink}
         {mode === "single" && tab === "cv" && (
           <>
             <button type="button" className="link-alt" onClick={() => switchTab("github")}>

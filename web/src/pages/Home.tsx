@@ -29,6 +29,7 @@ import { useT } from "../i18n";
 import { ApiError, api, type Showcase } from "../lib/api";
 import { onLinkClick } from "../lib/router";
 import { homeHook, useAppConfig } from "../lib/season";
+import { returnPending } from "../lib/entryApi";
 import { clearPending, dropPrefill, filmOwed, myCard, peekPrefill, pendingFile, type MyCard } from "../lib/session";
 
 /** Dénoncer depuis l'accueil (/<pseudo> d'un autre) : le bloc de la fiche, chargé seulement ce jour-là. */
@@ -291,7 +292,8 @@ export function Home() {
   const mineLogin = mem.mine?.login?.toLowerCase() ?? null;
   const direct = prefill?.direct && prefill.login ? prefill.login : null;
   const directIsMine = !!direct && direct.toLowerCase() === mineLogin;
-  const [open, setOpen] = useState(() => !!prefill && !directIsMine);
+  // Une connexion LinkedIn ou GitHub revient sur l'accueil : le formulaire est là pour dire où elle en est.
+  const [open, setOpen] = useState(() => (!!prefill && !directIsMine) || returnPending());
   const returning = !!mem.mine && !owed && !mem.pending;
   // /<pseudo> d'un autre, pour qui a sa fiche : c'est une dénonciation (§18.52), avec ses gardes
   // (pas soi-même, la fiche part au nom du dénonciateur, aucun partage public), pas « Faire ma fiche ».

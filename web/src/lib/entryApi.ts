@@ -5,13 +5,6 @@
 import type { GithubSuggestion, LinkedinSuggestion } from "../../../shared/entry";
 import { isMock } from "./api";
 
-/** Ce que la connexion LinkedIn a retrouvé : le profil sûr, sinon les homonymes à proposer. */
-export interface LinkedinReturn {
-  name: string;
-  auto?: LinkedinSuggestion;
-  candidates: LinkedinSuggestion[];
-}
-
 // --- Mode démo -----------------------------------------------------------------
 
 const MOCK_PEOPLE: LinkedinSuggestion[] = [
@@ -90,51 +83,166 @@ export function startGithubLogin(): void {
   window.location.assign(`/auth/github/enter?return=${encodeURIComponent(here())}`);
 }
 
-let linkedinReturn: Promise<LinkedinReturn | null> | null = null;
-/** Au retour de LinkedIn : le profil retrouvé, ou les homonymes. Demandé une fois par page. */
-export function entryLinkedin(): Promise<LinkedinReturn | null> {
-  linkedinReturn ??= isMock()
-    ? mockDelay().then(() => ({ name: "Léa Martin", candidates: MOCK_PEOPLE.slice(0, 3) }))
-    : getJson<{ signedIn?: boolean; name?: string; auto?: LinkedinSuggestion; candidates?: LinkedinSuggestion[] }>("/api/entry/linkedin").then((b) =>
-        b?.signedIn && typeof b.name === "string" ? { name: b.name, ...(b.auto?.url ? { auto: b.auto } : {}), candidates: Array.isArray(b.candidates) ? b.candidates.slice(0, 3) : [] } : null,
-      );
-  return linkedinReturn;
+// --- Le retour d'une connexion (§18.85) --------------------------------------------
+// `?li=` ou `?gh=` dans l'adresse au chargement de la page. Ce qui se passe ensuite
+// vit ici, hors des composants : un formulaire remonté, ou monté après coup (le
+// bloc « À ton tour » d'une fiche arrive avec la fiche), retrouve l'état où il en
+// est. Jamais de retour muet : une attente, puis la fiche, « C'est toi ? », ou une
+// phrase et le champ ouvert.
+
+export type ReturnPhase =
+  /** La recherche tourne : l'attente est à l'écran. `since` : le départ de la barre. */
+  | { s: "finding"; via: "linkedin" | "github"; since: number }
+  /** Le profil est sûr : la fiche part. */
+  | { s: "auto"; name: string; url: string }
+  /** Rien de sûr : « C'est toi ? ». */
+  | { s: "pick"; name: string; candidates: LinkedinSuggestion[] }
+  /** GitHub a rendu le pseudo : la fiche part. */
+  | { s: "github"; login: string }
+  /** « none » : personne à ce nom, ou la recherche est en panne. « error » : la connexion n'a pas abouti. */
+  | { s: "lost"; via: "linkedin" | "github"; why: "none" | "error" };
+
+/** Une demande au serveur attend la recherche 20 s, puis répond « pending » : on redemande jusque-là. */
+export const FIND_GIVE_UP_MS = 110_000;
+/** La durée attendue de la recherche (une seconde d'index, quatre de lecture, les photos). */
+const FIND_EXPECTED_MS = 8000;
+/** La barre de l'attente : elle avance sur la durée attendue, puis ralentit, sans toucher le bout. */
+export function findPct(elapsed: number): number {
+  const linear = Math.min(1, Math.max(0, elapsed) / FIND_EXPECTED_MS) * 80;
+  const tail = 17 * (1 - Math.exp(-Math.max(0, elapsed - FIND_EXPECTED_MS) / 25_000));
+  return Math.round(linear + tail);
 }
 
-let githubReturn: Promise<string | null> | null = null;
-/** Au retour de GitHub : le pseudo, rendu une seule fois par le serveur. Demandé une fois par page. */
-export function entryGithub(): Promise<string | null> {
-  githubReturn ??= isMock()
-    ? mockDelay().then(() => "leamd")
-    : getJson<{ signedIn?: boolean; login?: string }>("/api/entry/github").then((b) => (b?.signedIn && typeof b.login === "string" ? b.login : null));
-  return githubReturn;
+let phase: ReturnPhase | null = null;
+let started = false;
+let leader: object | null = null;
+const listeners = new Set<() => void>();
+const emit = () => listeners.forEach((l) => l());
+const setPhase = (next: ReturnPhase | null) => {
+  phase = next;
+  emit();
+};
+
+interface EntryAnswer {
+  signedIn?: boolean;
+  name?: string;
+  auto?: LinkedinSuggestion;
+  candidates?: LinkedinSuggestion[];
+  pending?: boolean;
 }
 
-export interface EntryReturn {
-  via: "linkedin" | "github";
-  /** false : annulé, ou la connexion n'a pas abouti. */
-  ok: boolean;
+/** Ce que le serveur a retrouvé, mis en phase. null : il cherche encore. */
+export function phaseOfAnswer(b: EntryAnswer | null): ReturnPhase | null {
+  if (!b?.signedIn || typeof b.name !== "string") return { s: "lost", via: "linkedin", why: "error" };
+  if (b.pending) return null;
+  if (b.auto?.url) return { s: "auto", name: b.auto.name || b.name, url: b.auto.url };
+  const candidates = Array.isArray(b.candidates) ? b.candidates.filter((c) => c && typeof c.url === "string").slice(0, 3) : [];
+  return candidates.length ? { s: "pick", name: b.name, candidates } : { s: "lost", via: "linkedin", why: "none" };
 }
 
-let taken: { owner: object; value: EntryReturn } | null = null;
+async function findLinkedin(since: number, mock: string | null): Promise<ReturnPhase> {
+  if (isMock()) {
+    await new Promise((r) => setTimeout(r, mock === "slow" ? 60_000 : 1400));
+    if (mock === "none") return { s: "lost", via: "linkedin", why: "none" };
+    if (mock === "auto") return { s: "auto", name: MOCK_PEOPLE[0]!.name, url: MOCK_PEOPLE[0]!.url };
+    return { s: "pick", name: "Léa Martin", candidates: MOCK_PEOPLE.slice(0, 3) };
+  }
+  let misses = 0;
+  while (Date.now() - since < FIND_GIVE_UP_MS) {
+    const body = await getJson<EntryAnswer>("/api/entry/linkedin");
+    // Réseau capricieux : deux nouvelles demandes, pas plus.
+    if (!body && ++misses <= 2) {
+      await new Promise((r) => setTimeout(r, 1500));
+      continue;
+    }
+    const next = phaseOfAnswer(body);
+    if (next) return next;
+  }
+  return { s: "lost", via: "linkedin", why: "none" };
+}
+
+async function findGithub(): Promise<ReturnPhase> {
+  if (isMock()) {
+    await mockDelay();
+    return { s: "github", login: "leamd" };
+  }
+  const b = await getJson<{ signedIn?: boolean; login?: string }>("/api/entry/github");
+  return b?.signedIn && typeof b.login === "string" ? { s: "github", login: b.login } : { s: "lost", via: "github", why: "error" };
+}
+
 /**
- * `?li=` ou `?gh=` dans l'adresse, retiré aussitôt lu : un rechargement ne relance
- * rien. Le premier formulaire qui le demande le garde (`owner`), les autres n'ont rien.
+ * Lit `?li=` ou `?gh=` une fois par page, le retire de l'adresse (un rechargement ne
+ * relance rien) et lance la recherche. Annulé (`cancel`) : rien, les deux boutons attendent.
  */
-export function takeReturn(owner: object): EntryReturn | null {
-  if (taken) return taken.owner === owner ? taken.value : null;
+function begin(): void {
+  if (started || typeof window === "undefined") return;
+  started = true;
   let u: URL;
   try {
     u = new URL(window.location.href);
   } catch {
-    return null;
+    return;
   }
   const li = u.searchParams.get("li");
   const gh = u.searchParams.get("gh");
-  if (li === null && gh === null) return null;
+  if (li === null && gh === null) return;
   u.searchParams.delete("li");
   u.searchParams.delete("gh");
   window.history.replaceState(window.history.state, "", u.pathname + u.search + u.hash);
-  taken = { owner, value: li !== null ? { via: "linkedin", ok: li === "1" } : { via: "github", ok: gh === "1" } };
-  return taken.value;
+  const via = li !== null ? "linkedin" : "github";
+  const value = li ?? gh;
+  if (value === "cancel") return;
+  const mockOnly = isMock() && (value === "none" || value === "auto" || value === "slow");
+  if (value !== "1" && !mockOnly) {
+    phase = { s: "lost", via, why: "error" };
+    return;
+  }
+  const since = Date.now();
+  phase = { s: "finding", via, since };
+  void (via === "linkedin" ? findLinkedin(since, value) : findGithub()).then(setPhase, () => setPhase({ s: "lost", via, why: "error" }));
+}
+
+/** Une connexion vient-elle de revenir sur cette page ? L'accueil ouvre alors son formulaire. */
+export function returnPending(): boolean {
+  begin();
+  return phase !== null;
+}
+
+export function subscribeReturn(listener: () => void): () => void {
+  begin();
+  listeners.add(listener);
+  return () => void listeners.delete(listener);
+}
+
+export function getReturn(): ReturnPhase | null {
+  begin();
+  return phase;
+}
+
+/** Le formulaire a agi (la fiche part, « C'est toi ? » est fermé, la phrase est à l'écran) : le retour est consommé. */
+export function doneReturn(): void {
+  if (phase) setPhase(null);
+}
+
+/**
+ * Un seul formulaire de la page porte le retour : le premier qui le demande. Il le
+ * rend en se démontant, et un autre le reprend là où il en est.
+ */
+export function leadReturn(owner: object): boolean {
+  leader ??= owner;
+  return leader === owner;
+}
+
+export function releaseReturn(owner: object): void {
+  if (leader !== owner) return;
+  leader = null;
+  emit();
+}
+
+/** Pour les tests : comme une page qui vient de se charger. */
+export function resetReturn(): void {
+  phase = null;
+  started = false;
+  leader = null;
+  listeners.clear();
 }
