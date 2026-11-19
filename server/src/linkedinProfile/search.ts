@@ -1,24 +1,26 @@
-// Recherche d'un profil LinkedIn par nom (SPEC §18.80) : ce qui remplace le lien
-// collé. Deux usages : le champ « Ton nom » (suggestions pendant la frappe) et le
-// retour de « Se connecter avec LinkedIn » (les candidats au nom rendu par LinkedIn).
+// Recherche d'un profil LinkedIn par nom (SPEC §18.80, §18.85) : ce qui remplace le
+// lien collé. Deux usages : les suggestions pendant la frappe (« Ton nom », « Son
+// nom »), et le retour de « Se connecter avec LinkedIn » (les candidats au nom rendu
+// par LinkedIn).
 //
-// Fournisseur par défaut : l'acteur Apify `harvestapi~linkedin-profile-search-by-name`,
-// sans cookies, mode « Short » : une page de dix profils au plus (adresse, nom,
-// titre, photo), 0,004 $ la recherche au 19 novembre 2026 (4 $ les 1 000).
+// Fournisseur par défaut : un index de recherche web (webSearch.ts), Brave puis
+// Serper, une seconde et 0,005 $ la requête au plus ; l'acteur Apify de Google en
+// dernier recours, au retour d'une connexion seulement. L'acteur Apify de
+// recherche par nom du §18.80 ne répondait pas en production : retiré.
 // Crustdata derrière LINKEDIN_SEARCH_PROVIDER=crustdata (POST /person/search,
 // 0,03 crédit par résultat, cinq au plus), et sa recherche inverse par email
 // professionnel derrière LINKEDIN_EMAIL_LOOKUP=crustdata (1 crédit par personne).
 //
 // Garde-fous : cache d'un jour par nom, un plafond de recherches payées par jour
 // (LINKEDIN_DAILY_SEARCHES), une limite par IP. Plafond atteint, panne ou pas de
-// jeton : « off », et le champ redevient celui où l'on colle un lien, sans rien dire.
+// clé : « off », et le champ redevient celui où l'on colle un lien.
 
+import { createHash } from "node:crypto";
 import type Database from "better-sqlite3";
-import { normalizeLinkedinUrl } from "../../../shared/entry";
 import { parsePersonName, samePublicFullName, type PersonName } from "../names";
-import { APIFY_API, ApifyError } from "./apify";
 import { CrustdataClient, CrustdataPeople } from "./crustdata";
 import { LinkedinCache } from "./store";
+import { ApifyGoogleSearch, BraveSearch, SerperSearch, WebPeopleSearch, type PeopleQuery, type WebSearchProvider } from "./webSearch";
 
 export interface LinkedinCandidate {
   /** Adresse normalisée : https://www.linkedin.com/in/<slug>. */
@@ -27,115 +29,29 @@ export interface LinkedinCandidate {
   headline: string;
   /** Adresse de la photo chez LinkedIn, si le fournisseur la donne. */
   photoUrl?: string;
+  /** Concordance avec la personne cherchée, de 0 à 1 (webSearch.ts, `scoreHit`) ; absente d'une saisie en cours. */
+  score?: number;
 }
 
-export const DEFAULT_APIFY_SEARCH_ACTOR = "harvestapi~linkedin-profile-search-by-name";
-/** Entrée de l'acteur : `{first}`, `{last}`, et `"{strict}"` remplacé par un booléen. */
-export const DEFAULT_APIFY_SEARCH_INPUT = '{"profileScraperMode":"Short","firstName":"{first}","lastName":"{last}","strictSearch":"{strict}","maxPages":1,"maxItems":10}';
-export const SEARCH_TIMEOUT_MS = 20_000;
 export const DEFAULT_DAILY_SEARCHES = 2000;
-/** Recherches payées par IP et par jour (les réponses du cache ne comptent pas). */
-export const SEARCHES_PER_IP = 30;
+/** Recherches payées par IP et par jour (les réponses du cache ne comptent pas) : un nom tapé en coûte trois ou quatre. */
+export const SEARCHES_PER_IP = 60;
 /** Candidats gardés par recherche. */
 export const MAX_CANDIDATES = 10;
 
 export interface PeopleSearchProvider {
-  readonly name: "apify" | "crustdata";
-  searchByName(name: PersonName, opts: { strict: boolean; signal?: AbortSignal }): Promise<LinkedinCandidate[]>;
+  readonly name: string;
+  /** false : trop lent pour des suggestions pendant la frappe (défaut : true). */
+  readonly typing?: boolean;
+  searchByName(name: PersonName, opts: PeopleQuery): Promise<LinkedinCandidate[]>;
 }
 
 export interface EmailLookupProvider {
   findByEmail(email: string, signal?: AbortSignal): Promise<LinkedinCandidate | null>;
 }
 
-// --- Apify ----------------------------------------------------------------------
-
-type Obj = Record<string, unknown>;
-const obj = (v: unknown): Obj | null => (v && typeof v === "object" && !Array.isArray(v) ? (v as Obj) : null);
-const str = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
-const first = (o: Obj, ...keys: string[]): unknown => {
-  for (const k of keys) if (o[k] !== undefined && o[k] !== null && o[k] !== "") return o[k];
-  return undefined;
-};
-
-/** L'entrée de l'acteur : le modèle, ses trois repères remplacés. */
-export function apifySearchInput(template: string, name: PersonName, strict: boolean): unknown {
-  const fill = (v: unknown): unknown => {
-    if (v === "{strict}") return strict;
-    if (typeof v === "string") return v.split("{first}").join(name.first).split("{last}").join(name.last).split("{name}").join(name.full);
-    if (Array.isArray(v)) return v.map(fill);
-    const o = obj(v);
-    return o ? Object.fromEntries(Object.entries(o).map(([k, x]) => [k, fill(x)])) : v;
-  };
-  return fill(JSON.parse(template));
-}
-
-/**
- * Un élément du jeu de données → un candidat, ou null. L'adresse vient du nom
- * public du profil (`publicIdentifier`) d'abord : l'autre forme (« ACoAA… »)
- * est sensible à la casse et ne se normalise pas.
- */
-export function candidateFromApifyItem(raw: unknown): LinkedinCandidate | null {
-  const item = obj(raw);
-  if (!item || item.error) return null;
-  const id = str(first(item, "publicIdentifier", "public_identifier", "vanityName"));
-  const given = first(item, "linkedinUrl", "url", "profileUrl", "publicProfileUrl", "linkedin_url");
-  const url = (id && !/^ACo/.test(id) ? normalizeLinkedinUrl(`linkedin.com/in/${id}`) : null) ?? (/\/in\/ACo[A-Za-z0-9_-]{10,}/.test(str(given)) ? null : normalizeLinkedinUrl(given));
-  const name = str(first(item, "name", "fullName", "full_name")) || [str(item.firstName), str(item.lastName)].filter(Boolean).join(" ");
-  if (!url || !name) return null;
-  const photoRaw = first(item, "photo", "profilePicture", "picture", "pictureUrl", "profilePic", "avatar", "image");
-  const photo = str(obj(photoRaw)?.url ?? photoRaw);
-  return {
-    url,
-    name: name.slice(0, 120),
-    headline: str(first(item, "headline", "position", "occupation", "summary")).slice(0, 220),
-    ...(photo ? { photoUrl: photo.slice(0, 600) } : {}),
-  };
-}
-
-export interface ApifySearchOptions {
-  token: string;
-  actor?: string;
-  inputTemplate?: string;
-  fetchImpl?: typeof fetch;
-  baseUrl?: string;
-  timeoutMs?: number;
-}
-
-export class ApifyPeopleSearch implements PeopleSearchProvider {
-  readonly name = "apify" as const;
-  private readonly fetchImpl: typeof fetch;
-  private readonly base: string;
-  private readonly actor: string;
-  private readonly template: string;
-  private readonly timeoutMs: number;
-
-  constructor(private readonly opts: ApifySearchOptions) {
-    this.fetchImpl = opts.fetchImpl ?? fetch;
-    this.base = (opts.baseUrl ?? APIFY_API).replace(/\/+$/, "");
-    this.actor = opts.actor?.trim() || DEFAULT_APIFY_SEARCH_ACTOR;
-    this.template = opts.inputTemplate?.trim() || DEFAULT_APIFY_SEARCH_INPUT;
-    this.timeoutMs = opts.timeoutMs ?? SEARCH_TIMEOUT_MS;
-    apifySearchInput(this.template, { first: "x", last: "y", full: "x y", key: "x y" }, false); // un modèle illisible casse au démarrage
-  }
-
-  async searchByName(name: PersonName, opts: { strict: boolean; signal?: AbortSignal }): Promise<LinkedinCandidate[]> {
-    const runSeconds = Math.max(1, Math.floor(this.timeoutMs / 1000));
-    const t = AbortSignal.timeout(this.timeoutMs + 2000);
-    const res = await this.fetchImpl(`${this.base}/acts/${encodeURIComponent(this.actor)}/run-sync-get-dataset-items?timeout=${runSeconds}&format=json&clean=true`, {
-      method: "POST",
-      headers: { authorization: `Bearer ${this.opts.token}`, "content-type": "application/json", accept: "application/json" },
-      body: JSON.stringify(apifySearchInput(this.template, name, opts.strict)),
-      signal: opts.signal ? AbortSignal.any([opts.signal, t]) : t,
-    });
-    if (!res.ok) throw new ApifyError(res.status, `apify ${res.status}`);
-    const items = await res.json().catch(() => null);
-    return (Array.isArray(items) ? items : []).flatMap((x) => candidateFromApifyItem(x) ?? []);
-  }
-}
-
 class CrustdataPeopleSearch implements PeopleSearchProvider {
-  readonly name = "crustdata" as const;
+  readonly name = "crustdata";
   constructor(private readonly people: CrustdataPeople) {}
   searchByName(name: PersonName, opts: { signal?: AbortSignal }): Promise<LinkedinCandidate[]> {
     return this.people.searchByName(name.full, opts.signal);
@@ -149,6 +65,8 @@ export interface SearchOptions {
   spend?: () => boolean;
   /** Prénom et nom exacts (retour de la connexion LinkedIn) ; sinon une saisie en cours. */
   strict?: boolean;
+  /** Avec un nom exact : l'employeur, qui départage les homonymes. */
+  company?: string | null;
   signal?: AbortSignal;
 }
 
@@ -174,8 +92,8 @@ export interface LinkedinSearchOptions {
   now?: () => number;
 }
 
-/** Les adresses qu'une recherche inverse ne trouve jamais : messageries personnelles. */
-const PERSONAL_MAIL_RE = /@(gmail|googlemail|hotmail|outlook|live|msn|yahoo|ymail|icloud|me|mac|proton|protonmail|pm|gmx|aol|orange|wanadoo|free|sfr|laposte|neuf|bbox|numericable)\.[a-z.]{2,6}$/i;
+/** Les adresses qu'une recherche inverse ne trouve jamais, et qui ne disent aucun employeur : messageries personnelles. */
+export const PERSONAL_MAIL_RE = /@(gmail|googlemail|hotmail|outlook|live|msn|yahoo|ymail|icloud|me|mac|proton|protonmail|pm|gmx|aol|orange|wanadoo|free|sfr|laposte|neuf|bbox|numericable)\.[a-z.]{2,6}$/i;
 
 /** Les candidats du même nom complet d'abord, dans l'ordre du fournisseur ; une adresse une seule fois. */
 export function rankCandidates(name: string, list: LinkedinCandidate[]): LinkedinCandidate[] {
@@ -194,7 +112,7 @@ export class LinkedinSearch implements LinkedinPeople {
     this.now = opts.now ?? Date.now;
   }
 
-  get providerName(): PeopleSearchProvider["name"] {
+  get providerName(): string {
     return this.opts.provider.name;
   }
 
@@ -209,7 +127,11 @@ export class LinkedinSearch implements LinkedinPeople {
   async byName(raw: string, opts: SearchOptions = {}): Promise<SearchResult> {
     const name = parsePersonName(raw);
     if (!name) return { status: "short" };
-    const key = `${opts.strict ? "s" : "n"}:${name.key}`;
+    // Une saisie en cours ne part jamais vers un index lent.
+    if (!opts.strict && this.opts.provider.typing === false) return { status: "off" };
+    const company = opts.strict ? (opts.company ?? "").trim().toLowerCase() : "";
+    // L'employeur vient d'un email vérifié : dans la clé, son empreinte seulement.
+    const key = `${opts.strict ? "s" : "n"}:${name.key}${company ? `:${createHash("sha256").update(company).digest("hex").slice(0, 16)}` : ""}`;
     const hit = this.opts.cache.getSearch<LinkedinCandidate>(key, this.now());
     if (hit) return { status: "ok", results: hit };
     // Deux frappes du même nom en vol : une seule recherche payée.
@@ -218,7 +140,7 @@ export class LinkedinSearch implements LinkedinPeople {
     if (!this.take(opts)) return { status: "off" };
     const flight = (async (): Promise<SearchResult> => {
       try {
-        const results = rankCandidates(name.full, await this.opts.provider.searchByName(name, { strict: !!opts.strict, signal: opts.signal }));
+        const results = rankCandidates(name.full, await this.opts.provider.searchByName(name, { strict: !!opts.strict, company: company || null, signal: opts.signal }));
         this.opts.cache.putSearch(key, results, this.now());
         return { status: "ok", results };
       } catch (err) {
@@ -250,22 +172,37 @@ function warn(what: string, err: unknown) {
 
 // --- Configuration ------------------------------------------------------------------
 
+/** Les index de recherche web dont le serveur a la clé, dans l'ordre où ils sont essayés. */
+export function webProvidersFromEnv(env: NodeJS.ProcessEnv, fetchImpl?: typeof fetch): WebSearchProvider[] {
+  const brave = env.BRAVE_SEARCH_API_KEY?.trim();
+  const serper = env.SERPER_API_KEY?.trim();
+  const apify = env.APIFY_TOKEN?.trim();
+  return [
+    ...(brave ? [new BraveSearch({ apiKey: brave, fetchImpl })] : []),
+    ...(serper ? [new SerperSearch({ apiKey: serper, fetchImpl })] : []),
+    ...(apify ? [new ApifyGoogleSearch({ token: apify, fetchImpl })] : []),
+  ];
+}
+
 /**
- * La recherche par nom, branchée sur la base du serveur. Fournisseur :
- * LINKEDIN_SEARCH_PROVIDER (apify ou crustdata), sinon celui des profils
- * (LINKEDIN_PROVIDER, apify par défaut). Sans son jeton : null, et le champ
- * « Ton nom » reste un champ où l'on colle un lien.
+ * La recherche par nom, branchée sur la base du serveur. Par défaut un index web :
+ * BRAVE_SEARCH_API_KEY, puis SERPER_API_KEY, puis APIFY_TOKEN (Google par Apify,
+ * au retour d'une connexion seulement). LINKEDIN_SEARCH_PROVIDER=crustdata, ou
+ * des profils lus par Crustdata, pour chercher chez Crustdata. Sans aucune clé :
+ * null, et le champ « Ton nom » reste un champ où l'on colle un lien.
  */
 export function linkedinSearchFromEnv(env: NodeJS.ProcessEnv, db: Database.Database, fetchImpl?: typeof fetch): LinkedinSearch | null {
-  const which = (env.LINKEDIN_SEARCH_PROVIDER?.trim() || env.LINKEDIN_PROVIDER?.trim() || "apify").toLowerCase();
+  const asked = env.LINKEDIN_SEARCH_PROVIDER?.trim().toLowerCase();
+  const which = asked || (env.LINKEDIN_PROVIDER?.trim().toLowerCase() === "crustdata" ? "crustdata" : "web");
   const crustKey = env.CRUSTDATA_API_KEY?.trim();
   const people = crustKey ? new CrustdataPeople(new CrustdataClient({ apiKey: crustKey, fetchImpl })) : null;
   let provider: PeopleSearchProvider | null = null;
   if (which === "crustdata") provider = people ? new CrustdataPeopleSearch(people) : null;
-  else if (which === "apify") {
-    const token = env.APIFY_TOKEN?.trim();
-    if (token) provider = new ApifyPeopleSearch({ token, actor: env.APIFY_LINKEDIN_SEARCH_ACTOR, inputTemplate: env.APIFY_LINKEDIN_SEARCH_INPUT, fetchImpl });
-  } else console.warn(`[linkedin] LINKEDIN_SEARCH_PROVIDER inconnu (${which}) : apify ou crustdata.`);
+  // « apify » : l'ancien nom du fournisseur par défaut (§18.80).
+  else if (which === "web" || which === "apify") {
+    const providers = webProvidersFromEnv(env, fetchImpl);
+    if (providers.length) provider = new WebPeopleSearch({ providers });
+  } else console.warn(`[linkedin] LINKEDIN_SEARCH_PROVIDER inconnu (${which}) : web ou crustdata.`);
   if (!provider) return null;
   const n = Number(env.LINKEDIN_DAILY_SEARCHES);
   const dailySearches = env.LINKEDIN_DAILY_SEARCHES?.trim() && Number.isFinite(n) && n >= 0 ? Math.floor(n) : DEFAULT_DAILY_SEARCHES;

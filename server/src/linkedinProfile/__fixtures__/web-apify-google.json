@@ -1,0 +1,33 @@
+[
+  {
+    "searchQuery": { "term": "site:linkedin.com/in \"Camille Ardent\"", "url": "http://www.google.com/search?q=exemple&gl=fr&hl=fr&num=10", "device": "DESKTOP", "page": 1, "type": "SEARCH", "domain": "google.com", "countryCode": "FR", "languageCode": "fr", "resultsPerPage": "10" },
+    "resultsTotal": null,
+    "relatedQueries": [],
+    "paidResults": [],
+    "paidProducts": [],
+    "organicResults": [
+      {
+        "title": "Camille Ardent - Senior Full-Stack Engineer @Paysolde",
+        "url": "https://www.linkedin.com/in/camille-ardent",
+        "displayedUrl": "https://www.linkedin.com › camille-ardent",
+        "position": 1,
+        "description": "Lyon, Auvergne-Rhône-Alpes, France · Senior Full-Stack Engineer · Paysolde",
+        "emphasizedKeywords": ["Camille Ardent"],
+        "siteLinks": [],
+        "productInfo": {},
+        "type": "organic"
+      },
+      {
+        "title": "Camille Ardent – Cheffe de projet – Mairie de Nantes",
+        "url": "https://fr.linkedin.com/in/camille-ardent-2",
+        "displayedUrl": "https://fr.linkedin.com › camille-ardent-2",
+        "position": 2,
+        "description": "Nantes · Cheffe de projet · Mairie de Nantes",
+        "emphasizedKeywords": ["Camille Ardent"],
+        "siteLinks": [],
+        "productInfo": {},
+        "type": "organic"
+      }
+    ]
+  }
+]
