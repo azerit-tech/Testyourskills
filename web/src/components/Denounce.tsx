@@ -232,7 +232,12 @@ export function Denounce({ cardId, selfLogin, toast, initial, mine }: Props) {
   const act = (step: Step) => {
     if (step.do === "send") return void send(step.entry, step.entry.kind === "github" ? `@${step.entry.login}` : (linkedinSlug(step.entry.url) ?? "LinkedIn"));
     if (step.do === "pick") return pickOne(step.item);
-    if (step.do === "list") return box.show();
+    // Plusieurs personnes : la liste s'ouvre sous le champ, qui reprend le focus (« Dénoncer » touché l'avait pris) :
+    // les flèches et Entrée la mènent, et elle se ferme quand on quitte le champ, au lieu de rester ouverte.
+    if (step.do === "list") {
+      input.current?.focus({ preventScroll: true });
+      return box.show();
+    }
     if (step.do === "error") setError(liOn ? d.invalidBoth : d.invalid);
   };
   /** Ce que le champ contient : un lien de profil LinkedIn ou un pseudo GitHub part tel quel ; un nom passe par la liste. */

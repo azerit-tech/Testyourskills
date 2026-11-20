@@ -170,7 +170,8 @@ describe("Dénoncer : le champ et le message", () => {
     expect(SRC).toContain("p.login.toLowerCase() === selfLogin.toLowerCase()");
     expect(SRC).toMatch(/const pickOne = \(item: Suggestion\) =>\s*void send\(item\.kind === "github" \? \{ kind: "github", login: item\.login \} : \{ kind: "linkedin", url: item\.url \}/);
     expect(SRC).toContain('if (step.do === "pick") return pickOne(step.item);');
-    expect(SRC).toContain('if (step.do === "list") return box.show();');
+    // Plusieurs personnes : la liste s'ouvre et le champ reprend le focus pris par « Dénoncer » (clavier, fermeture au départ du champ).
+    expect(SRC).toMatch(/if \(step\.do === "list"\) \{\s*(\/\/[^\n]*\n\s*)*input\.current\?\.focus\(\{ preventScroll: true \}\);\s*return box\.show\(\);/);
   });
 
   it("un nom, « Dénoncer » touché avant sa liste : on attend la liste, jamais « choisis dans la liste » ni la ligne d'une frappe d'avant", () => {
