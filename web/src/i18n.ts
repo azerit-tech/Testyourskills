@@ -168,6 +168,12 @@ const fr = frTypoDeep({
       /** `who` : le nom de la fiche, ou son « @pseudo ». */
       rowLabel: (rank: number, who: string, overall: number) => `Place ${rank} : ${who}, score de ${overall} %`,
     },
+    /* Sous un tableau de l'accueil, tout le classement ouvert sur place (§18.126). */
+    seeAll: {
+      open: (n: number) => `Voir tout le classement (${n})`,
+      more: "Voir plus",
+      close: "Réduire",
+    },
     errLogin: "Ce pseudo ne ressemble pas à un pseudo GitHub.",
     errEmptyLogin: "Donne-nous un pseudo GitHub (ou une URL de profil).",
     errEmptyCv: "Dépose un CV au format PDF.",
@@ -1061,6 +1067,11 @@ const en: Dict = {
       free: "Open spot",
       freeLabel: (rank) => `Spot ${rank} is open: get your rap sheet`,
       rowLabel: (rank, who, overall) => `Spot ${rank}: ${who}, scores ${overall}%`,
+    },
+    seeAll: {
+      open: (n) => `See the full ranking (${n})`,
+      more: "See more",
+      close: "Show less",
     },
     errLogin: "That doesn't look like a GitHub username.",
     errEmptyLogin: "Give us a GitHub username (or profile URL).",

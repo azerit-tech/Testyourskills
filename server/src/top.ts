@@ -172,14 +172,31 @@ function computeWeek(db: Database.Database, monday: number, now: number): Ranked
     .sort((a, b) => b.overall - a.overall || a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1));
 }
 
-/** Le haut du classement de la semaine en cours. */
-export function weekTop(db: Database.Database, opts: { now?: number; limit?: number } = {}): WeekTop {
+/** Lignes rendues au plus par une lecture paginée d'un classement (`GET /api/top?limit=`, §18.126). */
+export const TOP_PAGE_MAX = 100;
+
+/**
+ * `?offset=&limit=` d'une lecture paginée d'un classement (§18.126) : des entiers positifs,
+ * `limit` ramené à TOP_PAGE_MAX ; une valeur absente ou illisible prend le défaut.
+ */
+export function pageQuery(offset: string | undefined, limit: string | undefined, defaultLimit: number): { offset: number; limit: number } {
+  const int = (v: string | undefined) => (v !== undefined && /^\d{1,9}$/.test(v) ? Number(v) : null);
+  return { offset: int(offset) ?? 0, limit: Math.min(TOP_PAGE_MAX, int(limit) ?? defaultLimit) };
+}
+
+/**
+ * Une page du classement de la semaine en cours : `limit` lignes (la route les borne, pageQuery)
+ * à partir de la place `offset + 1`. Par défaut, les dix premières.
+ */
+export function weekTop(db: Database.Database, opts: { now?: number; limit?: number; offset?: number } = {}): WeekTop {
   const now = opts.now ?? Date.now();
   const limit = Math.max(0, Math.floor(opts.limit ?? 10));
+  const offset = Math.max(0, Math.floor(opts.offset ?? 0));
   const monday = weekStart(now);
   const ranked = rankWeek(db, monday, now);
   const get = db.prepare(`SELECT json, kind FROM cards WHERE id = ?`);
-  const entries: TopEntry[] = ranked.slice(0, limit).map((r, i) => {
+  const entries: TopEntry[] = ranked.slice(offset, offset + limit).map((r, j) => {
+    const i = offset + j;
     const raw = get.get(r.id) as { json: string; kind: string } | undefined;
     // Le nom du profil propre à la fiche (§18.107), comme sur sa page.
     const data = raw ? withCatalogProfiles(JSON.parse(raw.json)) : {};

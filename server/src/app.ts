@@ -31,7 +31,7 @@ import { autoJoinBands, mountBands, rootOf } from "./bands";
 import { mountBandPages } from "./bandPages";
 import { aiStatus as budgetAiStatus, type AiStatus } from "./ai/budget";
 import type { TokenPool } from "./github/tokens";
-import { weekTop, withWeekSpecial } from "./top";
+import { pageQuery, weekTop, withWeekSpecial } from "./top";
 import { normalizeLinkedinUrl, PAID_CALLS_PER_IP, type LinkedinFinder } from "./linkedinProfile/index";
 import { forgetLinkedinOfCard, latestLinkedinCard, recentLinkedinCard } from "./linkedinProfile/cards";
 import type { LinkedinPeople } from "./linkedinProfile/search";
@@ -655,9 +655,10 @@ export function createApp(opts: AppOptions) {
 
   // GET /api/top : le haut du classement de la semaine (§18.22). Rien de privé,
   // ce qui est déjà sur les fiches publiques. Marche aussi sans crédit IA.
+  // `?offset=10&limit=50` : la suite, pour « Voir tout le classement » (§18.126) ; 100 lignes au plus.
   app.get("/api/top", (c) => {
     c.header("Cache-Control", "public, max-age=60");
-    return c.json(weekTop(store.db, { now: Date.now(), limit: 10 }));
+    return c.json(weekTop(store.db, { now: Date.now(), ...pageQuery(c.req.query("offset"), c.req.query("limit"), 10) }));
   });
 
   // POST /api/card : JSON { login, lang, ref? } ou multipart (cv, login?, lang?, ref?).

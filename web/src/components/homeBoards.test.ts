@@ -47,6 +47,52 @@ describe("le top de la semaine sur l'accueil", () => {
     expect(html).not.toContain("Top 5");
   });
 
+  it("« Voir tout le classement (27) » sous les dix lignes, seulement au-delà de dix classés (§18.126)", () => {
+    expect(board(10)).not.toContain("board-all");
+    expect(board(7)).not.toContain("Voir tout");
+    const top = week(10);
+    top.total = 27;
+    const html = render(createElement(WeekBoardView, { top, now: 0, onPlay: () => undefined }));
+    expect(count(html, "Voir tout le classement (27)")).toBe(1);
+    expect(html).toMatch(/<button type="button" class="pill board-all" aria-expanded="false">Voir tout le classement \(27\)<\/button><\/section>$/);
+    // fermé : les dix lignes seules, rien n'est lu
+    expect(count(html, 'class="board-row"')).toBe(10);
+    expect(html).not.toContain("is-rest");
+    expect(render(createElement(WeekBoardView, { top, now: 0, onPlay: () => undefined }), "en-US")).toContain("See the full ranking (27)");
+  });
+
+  it("ouvert : toutes les lignes de la semaine, sur place, chacune avec son lien et ses logos ; la mienne en évidence ; « Réduire » (§18.126)", () => {
+    const top = week(10);
+    top.total = 27;
+    const rest = Array.from({ length: 17 }, (_, i) => ({ ...entry(i + 11), linkedinUrl: `https://www.linkedin.com/in/dev${i + 11}` }));
+    const html = render(createElement(WeekBoardView, { top, now: 0, onPlay: () => undefined, rest, mine: { id: "Card0000020", login: null, overall: 70 } }));
+    // les dix du bloc, puis les dix-sept suivantes après un filet : 27 lignes, 27 liens vers leur fiche
+    expect(count(html, "board-row")).toBe(27);
+    expect(html).toContain('<ol class="board-list is-rest" start="11">');
+    for (let r = 1; r <= 27; r++) expect(html).toContain(`href="/c/Card00000${r}"`);
+    expect(html).toMatch(/<span class="board-rank">27<\/span>/);
+    // les logos au bout des lignes de la suite (§18.108)
+    expect(html).toContain('href="https://www.linkedin.com/in/dev27"');
+    expect(html).toContain('href="https://github.com/dev27"');
+    // ma ligne, la 20e, mise en évidence, une seule fois
+    expect(count(html, "is-me")).toBe(1);
+    expect(html).toMatch(/class="board-row is-me" href="\/c\/Card0000020"/);
+    // tout est lu : ni « Voir plus » ni le bouton d'ouverture ; « Réduire » referme
+    expect(html).not.toContain("Voir plus");
+    expect(html).not.toContain("Voir tout");
+    expect(html).toMatch(/<button type="button" class="link-quiet board-less" aria-expanded="true">Réduire<\/button><\/section>$/);
+  });
+
+  it("ouvert, il reste des lignes à lire : « Voir plus » (§18.126)", () => {
+    const top = week(10);
+    top.total = 80;
+    const rest = Array.from({ length: 50 }, (_, i) => entry(i + 11));
+    const html = render(createElement(WeekBoardView, { top, now: 0, onPlay: () => undefined, rest }));
+    expect(count(html, "board-row")).toBe(60);
+    expect(html).toContain(">Voir plus</button>");
+    expect(html).toContain(">Réduire</button>");
+  });
+
   it("chaque ligne est la vraie personne : le nom de la fiche, ses initiales, le lien vers elle ; sans nom, le @pseudo (§18.88)", () => {
     const top = week(3);
     // Une fiche LinkedIn seule : un nom, pas de pseudo ; une fiche GitHub avec un nom ; une fiche GitHub sans nom.
@@ -191,6 +237,34 @@ describe("les bandes sur l'accueil : un classement par ligue (§18.92, §18.101)
     expect(league(low, "boite")).not.toContain("is-rest");
     // déjà dans les cinq lignes : pas de doublon
     expect(view({ ecole: five, boite: [], mine: { ecole: { place: 2, band: five[1]! } } }, { ecole: "e2" })).not.toContain("is-rest");
+  });
+
+  it("« Voir tout le classement (7) » sous une ligue de plus de cinq bandes ; ouverte, la suite à sa place, la sienne en évidence (§18.126)", () => {
+    const seven = [1, 2, 3, 4, 5, 6, 7].map((r) => band("ecole", `e${r}`, `École ${r}`, 30 - r, 3, r));
+    const top: BandsTop = { ecole: seven.slice(0, 5), boite: prod.boite, totals: { ecole: 7, boite: 3 } };
+    const closed = view(top);
+    expect(count(league(closed, "ecole"), "Voir tout le classement (7)")).toBe(1);
+    expect(league(closed, "ecole")).toMatch(/<button type="button" class="pill board-all" aria-expanded="false">/);
+    // trois boîtes : pas de bouton
+    expect(league(closed, "boite")).not.toContain("board-all");
+    expect(view(top, {}, "en-US")).toContain("See the full ranking (7)");
+    // ouverte : les places 6 et 7 après un filet, sa bande en évidence, « Réduire » ; la ligne du bas s'efface
+    const open = render(
+      createElement(BandsTopView, {
+        top: { ...top, mine: { ecole: { place: 7, band: seven[6]! } } },
+        mine: { ecole: "e7" },
+        onPlay: () => undefined,
+        rest: { ecole: seven.slice(5).map((b, i) => ({ place: i + 6, band: b })) },
+      }),
+    );
+    const ecole = league(open, "ecole");
+    expect(count(ecole, "league-row")).toBe(7);
+    expect(count(ecole, 'class="board-list is-rest"')).toBe(1);
+    expect(ecole).toMatch(/<ol class="board-list is-rest" start="6"><li><button[^>]*><span class="board-rank">6<\/span>/);
+    expect(count(ecole, "is-me")).toBe(1);
+    expect(ecole).toMatch(/is-me"[^>]*><span class="board-rank">7<\/span>/);
+    expect(ecole).toContain(">Réduire</button>");
+    expect(ecole).not.toContain("Voir tout le classement");
   });
 
   it("rien que le classement : ni « Ta bande », ni emplacements, ni partage, ni « Encore N fiches », ni lien vers /bandes", () => {

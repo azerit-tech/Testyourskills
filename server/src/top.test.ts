@@ -530,6 +530,33 @@ describe("routes", () => {
     expect(top.entries.map((e) => e.login)).toEqual(["alpha", "beta"]);
   });
 
+  it("GET /api/top?offset=&limit= : la suite du classement, les places qui suivent, 100 lignes au plus (§18.126)", async () => {
+    const { app, store } = setup();
+    const now = Date.now();
+    store.insertCards(Array.from({ length: 130 }, (_, i) => gh(`p${i}`, 99 - Math.floor(i / 2), now - 1000 - i)));
+    const page = async (q: string) => (await (await app.request(`/api/top${q}`)).json()) as WeekTop;
+    // Sans paramètre : les dix premiers, comme avant.
+    const head = await page("");
+    expect(head.total).toBe(130);
+    expect(head.entries.map((e) => e.rank)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    // La suite : les places 11 à 27, les mêmes personnes que le classement entier.
+    const rest = await page("?offset=10&limit=17");
+    expect(rest.total).toBe(130);
+    expect(rest.entries.map((e) => e.rank)).toEqual(Array.from({ length: 17 }, (_, i) => i + 11));
+    expect(rest.entries.map((e) => e.login)).toEqual(weekTop(store.db, { limit: 130 }).entries.slice(10, 27).map((e) => e.login));
+    expect(rest.entries.every((e) => e.cardId && e.stars >= 1)).toBe(true);
+    const res = await app.request("/api/top?offset=10&limit=50");
+    expect(res.headers.get("cache-control")).toBe("public, max-age=60");
+    // Plafond : 100 lignes, même pour limit=500.
+    const capped = await page("?offset=0&limit=500");
+    expect(capped.entries).toHaveLength(100);
+    expect(capped.entries[99]!.rank).toBe(100);
+    expect((await page("?offset=100&limit=100")).entries.map((e) => e.rank)).toEqual(Array.from({ length: 30 }, (_, i) => i + 101));
+    // Au-delà du dernier : rien ; une valeur illisible prend le défaut.
+    expect((await page("?offset=500&limit=10")).entries).toEqual([]);
+    expect((await page("?offset=-3&limit=abc")).entries.map((e) => e.rank)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  });
+
   it("GET /api/card/:id : le rang de la semaine et la spéciale lue à la volée", async () => {
     const { app, store } = setup();
     const now = Date.now();

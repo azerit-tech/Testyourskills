@@ -7,7 +7,7 @@ import type { CardData, JobState, Lang, Piece, Proposal, WeekRank, WeekTop } fro
 import type { ProfileLinks } from "../../../shared/profileLinks";
 /** La maquette (mock.ts), chargée seulement en mode démo : le site réel ne la télécharge jamais. */
 export const demoApi = () => import("./mock").then((m) => m.mockApi);
-import { mockTop, mockWeekRank } from "./mockTop";
+import { mockTop, mockTopPage, mockWeekRank } from "./mockTop";
 import { ApiError } from "./errors";
 import { currentRef } from "./session";
 
@@ -702,9 +702,15 @@ function getTop(): Promise<WeekTop | null> {
   return topFlight;
 }
 
-async function fetchTop(): Promise<WeekTop | null> {
+/** La suite du classement de la semaine, `limit` lignes après les `offset` premières (§18.126) ; null si le serveur ne répond pas. */
+function getTopPage(offset: number, limit: number): Promise<WeekTop | null> {
+  if (isMock()) return Promise.resolve(mockTopPage(offset, limit));
+  return fetchTop(`?offset=${offset}&limit=${limit}`);
+}
+
+async function fetchTop(query = ""): Promise<WeekTop | null> {
   try {
-    const res = await fetch("/api/top", { headers: { Accept: "application/json" } });
+    const res = await fetch(`/api/top${query}`, { headers: { Accept: "application/json" } });
     if (!res.ok) return null;
     return (await res.json()) as WeekTop;
   } catch {
@@ -712,7 +718,7 @@ async function fetchTop(): Promise<WeekTop | null> {
   }
 }
 
-export const api = { createCard, getJob, getCase, proposalOf, linksOf, declineProposal, vote, sendEmail, requestRemoval, deleteCard, track, getConfig, knownConfig, startLinkedInPhoto, getShowcase, getTop, getMe, getAccount, startClaim, setHidden, logout };
+export const api = { createCard, getJob, getCase, proposalOf, linksOf, declineProposal, vote, sendEmail, requestRemoval, deleteCard, track, getConfig, knownConfig, startLinkedInPhoto, getShowcase, getTop, getTopPage, getMe, getAccount, startClaim, setHidden, logout };
 
 /** URLs des images rendues par le serveur (§7). `?v=` : le dessin en cours, servi avec un cache d'un an (shared/images.ts). */
 export const images = {

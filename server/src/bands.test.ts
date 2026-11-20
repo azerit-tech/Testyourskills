@@ -5,13 +5,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import Database from "better-sqlite3";
 import { afterEach, describe, expect, it } from "vitest";
-import type { BandBoard, BandPage, BandRef, BandsTop, MyBands } from "../../shared/bands";
+import type { BandBoard, BandLeaguePage, BandPage, BandRef, BandsTop, MyBands } from "../../shared/bands";
 import { FIXTURES } from "../../shared/fixtures";
 import { aliasFor } from "../../shared/punchline";
 import type { CardData } from "../../shared/types";
 import { createApp, purge } from "./app";
 import { SESSION_COOKIE, signSession } from "./auth";
-import { bandBoard, bandsTop, bandStanding, forgetBands, joinBand } from "./bands";
+import { bandBoard, bandsLeague, bandsTop, bandStanding, forgetBands, joinBand } from "./bands";
+import { TOP_PAGE_MAX } from "./top";
 import { migrate, RETENTION_MS, Store } from "./db";
 import type { Deps } from "./pipeline";
 
@@ -493,6 +494,32 @@ describe("pages publiques", () => {
     const mine = await call<BandsTop>(ctx, "/api/bands/top?boite=blablacar&ecole=%3Cx%3E");
     expect(mine.json.boite.map((b) => b.id)).toEqual(["doctolib", "meta", "google", "ubisoft", "mistral-ai"]);
     expect(mine.json.mine).toMatchObject({ boite: { place: 6, band: { id: "blablacar", members: 2 } } });
+    // « Voir tout le classement (6) » (§18.126) : le compte de chaque ligue, puis la suite, page par page
+    expect(mine.json.totals).toEqual({ ecole: 0, boite: 6 });
+    const rest = await call<BandLeaguePage>(ctx, "/api/bands/top/boite?offset=5&limit=50");
+    expect(rest.status).toBe(200);
+    expect(rest.json).toMatchObject({ type: "boite", total: 6, entries: [{ place: 6, band: { id: "blablacar" } }] });
+    const all = await call<BandLeaguePage>(ctx, "/api/bands/top/boite?offset=0&limit=500");
+    expect(all.json.entries.map((e) => [e.place, e.band.id])).toEqual([
+      [1, "doctolib"],
+      [2, "meta"],
+      [3, "google"],
+      [4, "ubisoft"],
+      [5, "mistral-ai"],
+      [6, "blablacar"],
+    ]);
+    expect((await call<BandLeaguePage>(ctx, "/api/bands/top/boite?offset=1&limit=2")).json.entries.map((e) => e.place)).toEqual([2, 3]);
+    expect((await call(ctx, "/api/bands/top/ville")).status).toBe(404);
+  });
+
+  it("la suite d'une ligue : 100 lignes au plus par page (§18.126)", () => {
+    const ctx = setup();
+    for (let i = 0; i < 130; i++) put(ctx.store, insert(ctx.store), { type: "boite", id: `boite-${i}`, label: `Boîte ${i}` });
+    forgetBands(ctx.store.db);
+    expect(bandsTop(ctx.store.db).totals).toMatchObject({ boite: 130 });
+    const page = bandsLeague(ctx.store.db, "boite", 100, TOP_PAGE_MAX);
+    expect(page.total).toBe(130);
+    expect(page.entries.map((e) => e.place)).toEqual(Array.from({ length: 30 }, (_, i) => i + 101));
   });
 
   it("la vue publique d'une fiche ne porte pas son école ; la personne fichée la lit", async () => {

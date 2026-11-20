@@ -1884,6 +1884,15 @@ svg {
   margin-top: 4px;
   border-top: 1px solid var(--c-line);
 }
+/* « Voir tout le classement (27) » et « Voir plus » sous un tableau (§18.126) : la largeur du
+   tableau, en contour ; « Réduire » en lien, centré dessous */
+.board-all {
+  width: 100%;
+  margin-top: 8px;
+}
+.board-less {
+  justify-self: center;
+}
 /* téléphone : les étoiles passent sous le nom, qui garde la largeur de la ligne (un nom
    entier tient à 390 px, §18.88) ; rang, visage et note restent sur l'axe de la ligne */
 @media (max-width: 479px) {

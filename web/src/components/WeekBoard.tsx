@@ -3,6 +3,7 @@
 // qu'elle dit (Jacques, 20 nov. 2026). Semaine vide : rien. Mat, sans dégradé :
 // celui de l'écran est la fiche.
 // Le tableau porte l'ancre « semaine » ; la ligne de la fiche en mémoire y est mise en évidence.
+// Plus de dix classés : « Voir tout le classement (27) » ouvre la suite sur place (§18.126).
 import { useEffect, useRef, useState } from "react";
 import { personLabel } from "../../../shared/boardPerson";
 import { personLinks } from "../../../shared/profileLinks";
@@ -13,6 +14,7 @@ import { onLinkClick } from "../lib/router";
 import { myCard, type MyCard } from "../lib/session";
 import { Avatar } from "./Avatar";
 import { ProfileLinks } from "./ProfileLinks";
+import { SeeAllView, useSeeAll } from "./SeeAll";
 import { Stars } from "./Stars";
 
 const SIZE = 10;
@@ -112,8 +114,30 @@ export function WeekBoard({ onPlay }: { onPlay: () => void }) {
   return <WeekBoardView top={top} now={now} onPlay={onPlay} mine={mine} />;
 }
 
-/** Le tableau d'une semaine connue, sans appel au serveur. */
-export function WeekBoardView({ top, now, mine }: { top: WeekTop; now: number; onPlay: () => void; mine?: MyCard | null }) {
+/** La suite de la semaine, lue à la demande (§18.126). */
+const loadTop = (offset: number, limit: number) => api.getTopPage(offset, limit).then((p) => p && { total: p.total, rows: p.entries });
+
+/**
+ * Plus de dix classés : « Voir tout le classement (27) », qui ouvre la suite sur place, après un
+ * filet, dans les mêmes lignes ; la mienne y est mise en évidence. `initial` : déjà ouvert (tests).
+ */
+function TopMore({ top, mine, initial }: { top: WeekTop; mine?: MyCard | null; initial?: TopEntry[] }) {
+  const all = useSeeAll<TopEntry>(SIZE, top.total, loadTop, initial && { open: true, rows: initial });
+  return (
+    <SeeAllView state={all}>
+      {all.rows.length > 0 && (
+        <ol className="board-list is-rest" start={all.rows[0]!.rank}>
+          {all.rows.map((e) => (
+            <Row key={e.cardId ?? `rang-${e.rank}`} e={e} me={isMine(e, mine)} />
+          ))}
+        </ol>
+      )}
+    </SeeAllView>
+  );
+}
+
+/** Le tableau d'une semaine connue, sans appel au serveur tant que la suite n'est pas demandée. */
+export function WeekBoardView({ top, now, mine, rest }: { top: WeekTop; now: number; onPlay: () => void; mine?: MyCard | null; rest?: TopEntry[] }) {
   const { t } = useT();
   const tt = t.home.top;
   // Venu par l'ancre (« /#semaine », depuis le rang d'une fiche) : le tableau n'existait
@@ -147,6 +171,8 @@ export function WeekBoardView({ top, now, mine }: { top: WeekTop; now: number; o
           </ol>
         </div>
       )}
+      {/* Une autre semaine : la liste ouverte se referme. */}
+      {top.total > SIZE && rows.length === SIZE && <TopMore key={top.weekStart} top={top} mine={mine} initial={rest} />}
     </section>
   );
 }

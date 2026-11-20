@@ -2990,3 +2990,22 @@ Jacques : « https://github.com/Hennzau : comment ça se fait qu'on n'a pas trou
   - le pseudo.
 
   `denounceMatch.test.ts` couvre la fiche pour soi (forte, moyenne, à vérifier) et `linkedinMatch` ; `rattrapageLinkedin.test.ts` couvre le rattrapage. Les suites `entry`, `proposal`, `linkedinProfile` et `github` passent aussi, avec `tsc -b` et `vite build`. **Pas vérifié** : la production, le rattrapage sur la vraie base, la lecture « à vérifier » avec un vrai profil.
+
+### 18.126 « Voir tout le classement » : tout le monde de la semaine, sur place (20 novembre 2026, branche `site/classement-voir-plus`)
+
+Jacques : « Est-ce que tu peux faire un "voir +" pour voir tous ceux qui ont participé ? » Le top de la semaine de l'accueil montre dix lignes ; la production en compte 27 cette semaine. Ce paragraphe complète le §18.22 (API, accueil) et le §18.103.
+
+- **Le bouton** : sous les dix lignes, « Voir tout le classement (27) » (“See the full ranking (27)”), un bouton en contour de la largeur du tableau. Il n'est là que si `total` (de `GET /api/top`) dépasse dix.
+- **Sur place** : touché, le classement s'ouvre dans la page, sans navigation. Après un filet, les places 11 et suivantes, dans les mêmes lignes que le top : rang, visage ou initiales, nom, étoiles, score en %, logos LinkedIn et GitHub (§18.108), et le toucher qui ouvre la fiche. Ma ligne, si elle y est, est mise en évidence comme dans le top.
+- **Lu à la demande** : `GET /api/top?offset=10&limit=50`. Sans paramètre, la route rend toujours les dix premiers. `limit` est borné à 100 (`TOP_PAGE_MAX`) ; une valeur illisible prend le défaut. Même classement, mêmes exclusions et même cache que le top (60 s en mémoire, `Cache-Control: public, max-age=60`). Les pages font 50 lignes. La suivante se lit quand le bas de la liste approche (à 600 px), ou sur « Voir plus », qui sert aussi à réessayer après une panne.
+- **« Réduire »** : un lien discret sous la liste la referme et ramène le bouton à l'écran. Les lignes lues restent en mémoire. Une nouvelle semaine referme la liste.
+- **Les ligues de bandes** : même bouton sous une ligue de plus de cinq bandes. `GET /api/bands/top` rend `totals` (le nombre de lignes de chaque ligue, dans l'ordre de l'accueil). `GET /api/bands/top/:type?offset=5&limit=50` rend la suite, chaque ligne avec sa place (100 au plus, même cache). Ouverte, la ligue montre sa bande à sa place, mise en évidence, et la ligne « plus bas, après un filet » s'efface.
+- **Démo** : `?mock=1&top=27` donne 27 classés (soixante au plus) ; au-delà des dix nommés, des pseudos et des noms inventés, sans photo.
+- **Vérifié** :
+  - `top.test.ts` : pagination, places qui suivent, plafond à 100, valeurs illisibles ;
+  - `bands.test.ts` : `totals`, la suite d'une ligue, le plafond ;
+  - `homeBoards.test.ts` : le bouton seulement au-delà de dix (cinq pour une ligue), la liste ouverte avec ses 27 lignes, leurs liens et leurs logos, ma ligne, « Voir plus », « Réduire » ;
+  - `tsc -b` et `vite build` passent ;
+  - Chrome sans tête et muet, 390 × 844, démo à 27.
+
+  **Pas vérifié** : la production, un vrai iPhone.

@@ -1,7 +1,7 @@
 // Les bandes côté navigateur (§18.38) : l'API, sa démo (?mock=1), et un souvenir
 // local, les bandes de la personne (sa ligne au classement de l'accueil, §18.92).
 import { boardPerson } from "../../../shared/boardPerson";
-import type { BandPage, BandRef, BandsTop, BandStanding, BandType, MyBands } from "../../../shared/bands";
+import type { BandLeaguePage, BandPage, BandRef, BandsTop, BandStanding, BandType, MyBands } from "../../../shared/bands";
 import { RANKING_ANCHOR } from "../../../shared/routes";
 import { BAND_MIN_MEMBERS, BAND_TYPES, bandHasPage, companyCheck, schoolById } from "../../../shared/bands";
 import { isMock, tokens } from "./api";
@@ -52,6 +52,11 @@ export const bandsApi = {
     if (isMock()) return mock.top(mine);
     const q = BAND_TYPES.filter((k) => mine[k]).map((k) => `${k}=${encodeURIComponent(mine[k]!)}`).join("&");
     return getJson<BandsTop>(`/api/bands/top${q ? `?${q}` : ""}`).catch(() => null);
+  },
+  /** La suite du classement d'une ligue, `limit` lignes après les `offset` premières (§18.126) ; null si le serveur ne répond pas. */
+  async league(type: BandType, offset: number, limit: number): Promise<BandLeaguePage | null> {
+    if (isMock()) return mock.league(type, offset, limit);
+    return getJson<BandLeaguePage>(`/api/bands/top/${type}?offset=${offset}&limit=${limit}`).catch(() => null);
   },
   /** Les fiches d'une bande (ouverte au classement de l'accueil) ; null si elle n'existe pas. Une panne réseau remonte en ApiError. */
   async page(type: BandType, id: string): Promise<BandPage | null> {
@@ -191,21 +196,32 @@ function mockStandings(type: BandType): BandStanding[] {
   });
 }
 
+/** L'ordre de l'accueil : le tableau, puis les bandes en formation qui ont leur page, les plus étoilées d'abord. */
+function mockOrder(type: BandType): BandStanding[] {
+  const all = mockStandings(type);
+  return [
+    ...all.filter((b) => b.rank !== null).sort((a, b) => a.rank! - b.rank!),
+    ...all.filter((b) => b.rank === null && b.hasPage).sort((a, b) => b.score - a.score || b.members - a.members),
+  ];
+}
+
 const mock = {
   // Comme le serveur : le tableau, puis les bandes en formation qui ont leur page, les plus étoilées d'abord.
   top(mine: Partial<Record<BandType, string | null>> = {}): BandsTop {
-    const out: BandsTop = { ecole: [], boite: [] };
+    const out: BandsTop = { ecole: [], boite: [], totals: {} };
     for (const type of BAND_TYPES) {
-      const all = mockStandings(type);
-      const order = [
-        ...all.filter((b) => b.rank !== null).sort((a, b) => a.rank! - b.rank!),
-        ...all.filter((b) => b.rank === null && b.hasPage).sort((a, b) => b.score - a.score || b.members - a.members),
-      ];
+      const order = mockOrder(type);
       out[type] = order.slice(0, 5);
+      out.totals![type] = order.length;
       const i = mine[type] ? order.findIndex((b) => b.id === mine[type]) : -1;
       if (i >= 5) (out.mine ??= {})[type] = { place: i + 1, band: order[i]! };
     }
     return out;
+  },
+  league(type: BandType, offset: number, limit: number): BandLeaguePage {
+    const order = mockOrder(type);
+    const from = Math.max(0, offset);
+    return { type, total: order.length, entries: order.slice(from, from + Math.min(100, limit)).map((band, i) => ({ place: from + i + 1, band })) };
   },
   page(type: BandType, id: string): BandPage | null {
     const band = mockStandings(type).find((b) => b.id === id) ?? (type === "ecole" && schoolById(id) ? { ...standing("ecole", id, schoolById(id)!.label, 0, 0), rank: null, gap: null, ahead: null } : null);
