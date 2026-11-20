@@ -1,6 +1,56 @@
 # Le barème de recrutement
 
-*Proposition du 10 novembre 2026, construite depuis (barème 0.4.0, SPEC §18.37). Le barème qui tourne est le 0.6.0 du 20 novembre : sa section, juste dessous, fait foi là où elle contredit la suite ; puis celle du 0.5.0, puis la proposition.*
+*Proposition du 10 novembre 2026, construite depuis (barème 0.4.0, SPEC §18.37). Le barème qui tourne est le 0.7.0 du 20 novembre : sa section, juste dessous, fait foi là où elle contredit la suite ; puis celle du 0.6.0, celle du 0.5.0, puis la proposition.*
+
+## Barème 0.7.0 : moins dur au milieu (20 novembre 2026)
+
+*Le moteur tel qu'il tourne (`data/grid.json`, `server/src/scoring/grid.ts`, SPEC §18.117). Il remplace dans la section 0.6.0 la note « 10 × la moyenne » (point 4) et la table du parcours au junior (point 3).*
+
+Jacques : « Tu es trop dur : les gens avec des petits projets, du type Raphael, ne méritent pas 50. »
+
+**Le milieu des tables de son niveau est un bon profil.** Un étudiant ou un junior avec un stage, une école et de vrais petits projets se lit au milieu des tables de son niveau, 5 sur 10. Sous 0.6.0, cela faisait 50, trois étoiles : « on te regarde ». Depuis 0.7.0, 65 à 70, quatre étoiles : « on te cherche ». Le haut ne bouge pas, le presque vide non plus.
+
+1. **La courbe de la note** (`final.curve`). La moyenne pondérée des critères comptés, sur 100, passe par cette courbe (interpolation linéaire), avant le plafond sans code prouvé et l'aléa :
+
+   | Moyenne | 0 | 35 | 45 | 55 | 60 | 70 | 77 | 80 et plus |
+   |---|---|---|---|---|---|---|---|---|
+   | Note | 0 | 35 | 51 | 67 | 69 | 74 | 77 | la moyenne |
+
+   **Pourquoi une courbe et pas un bonus** : un bonus fixe aurait levé aussi le haut (Jacques et Lumine passaient devant les mainteneurs connus) et le presque vide. La courbe lève seulement le milieu. Son coût : entre 55 et 77 de moyenne, la note sépare moins les dossiers, 0,45 point par point.
+
+2. **La table du junior lit les stages** (`EMP.tables.junior`). Les stages, comptés pour moitié, font passer un étudiant au junior. Avant, la table du junior ne les lisait qu'à 3, sous la table du début de carrière qu'il quittait (un an de stages cumulés : 7) : un stage de plus faisait baisser la note. Elle lit maintenant les stages un cran sous le début de carrière :
+
+   | Note | Junior, ajouté en 0.7.0 |
+   |---|---|
+   | 6 | 12 mois de stage ou d'alternance cumulés, ou un stage de 4 mois dans une équipe produit exigeante |
+   | 5 | 2 stages ou alternances, ou un stage de 4 mois |
+
+3. **Le plancher du niveau** (`final.floors`). Au début de carrière et au junior, un critère compté ne descend pas sous 2. Un signal absent (aucune semaine active sur l'année) ne vaut pas 0 quand le niveau ne le demande pas, et sa pièce le dit : « Plancher du niveau : 2 ». L'école et l'open source gardent leur note, puisqu'elles ne comptent que pour monter. À partir du confirmé, aucun plancher.
+
+4. **Le prompt de l'IA ne change pas.** Il lit des faits : le niveau du code, les résultats datés, les technos rattachées. La dureté venait du calcul.
+
+**Les dossiers de production du 20 novembre**, note affichée (aléa de la fiche compris) :
+
+| Dossier | 0.6.0 | 0.7.0 |
+|---|---|---|
+| Étudiant d'école, 23 mois de stage (lu junior), petits projets Python lus 3,5 sur 5, 7 semaines actives | 50 (exact 53) | 66 (exact 69) ; 61 refait depuis ses critères rangés, sans relecture |
+| Jacques, dossier | 79 | 79 |
+| Lumine, dossier, code non prouvé | 80 | 80 |
+
+**Les dossiers de référence** (`levels.test.ts`, `grid.test.ts`, `calibration.test.ts`), note exacte avant l'aléa :
+
+| Dossier | 0.6.0 | 0.7.0 |
+|---|---|---|
+| (a) Stage de 6 mois chez un employeur très sélectif, GitHub correct | 80 | 80 |
+| (b) Le même stage dans une entreprise que rien ne distingue | 60 | 69 |
+| (c) Douze ans dans le même poste, GitHub médiocre | 49 | 58 |
+| (d) École d'ingénieurs, 6 mois en startup de produit, commits de cours | 70 | 74 |
+| (d') La même, deux stages que rien ne distingue | 60 | 69 |
+| Jacques : LinkedIn seul, GitHub seul, dossier | 60, 87, 80 | 69, 87, 80 |
+| Un dossier vide ; un seul stage ; un GitHub à peine au-dessus du trop mince | 20, 30, 37 | 20, 30, 38 |
+
+**Le recalcul** (`scripts/recalcule-notes.ts`, à blanc par défaut) refait la note des fiches LinkedIn, CV et des dossiers depuis leurs critères rangés, avec la courbe et le plancher. La table du junior qui lit les stages demande une nouvelle lecture du profil.
+
 
 ## Barème 0.6.0 : LinkedIn et GitHub au même point, la preuve en plus (20 novembre 2026)
 
