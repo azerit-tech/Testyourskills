@@ -7,8 +7,10 @@
 // - Base : la pièce GitHub quand le code est jugeable, sinon la pièce déclarative
 //   (GitHub « dossier vide »). Peine, caution, preuves, métier et langage : ceux de la base.
 // - Note, étoiles, palier et grille : ceux du dossier (sans grille rangée, ceux de la base).
-// - Nom, pseudo et portrait : ceux de la pièce GitHub. Profil et sa phrase : toujours
+// - Nom et pseudo : ceux de la pièce GitHub. Profil et sa phrase : toujours
 //   ceux de la pièce GitHub (une façon de travailler vue en public).
+// - Portrait (§18.98) : la photo LinkedIn d'abord, quelle que soit la pièce qui la porte ;
+//   sinon l'avatar GitHub ; sinon la photo de la pièce déclarative.
 // - Barre XP : celle de la pièce où la grille a pris l'expérience.
 // - Employeur : la pièce déclarative d'abord, sinon GitHub.
 // - Chefs d'accusation : ceux de la base, sans ton `gap` (ils étaient nés de l'écart) ;
@@ -64,6 +66,16 @@ export function oneNote<T extends CardData | ComparisonData>(data: T): T {
   return { ...data, cv: piece(data.cv, false), github: piece(data.github, data.github.grid?.rule === "empty_file") };
 }
 
+/**
+ * La pièce dont le dossier prend le portrait (§18.98) : la photo LinkedIn d'abord, sur
+ * l'une ou l'autre pièce ; sinon l'avatar GitHub ; sinon celle de la pièce déclarative.
+ */
+export function photoPiece(gh: CardData, declared: CardData): CardData {
+  if (gh.avatarUrl && gh.photoSource === "linkedin") return gh;
+  if (declared.avatarUrl && declared.photoSource === "linkedin") return declared;
+  return gh.avatarUrl ? gh : declared;
+}
+
 /** La fiche du dossier, à la lecture : voir l'en-tête. */
 export function caseCard(cmp: ComparisonData): CardData {
   const gh = cmp.github;
@@ -94,7 +106,7 @@ export function caseCard(cmp: ComparisonData): CardData {
   }
 
   const { rank: _rank, deleteToken: _token, special: _special, grid: _grid, sealed: _sealed, sentence: _sentence, ...rest } = base;
-  const avatar = gh.avatarUrl ? gh : declared;
+  const avatar = photoPiece(gh, declared);
   return {
     ...rest,
     id: cmp.id,

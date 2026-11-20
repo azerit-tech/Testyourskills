@@ -129,6 +129,21 @@ describe("la fiche du dossier", () => {
     expect(caseCard({ ...cmp, github: { ...cmp.github, special: "totw" } }).special).toBe("totw");
   });
 
+  it("le portrait : la photo LinkedIn d'abord, l'avatar GitHub seulement à défaut (§18.98)", () => {
+    const li = "https://testyourskills.example/avatar/dossier.jpg?v=1";
+    const gh = "https://avatars.githubusercontent.com/u/1?v=4";
+    const base = jacques();
+    const both = { ...base, cv: { ...base.cv, avatarUrl: li, photoSource: "linkedin" as const }, github: { ...base.github, avatarUrl: gh, photoSource: undefined } };
+    expect(caseCard(both).avatarUrl).toBe(li);
+    expect(caseCard(both).photoSource).toBe("linkedin");
+    // L'avatar GitHub seul : c'est lui.
+    expect(caseCard({ ...both, cv: { ...both.cv, avatarUrl: undefined, photoSource: undefined } }).avatarUrl).toBe(gh);
+    // La photo LinkedIn posée sur la pièce GitHub (« Mettre ma photo LinkedIn ») : la même.
+    expect(caseCard({ ...both, cv: { ...both.cv, avatarUrl: undefined, photoSource: undefined }, github: { ...both.github, avatarUrl: li, photoSource: "linkedin" } }).avatarUrl).toBe(li);
+    // Ni l'une ni l'autre : aucune photo, les initiales.
+    expect(caseCard({ ...both, cv: { ...both.cv, avatarUrl: undefined, photoSource: undefined }, github: { ...both.github, avatarUrl: undefined } }).avatarUrl).toBeUndefined();
+  });
+
   it("les pièces et leur libellé", () => {
     expect(piecesOf({ declaredSource: "linkedin" })).toEqual(["linkedin", "github"]);
     expect(piecesOf({})).toEqual(["cv", "github"]);
