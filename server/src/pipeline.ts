@@ -123,6 +123,15 @@ export function asPieces(
   return { cv: piece(scored.cv, own.cv), github: piece(scored.github, own.github), grid };
 }
 
+/**
+ * La phrase que l'IA a écrite pendant la lecture (§18.103), rangée avec le profil de
+ * la fiche. Sans phrase (IA absente, sortie rejetée) ou sans profil : la fiche telle
+ * quelle, qui tirera la sienne au recueil à la lecture.
+ */
+export function withLine<T extends Pick<CardData, "profile">>(card: T, line: Fact | undefined): T {
+  return line && card.profile ? { ...card, profile: { ...card.profile, line } } : card;
+}
+
 // --- Identifiants -----------------------------------------------------------
 
 const B62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
@@ -890,7 +899,7 @@ export class Pipeline {
       if (gh!.cached) return { ...gh!.cached, id: cardId, createdAt };
       const found = foundForGithub();
       const body = phaseSync("barème", () => deps.scoreGithub(gh!.facts, gh!.ai, { lang, judgedInSeconds }));
-      return { ...body, ...(found.length ? { findings: found } : {}), id: cardId, createdAt };
+      return { ...withLine(body, gh!.ai?.card_line), ...(found.length ? { findings: found } : {}), id: cardId, createdAt };
     };
     const githubRow = (card: CardData, parentId: string | null, degraded = gh!.degraded): NewCardRow => ({
       id: card.id,
@@ -948,7 +957,7 @@ export class Pipeline {
       }
       const found = linkedinUrl ? strongest(ctx.findings()) : [];
       const card = withLiPhoto(asDeclared({
-        ...phaseSync("barème", () => deps.scoreCv(reading, declared.counts, { lang, judgedInSeconds, ...declaredOpts })),
+        ...withLine(phaseSync("barème", () => deps.scoreCv(reading, declared.counts, { lang, judgedInSeconds, ...declaredOpts })), reading.card_line),
         ...(found.length ? { findings: found } : {}),
         ...(linkedinUrl ? { linkedinUrl } : {}),
         id,
@@ -975,7 +984,9 @@ export class Pipeline {
     const found = foundForGithub();
     const pieces = asPieces(scored, { cv: { id: newId(), createdAt }, github: { id: newId(), createdAt, ...(found.length ? { findings: found } : {}) } });
     const cmp = linkedinUrl ? asLinkedinComparison(pieces) : pieces;
-    const comparison: ComparisonData = { ...cmp, cv: withLiPhoto(cmp.cv), github: withLiPhoto(cmp.github), id, createdAt };
+    // La phrase du dossier : celle du parcours d'abord (elle voit le métier), sinon celle du code ; sur les deux pièces.
+    const line = reading.card_line ?? gh.ai?.card_line;
+    const comparison: ComparisonData = { ...cmp, cv: withLiPhoto(withLine(cmp.cv, line)), github: withLiPhoto(withLine(cmp.github, line)), id, createdAt };
     return [
       {
         id,
