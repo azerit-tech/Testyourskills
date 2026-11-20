@@ -28,8 +28,10 @@
 // contrat en pastille devant les postes) ; bande et prime centrent leur colonne de gauche au-dessus
 // de l'appel ; un rang s'écrit « 2ᵉ » ; l'appel n'a plus de double espace après ses deux-points.
 // Toujours v10 : une fiche sans langage écrit « ARME · Non déclarée », plus un tiret.
+// v11 (20 novembre 2026) : les douze coloris de la fiche (§18.102) ; chaque fiche prend le sien,
+// rangé à sa naissance ou tiré de son id : toutes les images se redessinent.
 
-export const IMAGE_DESIGN = 10;
+export const IMAGE_DESIGN = 11;
 
 /** Dossier du cache disque, sous og/. */
 export const IMAGE_DESIGN_DIR = `v${IMAGE_DESIGN}`;

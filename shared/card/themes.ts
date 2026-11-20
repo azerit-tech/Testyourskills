@@ -1,9 +1,10 @@
-// Thèmes de rendu de la fiche (SPEC §18.18) : un par nombre d'étoiles, plus les
-// trois spéciales. Style mat : fonds plats teintés, UN seul dégradé par fiche
-// (le fond, la note ou le ciel), palmiers ton sur ton, aucune lueur sauf le
-// contour éclairé de ★★★★★★. Valeurs reprises de la maquette validée.
+// Thèmes de rendu de la fiche (SPEC §18.18, §18.102) : la forme vient du niveau (un par
+// nombre d'étoiles, plus les trois spéciales), les couleurs du coloris de la fiche
+// (colorways.ts). Style mat : fonds plats teintés, UN seul dégradé par fiche (le fond
+// ou le ciel), palmiers ton sur ton, aucune lueur sauf le contour éclairé de ★★★★★★.
 import type { CardData, Fact, Stars, StatusTone } from "../types";
 import { starsFor } from "../types";
+import { COLORWAYS, colorwayOf, type Colorway, type ColorwayKey } from "./colorways";
 
 /** Palette mate (docs/inspiration-gta6.md §2), source unique pour le SVG et le CSS. */
 export const PALETTE = {
@@ -29,13 +30,13 @@ export const PALETTE = {
   duskB: "#b05ad8",
   duskC: "#f0589a",
   duskD: "#ffb366",
-  /* Ciel de ★★★★★ (l'heure rose, un ton plus bas pour lire le crème) */
+  /* Ciel de ★★★★★ d'avant les coloris (l'heure rose), repris par le coloris marine */
   roseA: "#5560cf",
   roseB: "#9150c8",
   roseC: "#e5558f",
   roseD: "#ffb366",
   duskGround: "#2a1c3c",
-  /* Ciel de ★★★★★★ (l'heure bleue) */
+  /* Ciel de ★★★★★★ d'avant les coloris (l'heure bleue) */
   blueA: "#191b45",
   blueB: "#3d42a8",
   blueC: "#9a4aa8",
@@ -66,6 +67,8 @@ export type GradientSlot = "bg" | "num" | "sky";
 
 export interface CardTheme {
   key: ThemeKey;
+  /** Le coloris de la fiche (§18.102). */
+  colorway: ColorwayKey;
   /** Libellé du niveau ou de la spéciale (la pilule pour les spéciales). */
   label: Fact;
   /** Emplacement du seul dégradé : le fond qui descend dans son ton, la note, ou le ciel peint. */
@@ -110,77 +113,74 @@ const TONES: Record<StatusTone, string> = {
   gap: PALETTE.peach,
 };
 
-const DUSK: Stop[] = [[0, PALETTE.duskA], [0.35, PALETTE.duskB], [0.65, PALETTE.duskC], [1, PALETTE.duskD]];
+/**
+ * La forme d'un niveau, sans couleur : le ciel peint (heure dorée à ★★★★★, nuit à
+ * ★★★★★★), l'horizon bas qui grandit, le palmier du coin, le contour, la pilule.
+ * Les spéciales gardent leur pilule (et la photo grise d'Affaire classée) dans le
+ * coloris de la fiche : c'est la pilule qui les dit.
+ */
+interface Shape {
+  label: Fact;
+  sky?: "dusk" | "night";
+  horizon?: { scale: number; palms: 0 | 1 | 2 | 3 };
+  palm: boolean;
+  rim?: boolean;
+  gray?: boolean;
+  badge?: { bg: string; ink: string };
+}
 
-type ThemeInput = Pick<CardTheme, "grad" | "bg" | "bar" | "palm"> & Partial<CardTheme>;
+const SHAPES: Record<ThemeKey, Shape> = {
+  s1: { label: { fr: "Petit délit", en: "Petty crime" }, palm: false, horizon: { scale: 0.55, palms: 0 } },
+  s2: { label: { fr: "Délit", en: "Misdemeanor" }, palm: true, horizon: { scale: 0.7, palms: 1 } },
+  s3: { label: { fr: "Mandat d'arrêt", en: "Warrant out" }, palm: true, horizon: { scale: 0.85, palms: 2 } },
+  s4: { label: { fr: "Haute surveillance", en: "Under surveillance" }, palm: true, horizon: { scale: 1, palms: 3 } },
+  s5: { label: { fr: "Menace publique", en: "Public menace" }, palm: true, sky: "dusk" },
+  s6: { label: { fr: "Priorité absolue", en: "Top priority" }, palm: true, sky: "night", rim: true },
+  wonderkid: { label: { fr: "Débarque en ville", en: "New in town" }, palm: true, horizon: { scale: 0.7, palms: 1 }, badge: { bg: PALETTE.lime, ink: PALETTE.ink0 } },
+  flashback: { label: { fr: "Affaire classée", en: "Cold case" }, palm: true, horizon: { scale: 0.7, palms: 1 }, gray: true, badge: { bg: PALETTE.peach, ink: PALETTE.ink0 } },
+  totw: { label: { fr: "Top 5 de la semaine", en: "This week's top 5" }, palm: true, horizon: { scale: 1, palms: 3 }, badge: { bg: PALETTE.cream, ink: PALETTE.ink0 } },
+};
 
-function theme(key: ThemeKey, label: Fact, o: ThemeInput): CardTheme {
+/** Le thème d'un niveau (ou d'une spéciale) dans un coloris. */
+export function themeFor(key: ThemeKey, cw: Colorway = COLORWAYS.marine): CardTheme {
+  const shape = SHAPES[key];
+  const painted = shape.sky === "dusk" ? cw.sky5 : shape.sky === "night" ? cw.sky6 : null;
+  const sky = painted
+    ? { stops: painted.stops, ground: painted.ground, ...(shape.sky === "dusk" ? { sun: "#ffe0b8" } : { lights: true }) }
+    : undefined;
   return {
     key,
-    label,
-    num: o.grad === "num" ? DUSK : [],
-    rim: false,
-    gray: false,
+    colorway: cw.key,
+    label: shape.label,
+    grad: sky ? "sky" : "bg",
+    bg: sky ? [sky.ground, sky.ground] : cw.bg,
+    ...(sky ? { sky } : {}),
+    ...(shape.horizon && !sky ? { horizon: { color: cw.horizon, ...shape.horizon } } : {}),
+    num: [],
+    bar: cw.bar,
+    palm: shape.palm ? (painted ? painted.palm : cw.palm) : null,
+    rim: !!shape.rim,
+    gray: !!shape.gray,
     ink: PALETTE.cream,
-    inkSoft: PALETTE.lilac,
+    inkSoft: cw.inkSoft,
     tones: TONES,
     buzz: PALETTE.siren,
-    accent: o.bar,
-    accent2: o.bg[0],
+    ...(shape.badge ? { badge: shape.badge } : {}),
+    accent: shape.rim ? PALETTE.rimGlow : cw.bar,
+    accent2: sky ? sky.stops[1] : cw.bg[0],
     fx: { grain: 0.12 },
-    ...o,
   };
 }
 
-export const THEMES: Record<ThemeKey, CardTheme> = {
-  s1: theme("s1", { fr: "Petit délit", en: "Petty crime" }, {
-    grad: "bg", bg: [PALETTE.slate, PALETTE.slateLow], bar: PALETTE.lilac2, palm: null,
-    horizon: { color: "#2c2d50", scale: 0.55, palms: 0 },
-  }),
-  // Le rose poudré dit « ça se touche » (§18.48) : jamais sur une barre, une phrase ou une note de la fiche.
-  s2: theme("s2", { fr: "Délit", en: "Misdemeanor" }, {
-    grad: "bg", bg: [PALETTE.navy, PALETTE.navyLow], bar: PALETTE.lilac2, palm: "#2c3a60",
-    horizon: { color: "#2b385c", scale: 0.7, palms: 1 },
-  }),
-  s3: theme("s3", { fr: "Mandat d'arrêt", en: "Warrant out" }, {
-    grad: "bg", bg: [PALETTE.plum, PALETTE.plumLow], bar: PALETTE.lilac2, palm: "#3a2442",
-    horizon: { color: "#4a2e55", scale: 0.85, palms: 2 },
-  }),
-  // ★★★★ : la note est crème comme partout ; le seul dégradé passe au fond, violet de nuit.
-  s4: theme("s4", { fr: "Haute surveillance", en: "Under surveillance" }, {
-    grad: "bg", bg: [PALETTE.violet, PALETTE.violetLow], bar: PALETTE.peach, palm: "#4a4088", accent2: PALETTE.duskC,
-    horizon: { color: "#4a4088", scale: 1, palms: 3 },
-  }),
-  s5: theme("s5", { fr: "Menace publique", en: "Public menace" }, {
-    grad: "sky", bg: [PALETTE.duskGround, PALETTE.duskGround], bar: PALETTE.peach, palm: "#35244a",
-    sky: { stops: [PALETTE.roseA, PALETTE.roseB, PALETTE.roseC, PALETTE.roseD], ground: PALETTE.duskGround, sun: "#ffe0b8" },
-    accent2: PALETTE.roseC,
-  }),
-  s6: theme("s6", { fr: "Priorité absolue", en: "Top priority" }, {
-    grad: "sky", bg: [PALETTE.blueGround, PALETTE.blueGround], bar: PALETTE.peach, palm: "#1b1c3e",
-    sky: { stops: [PALETTE.blueA, PALETTE.blueB, PALETTE.blueC, PALETTE.blueD], ground: PALETTE.blueGround, lights: true },
-    rim: true, accent: PALETTE.rimGlow, accent2: PALETTE.blueB,
-  }),
-  wonderkid: theme("wonderkid", { fr: "Débarque en ville", en: "New in town" }, {
-    grad: "bg", bg: [PALETTE.moss, PALETTE.mossLow], bar: PALETTE.lime, palm: "#1f3430",
-    badge: { bg: PALETTE.lime, ink: PALETTE.ink0 },
-    horizon: { color: "#1d302c", scale: 0.7, palms: 1 },
-  }),
-  flashback: theme("flashback", { fr: "Affaire classée", en: "Cold case" }, {
-    grad: "bg", bg: [PALETTE.cold, PALETTE.coldLow], bar: PALETTE.peach, palm: "#323e4a", gray: true,
-    badge: { bg: PALETTE.peach, ink: PALETTE.ink0 },
-    horizon: { color: "#2d3945", scale: 0.7, palms: 1 },
-  }),
-  totw: theme("totw", { fr: "Top 5 de la semaine", en: "This week's top 5" }, {
-    grad: "bg", bg: [PALETTE.indigo, PALETTE.indigoLow], bar: PALETTE.peach, palm: "#34407a",
-    badge: { bg: PALETTE.cream, ink: PALETTE.ink0 }, accent2: PALETTE.duskC,
-    horizon: { color: "#34407a", scale: 1, palms: 3 },
-  }),
-};
+/** Les thèmes dans le coloris d'origine (marine) : aperçus et tests de forme. */
+export const THEMES: Record<ThemeKey, CardTheme> = Object.fromEntries(
+  (Object.keys(SHAPES) as ThemeKey[]).map((k) => [k, themeFor(k)]),
+) as Record<ThemeKey, CardTheme>;
 
-/** Thème d'une fiche : la spéciale si elle s'applique, sinon le niveau d'étoiles. */
-export function themeOf(card: Pick<CardData, "overall" | "special">): CardTheme {
-  return card.special ? THEMES[card.special] : THEMES[`s${starsFor(card.overall)}`];
+/** Thème d'une fiche : la spéciale si elle s'applique, sinon le niveau d'étoiles ; dans le coloris de la fiche. */
+export function themeOf(card: Pick<CardData, "overall" | "special"> & Partial<Pick<CardData, "id" | "colorway">>): CardTheme {
+  const key: ThemeKey = card.special ?? `s${starsFor(card.overall)}`;
+  return themeFor(key, COLORWAYS[colorwayOf(card)]);
 }
 
 /** Variables CSS dérivées du thème, pour les calques du web (grain, contour de ★★★★★★). */

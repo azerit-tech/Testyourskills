@@ -7,6 +7,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { Card } from "../../../shared/card/Card";
 import { CARD_H, CARD_W } from "../../../shared/card/geometry";
 import type { CardData, Lang } from "../../../shared/types";
+import { IMAGE_QUERY } from "../../../shared/images";
 import { isMock } from "../lib/api";
 import { loadImageTexture } from "./textures";
 
@@ -98,7 +99,7 @@ async function rasterize(card: CardData, lang: Lang): Promise<THREE.Texture> {
 export async function loadCardTexture(card: CardData, lang: Lang): Promise<THREE.Texture> {
   if (!isMock()) {
     try {
-      const t = await loadImageTexture(`/og/${encodeURIComponent(card.id)}-card.png`);
+      const t = await loadImageTexture(`/og/${encodeURIComponent(card.id)}-card.png?${IMAGE_QUERY}`);
       t.anisotropy = 8;
       return t;
     } catch {
