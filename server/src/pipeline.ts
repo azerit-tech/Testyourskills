@@ -840,7 +840,7 @@ export class Pipeline {
         return null;
       });
     };
-    // La photo de la connexion : sa fiche LinkedIn, ou son dossier quand il a donné son GitHub avant le jugement (§18.110).
+    // La photo de la connexion : sa fiche LinkedIn, ou son dossier quand il a donné son GitHub avant le jugement (§18.111).
     if (!pdf) keep(input.photo);
     const sure = isEntry && input.identity?.how === "email" && !this.opts.store.isHidden(input.identity.githubLogin) ? input.identity.githubLogin : undefined;
     const earlyGh = sure ? this.githubBranch(sure, ctx, true) : undefined;

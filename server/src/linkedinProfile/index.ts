@@ -73,7 +73,7 @@ export interface LinkedinFinder {
   forUrl(url: string, opts?: LookupOptions): Promise<UrlLookup>;
   /** Le profil lu pour sa photo, au retour d'une connexion LinkedIn (§18.90). null : introuvable, plafond, panne. */
   peek?(url: string, opts?: LookupOptions): Promise<ProfilePeek | null>;
-  /** Lit le profil d'avance (§18.110) : une lecture qui le demande pendant ce temps l'attend au lieu d'en payer une autre. */
+  /** Lit le profil d'avance (§18.111) : une lecture qui le demande pendant ce temps l'attend au lieu d'en payer une autre. */
   warm?(url: string, opts?: LookupOptions): void;
 }
 
@@ -104,12 +104,12 @@ export class LinkedinProfiles implements LinkedinFinder {
     return this.opts.provider.name;
   }
 
-  /** Les profils lus d'avance (§18.110), le temps de leur lecture. */
+  /** Les profils lus d'avance (§18.111), le temps de leur lecture. */
   private warming = new Map<string, Promise<unknown>>();
 
   /**
    * Lit le profil d'avance, pendant que la personne répond à la question d'avant le jugement
-   * (§18.110). Une lecture qui le demande pendant ce temps l'attend, puis le trouve au cache :
+   * (§18.111). Une lecture qui le demande pendant ce temps l'attend, puis le trouve au cache :
    * jamais deux lectures payées du même profil.
    */
   warm(raw: string, opts: LookupOptions = {}): void {
@@ -256,7 +256,7 @@ export class LinkedinProfiles implements LinkedinFinder {
     const { cache, provider, registry } = this.opts;
     const url = normalizeLinkedinUrl(raw);
     if (!url) return { status: "not_found" };
-    // La lecture d'avance (§18.110) : celle-ci n'est pas elle-même, elle l'attend.
+    // La lecture d'avance (§18.111) : celle-ci n'est pas elle-même, elle l'attend.
     if (!opts.warming) await this.warmed(url);
     const hit = cache.getProfile(url, this.now());
     if ((hit && !hit.found) || (hit?.found && hit.githubLogin !== undefined)) count("linkedin_cache");

@@ -183,7 +183,7 @@ export function EntryForm({ inputRef, variant = "full", secondary = false, anoth
   const finding = back?.s === "finding" && back.via === "linkedin" ? back : null;
   /** Au retour de LinkedIn, rien de sûr : « C'est toi ? », trois profils au plus (§18.80). */
   const picking = back?.s === "pick" ? back : null;
-  /** Son profil trouvé, son GitHub demandé avant de juger (§18.110). */
+  /** Son profil trouvé, son GitHub demandé avant de juger (§18.111). */
   const asking = back?.s === "ask" ? back : null;
   const [file, setFile] = useState<File | null>(init?.file ?? null);
   const [error, setError] = useState<string | null>(init?.error ? (typeof init.error === "string" ? init.error : pick(init.error, lang)) : null);
@@ -230,7 +230,7 @@ export function EntryForm({ inputRef, variant = "full", secondary = false, anoth
   // ramène d'abord. Pas tant qu'un retour de connexion est en cours : ce parcours-là va jusqu'au bout.
   const acct = useAccount();
   /**
-   * Une source déjà à lui n'est jamais reproposée (§18.105, §18.110) : connecté par elle, ou déjà sur sa
+   * Une source déjà à lui n'est jamais reproposée (§18.105, §18.111) : connecté par elle, ou déjà sur sa
    * fiche. « Se connecter avec LinkedIn » ou « avec GitHub » ne s'affiche plus pour elle.
    */
   const liMine = !!acct?.sources.includes("linkedin") || !!acct?.cardLinkedin;
@@ -277,7 +277,7 @@ export function EntryForm({ inputRef, variant = "full", secondary = false, anoth
 
   /** Lance la carte : un pseudo validé et/ou un PDF validé, ou un lien LinkedIn normalisé. */
   /** `viaLogin` : lancée par l'entrée connectée (le retour de LinkedIn ou de GitHub) ; elle va au compte (§18.91). */
-  /** `noGithub` : « Je n'en ai pas » (§18.110), sa fiche LinkedIn seule. */
+  /** `noGithub` : « Je n'en ai pas » (§18.111), sa fiche LinkedIn seule. */
   const start = async (input: { login?: string; file?: File | null; linkedin?: string; viaLogin?: boolean; noGithub?: boolean }) => {
     if (busyRef.current) return;
     busyRef.current = true;
@@ -298,7 +298,7 @@ export function EntryForm({ inputRef, variant = "full", secondary = false, anoth
       markFresh(res.id, input.login, input.linkedin, !!input.file);
       // Le serveur l'a liée au compte ; la démo fait de même. La barre gagne « Ma fiche ».
       if (input.viaLogin) {
-        // La question de son GitHub (§18.110) part avec la fiche.
+        // La question de son GitHub (§18.111) part avec la fiche.
         doneReturn();
         if (isMock()) mockLinkCard(res.id);
         void loadAccount(true);
@@ -846,7 +846,7 @@ export function EntryForm({ inputRef, variant = "full", secondary = false, anoth
                   autoFocus={i === 0 && !isTouch()}
                   onClick={() => {
                     setLogin(p.name);
-                    // Son GitHub d'abord, s'il n'est pas connu (§18.110).
+                    // Son GitHub d'abord, s'il n'est pas connu (§18.111).
                     if (picking.ask) return askGithub(p.name || picking.name, p.url, picking.ask);
                     doneReturn();
                     void start({ linkedin: p.url, viaLogin: true });
@@ -862,7 +862,7 @@ export function EntryForm({ inputRef, variant = "full", secondary = false, anoth
       document.body,
     );
 
-  /** « C'est ton GitHub ? » ou « Ajoute ton GitHub » (§18.110) : la réponse lance le dossier, ou la fiche LinkedIn seule. */
+  /** « C'est ton GitHub ? » ou « Ajoute ton GitHub » (§18.111) : la réponse lance le dossier, ou la fiche LinkedIn seule. */
   const askBlock = hold && asking && (
     <GithubAsk
       key={asking.url}

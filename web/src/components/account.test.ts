@@ -98,7 +98,7 @@ describe("l'entrée connectée", () => {
     }
   });
 
-  describe("une source déjà sur sa fiche n'est jamais reproposée (§18.110)", () => {
+  describe("une source déjà sur sa fiche n'est jamais reproposée (§18.111)", () => {
     /** Connecté par LinkedIn, son dossier porte déjà son GitHub. */
     const BOTH = { ...LI, cardLogin: "camroux", cardLinkedin: true };
 

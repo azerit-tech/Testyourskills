@@ -22,7 +22,7 @@ const MOCK_ACCOUNTS: GithubSuggestion[] = [
   { login: "leamartin-dev", name: "Léa M.", avatarUrl: "" },
 ];
 const mockDelay = () => new Promise((r) => setTimeout(r, 250));
-/** Le GitHub que la démo trouve à son nom (§18.110), comme la proposition sous une fiche (§18.100). */
+/** Le GitHub que la démo trouve à son nom (§18.111), comme la proposition sous une fiche (§18.100). */
 const MOCK_ASK: GithubAsk = { candidate: { login: "camroux", name: "Camille Roux", avatarUrl: "https://github.com/camroux.png?size=96" } };
 
 // --- Suggestions ----------------------------------------------------------------
@@ -104,7 +104,7 @@ export type ReturnPhase =
   | { s: "finding"; via: "linkedin" | "github"; since: number }
   /** Le profil est sûr : la fiche part. */
   | { s: "auto"; name: string; url: string }
-  /** Le profil est le sien, son GitHub est à demander avant de juger (§18.110). */
+  /** Le profil est le sien, son GitHub est à demander avant de juger (§18.111). */
   | { s: "ask"; name: string; url: string; candidate: GithubSuggestion | null }
   /** Rien de sûr : « C'est toi ? ». `ask` : son GitHub sera demandé après son choix. */
   | { s: "pick"; name: string; candidates: LinkedinSuggestion[]; ask?: GithubAsk }
@@ -243,7 +243,7 @@ export function getReturn(): ReturnPhase | null {
   return phase;
 }
 
-/** « C'est toi ? » : son profil choisi, son GitHub demandé avant de juger (§18.110). */
+/** « C'est toi ? » : son profil choisi, son GitHub demandé avant de juger (§18.111). */
 export function askGithub(name: string, url: string, ask: GithubAsk): void {
   setPhase({ s: "ask", name, url, candidate: ask.candidate });
 }

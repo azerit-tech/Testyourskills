@@ -82,7 +82,7 @@ const fr = frTypoDeep({
     /** Au retour de LinkedIn (§18.90) : le temps de retrouver le profil, puis, sans personne, la phrase qui le dit. */
     finding: "On te retrouve sur LinkedIn…",
     findingNote: "30 secondes au plus.",
-    /** Avant de juger (§18.110) : son GitHub, trouvé (« C'est ton GitHub ? ») ou à taper. */
+    /** Avant de juger (§18.111) : son GitHub, trouvé (« C'est ton GitHub ? ») ou à taper. */
     ghAsk: { q: "C'est ton GitHub ?", yes: "Oui", no: "Non", title: "Ajoute ton GitHub", label: "Pseudo GitHub", go: "Valider", none: "Je n'en ai pas" },
     lostNone: "On ne t'a pas retrouvé sur LinkedIn. Colle le lien de ton profil.",
     lostError: "La connexion LinkedIn n'a pas abouti. Colle le lien de ton profil.",

@@ -149,7 +149,7 @@ export function setupEntry(o: EntrySetup = {}) {
     ogDir: mkdtempSync(join(tmpdir(), "tys-entry-")),
     linkedinProfiles,
     linkedinPeople,
-    // Les comptes GitHub à un nom (§18.110) : aucun, sans réseau ; un test en donne.
+    // Les comptes GitHub à un nom (§18.111) : aucun, sans réseau ; un test en donne.
     githubAccounts: async () => null,
     ...o.app,
   });

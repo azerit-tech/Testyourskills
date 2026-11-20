@@ -435,7 +435,7 @@ describe("profil → texte, et « CV » devient « LinkedIn »", () => {
   });
 });
 
-describe("la lecture d'avance (§18.110)", () => {
+describe("la lecture d'avance (§18.111)", () => {
   it("lu pendant la question : la fiche qui le demande ensuite l'attend, une seule lecture payée", async () => {
     let release!: () => void;
     const gate = new Promise<void>((r) => (release = r));

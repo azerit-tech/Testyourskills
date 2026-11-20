@@ -148,7 +148,7 @@ export interface GithubSuggestion {
 }
 
 /**
- * Avant de juger (§18.110) : au retour de LinkedIn, son GitHub est demandé, pour que la
+ * Avant de juger (§18.111) : au retour de LinkedIn, son GitHub est demandé, pour que la
  * première fiche soit le dossier LinkedIn + GitHub. `candidate` : le compte que la
  * recherche a trouvé (« C'est ton GitHub ? ») ; null : « Ajoute ton GitHub », un champ.
  */

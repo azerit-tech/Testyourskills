@@ -35,7 +35,7 @@ describe("connexion = compte", () => {
     const { json, status } = await linkedinCard(ctx, first.jar);
     expect(status).toBe(202);
     expect(rows(ctx)[0]!.card_id).toBe(json.id);
-    // Son LinkedIn est sur sa fiche : il ne lui est plus proposé (§18.110).
+    // Son LinkedIn est sur sa fiche : il ne lui est plus proposé (§18.111).
     expect(await me(ctx, first.jar)).toMatchObject({ cardId: json.id, cardLinkedin: true, initial: expect.any(String), sources: ["linkedin"] });
 
     // Un autre téléphone, sans rien : la même personne retrouve le même compte, et sa fiche.

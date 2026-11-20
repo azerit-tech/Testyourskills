@@ -121,7 +121,7 @@ export interface AppOptions {
   githubIdentity?: LinkedinEnterOptions["resolveGithub"];
   samePhoto?: LinkedinEnterOptions["samePhoto"];
   samePhotoBytes?: LinkedinEnterOptions["samePhotoBytes"];
-  /** Les comptes GitHub à un nom, avant le jugement (§18.110). Absent : la vraie recherche (match/github.ts). */
+  /** Les comptes GitHub à un nom, avant le jugement (§18.111). Absent : la vraie recherche (match/github.ts). */
   githubAccounts?: LinkedinEnterOptions["githubAccounts"];
   /** Attente d'une demande de /api/entry/linkedin avant « pending » (tests). */
   entryPollWaitMs?: number;
@@ -433,7 +433,7 @@ export function createApp(opts: AppOptions) {
           namesakes: opts.registry ? (name) => opts.registry!.namesakes(name) : undefined,
           profileOfEmail: opts.registry ? (email) => opts.registry!.linkedinOfEmail(email) : undefined,
           linkedinOfGithub: opts.registry ? (login) => opts.registry!.linkedinOf(login) : undefined,
-          // Son GitHub avant le jugement (§18.110) : celui que le registre relie à son profil n'est pas redemandé,
+          // Son GitHub avant le jugement (§18.111) : celui que le registre relie à son profil n'est pas redemandé,
           // et le profil se lit pendant la question (la fiche le trouve au cache).
           githubAccounts: opts.githubAccounts,
           githubOfLinkedin: opts.registry ? async (url) => (await opts.registry!.githubOf(url))?.login ?? null : undefined,
@@ -678,7 +678,7 @@ export function createApp(opts: AppOptions) {
       // La fiche que celle-ci complète (« Ajoute ton GitHub », « Ajoute ton LinkedIn ») : ses bandes suivent (§18.82).
       let from: unknown;
       let linkedinUrl: string | undefined;
-      // « Je n'en ai pas » (§18.110) : sa fiche LinkedIn sort seule, sans GitHub proposé dessous.
+      // « Je n'en ai pas » (§18.111) : sa fiche LinkedIn sort seule, sans GitHub proposé dessous.
       let noGithub = false;
 
       if (ct.startsWith("multipart/form-data")) {
@@ -763,7 +763,7 @@ export function createApp(opts: AppOptions) {
       // « Se connecter avec LinkedIn » (§18.80) : le profil lancé est celui de la personne
       // connectée (le profil sûr, ou l'un des homonymes proposés). Sa fiche reçoit le
       // GitHub retrouvé d'après son identité, et son email vérifié comme contact.
-      // Avec un pseudo (§18.110) : son GitHub, donné ou confirmé avant le jugement ; le dossier LinkedIn + GitHub part
+      // Avec un pseudo (§18.111) : son GitHub, donné ou confirmé avant le jugement ; le dossier LinkedIn + GitHub part
       // d'emblée, avec son contact et son compte. « Je n'en ai pas » : le GitHub trouvé par le nom n'est pas attaché.
       const signedIn = linkedinUrl && !pdf && !denounce ? (linkedinEnter?.identityFor(c, linkedinUrl) ?? null) : null;
       const who = signedIn && (login || noGithub) && signedIn.github?.how !== "email" ? { ...signedIn, github: null } : signedIn;
@@ -781,7 +781,7 @@ export function createApp(opts: AppOptions) {
         const accountId = who?.accountId;
         if (!email && !accountId) return;
         // Le profil qu'elle vient de lancer : son compte le retient, pour ne plus la renvoyer chez LinkedIn (§18.105),
-        // avec le GitHub qu'elle a donné ou son « Je n'en ai pas » (§18.110).
+        // avec le GitHub qu'elle a donné ou son « Je n'en ai pas » (§18.111).
         if (accountId && linkedinUrl && who) {
           const github = login ? { login, how: "name" as const } : who.github;
           account?.rememberProfile(accountId, { url: linkedinUrl, how: who.profileHow, github, noGithub: noGithub && !login });
@@ -895,7 +895,7 @@ export function createApp(opts: AppOptions) {
         ...(who?.github ? { identity: { githubLogin: who.github.login, how: who.github.how, sureProfile: who.sureProfile } } : {}),
         ...(who?.picture ? { photo: who.picture } : {}),
         // Sa propre fiche, jamais une dénonciation : l'autre source se cherche pour la lui proposer (§18.100) ;
-        // jamais après « Je n'en ai pas » (§18.110).
+        // jamais après « Je n'en ai pas » (§18.111).
         ...(!denounce && !pdf && !noGithub ? { propose: true, searchSpend: () => limiter.take("li-search", ip, SEARCHES_PER_IP) } : {}),
         ...(shownBefore ? { colorway: colorwayOf(shownBefore) } : {}),
       });

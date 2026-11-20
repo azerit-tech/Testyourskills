@@ -688,7 +688,7 @@ describe("le registre de l'App Azerit (§18.95)", () => {
   });
 });
 
-describe("son GitHub avant le jugement (§18.110)", () => {
+describe("son GitHub avant le jugement (§18.111)", () => {
   const account = (login: string, name: string | null) => ({ login, name, avatarUrl: `https://avatars.test/${login}`, bio: null, company: null, websiteUrl: null, socialAccounts: [] });
   const found = (...accounts: ReturnType<typeof account>[]) => async () => ({ accounts, namesakes: accounts.length });
   const asked = async (ctx: EntryCtx, jar: string) => ((await entry(ctx, jar)) as { ask?: { candidate: { login: string; name: string | null; avatarUrl: string } | null } }).ask;

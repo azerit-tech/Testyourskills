@@ -29,7 +29,7 @@
 // `tys_known=1`, lisible par le front : il ne demande /api/entry/me que s'il est là.
 // Sa fiche supprimée, les deux cookies partent.
 //
-// Son GitHub avant le jugement (§18.110) : dès le retour de LinkedIn, les comptes
+// Son GitHub avant le jugement (§18.111) : dès le retour de LinkedIn, les comptes
 // GitHub à son nom se cherchent (match/github.ts, un appel, deux secondes) en même
 // temps que son profil. Le profil trouvé, et sans GitHub déjà connu (l'email, le
 // registre de l'App, son compte), la réponse porte `ask` : le front demande
@@ -75,7 +75,7 @@ export const POLL_WAIT_MS = 20_000;
 export const GITHUB_PROOF_WAIT_MS = 2500;
 /** Au-delà (l'index lent a 90 s), la recherche est dite en panne. */
 export const RESOLVE_MAX_MS = 100_000;
-/** Le registre de l'App est attendu ce temps-là pour dire le GitHub d'un profil (§18.110). */
+/** Le registre de l'App est attendu ce temps-là pour dire le GitHub d'un profil (§18.111). */
 const REGISTRY_WAIT_MS = 800;
 const SESSIONS_MAX = 5000;
 
@@ -93,7 +93,7 @@ export interface Resolution {
   github: GithubIdentity | null;
   /** La recherche n'a pas pu se faire (plafond, panne) : le champ redevient un lien à coller. */
   off: boolean;
-  /** Son GitHub est à demander avant le jugement (§18.110) ; absent : il est connu, ou rien n'est à juger. */
+  /** Son GitHub est à demander avant le jugement (§18.111) ; absent : il est connu, ou rien n'est à juger. */
   ask?: { candidate: GithubProposal | null };
 }
 
@@ -135,7 +135,7 @@ export interface EntryIdentity {
   accountId?: string;
   /** La photo que LinkedIn vient de rendre (§18.99) : la photo de sa fiche, d'office. */
   picture?: string;
-  /** Le compte que « C'est ton GitHub ? » lui a proposé avant le jugement (§18.110), sinon null. */
+  /** Le compte que « C'est ton GitHub ? » lui a proposé avant le jugement (§18.111), sinon null. */
   asked: GithubProposal | null;
 }
 
@@ -164,11 +164,11 @@ export interface LinkedinEnterOptions {
   profileOfEmail?: (email: string) => Promise<string | null>;
   /** Le LinkedIn que l'App relie à ce GitHub, avec la force du lien (§18.95). */
   linkedinOfGithub?: (login: string) => Promise<{ url: string; strength: number } | null>;
-  /** Les comptes GitHub à ce nom (§18.110) ; absent : la vraie recherche (match/github.ts). */
+  /** Les comptes GitHub à ce nom (§18.111) ; absent : la vraie recherche (match/github.ts). */
   githubAccounts?: (name: string) => Promise<GithubFound | null>;
   /** Le GitHub que le registre de l'App relie à ce profil (§18.95) : connu, il est pris sans rien demander. */
   githubOfLinkedin?: (url: string) => Promise<string | null>;
-  /** Lit le profil pendant la question (§18.110) : la fiche qui part ensuite le trouve au cache. */
+  /** Lit le profil pendant la question (§18.111) : la fiche qui part ensuite le trouve au cache. */
   warmProfile?: (url: string, ip: string) => void;
   /** La fiche de qui s'est connecté : celle du cookie si elle existe encore, sinon la dernière de son profil. */
   knownCard?: (who: Who) => KnownCard | null;
@@ -399,7 +399,7 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
     (o.githubAccounts ?? ((n: string) => fetchGithubAccounts(o.github, n)))(name).catch(() => null);
 
   /**
-   * Faut-il lui demander son GitHub avant de juger (§18.110) ? Non s'il n'y a rien à juger, ou si son
+   * Faut-il lui demander son GitHub avant de juger (§18.111) ? Non s'il n'y a rien à juger, ou si son
    * GitHub est déjà connu : l'email (une preuve), le registre de l'App, son compte. Sinon le compte à
    * proposer : celui que la connexion a trouvé par le nom, ou le seul assez proche (§18.100) ; null,
    * un champ. Le profil sûr se lit pendant la question.
@@ -436,7 +436,7 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
       const id = randomBytes(18).toString("base64url");
       const who = { ...profile, name: profile.name ?? "" };
       const ip = clientIp(c);
-      // Ses comptes GitHub se cherchent en même temps que son profil (§18.110).
+      // Ses comptes GitHub se cherchent en même temps que son profil (§18.111).
       const accounts = accountsOf(who.name);
       const session: Session = {
         name: who.name,
@@ -470,7 +470,7 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
         github: memo.github ?? null,
         off: false,
       };
-      // Son GitHub ni connu ni refusé : demandé avant de refaire sa fiche (§18.110).
+      // Son GitHub ni connu ni refusé : demandé avant de refaire sa fiche (§18.111).
       const asking = !memo.github && !memo.noGithub;
       const session: Session = {
         name,

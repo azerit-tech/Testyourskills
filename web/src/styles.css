@@ -2064,7 +2064,7 @@ svg {
   font: 500 var(--t-14) / 1.4 var(--f-text);
   color: var(--c-text-2);
 }
-/* avant de juger (§18.110) : son GitHub, à la place des deux boutons. Le compte trouvé (visage, pseudo,
+/* avant de juger (§18.111) : son GitHub, à la place des deux boutons. Le compte trouvé (visage, pseudo,
    nom), la question, « Oui » en rose et « Non » en lien ; sinon un champ, « Valider » et « Je n'en ai pas ». */
 .gh-ask {
   display: grid;

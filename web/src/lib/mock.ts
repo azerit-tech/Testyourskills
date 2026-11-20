@@ -27,7 +27,7 @@ interface MockJob {
   timeline: ProgressEvent[];
   doneAt: number;
   denouncedBy?: string;
-  /** « Je n'en ai pas » (§18.110) : rien à lui proposer sous sa fiche. */
+  /** « Je n'en ai pas » (§18.111) : rien à lui proposer sous sa fiche. */
   noGithub?: boolean;
 }
 

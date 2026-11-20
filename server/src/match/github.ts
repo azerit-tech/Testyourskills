@@ -231,7 +231,7 @@ export interface GithubFound {
 
 /**
  * Les comptes GitHub qui pourraient être ceux de ce nom, sans encore les noter : il ne
- * faut que le nom. La connexion LinkedIn (§18.110) les cherche dès le retour de LinkedIn,
+ * faut que le nom. La connexion LinkedIn (§18.111) les cherche dès le retour de LinkedIn,
  * avant même de savoir quel profil est le sien, puis les note avec `pickGithub`. null :
  * pas de jeton, GitHub lent ou en panne, nom inutilisable. Jamais d'erreur.
  */

@@ -74,7 +74,7 @@ export interface LinkedinMemo {
   photoId?: string;
   /** Le GitHub que la connexion avait retrouvé (l'email : une preuve ; le nom : un indice). */
   github?: { login: string; how: "email" | "name" };
-  /** « Je n'en ai pas » à la question d'avant le jugement (§18.110) : son GitHub ne lui est plus demandé. */
+  /** « Je n'en ai pas » à la question d'avant le jugement (§18.111) : son GitHub ne lui est plus demandé. */
   noGithub?: true;
 }
 
@@ -449,7 +449,7 @@ export function createAccounts(o: AccountOptions): AccountKit | null {
       }
     },
     rememberProfile(accountId, p) {
-      // Un GitHub choisi efface « Je n'en ai pas », et l'inverse (§18.110).
+      // Un GitHub choisi efface « Je n'en ai pas », et l'inverse (§18.111).
       accounts.remember(accountId, { url: p.url, how: p.how, github: p.noGithub ? null : (p.github ?? undefined), noGithub: p.noGithub ? true : p.github ? null : undefined });
     },
     linkedinOf(a) {

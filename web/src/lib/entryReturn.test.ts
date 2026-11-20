@@ -77,7 +77,7 @@ describe("le retour d'une connexion", () => {
     expect(await p.settled()).toEqual({ s: "pick", name: "Léa Martin", candidates: four.slice(0, 3) });
   });
 
-  it("son GitHub à demander avant de juger (§18.110) : la question, avec le compte trouvé ou un champ", async () => {
+  it("son GitHub à demander avant de juger (§18.111) : la question, avec le compte trouvé ou un champ", async () => {
     const gh = { login: "leamd", name: "Léa Martin", avatarUrl: "https://avatars.test/leamd" };
     const found = await page("?li=1", [{ signedIn: true, name: "Léa Martin", auto: LEA, candidates: [], ask: { candidate: gh } }]);
     expect(await found.settled()).toEqual({ s: "ask", name: "Léa Martin", url: LEA.url, candidate: gh });

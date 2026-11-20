@@ -25,7 +25,7 @@ export interface CreateInput {
   denouncedBy?: string;
   /** La fiche que celle-ci complète (« Ajoute ton GitHub », « Ajoute ton LinkedIn ») : ses bandes suivent (§18.82). */
   from?: string;
-  /** « Je n'en ai pas » à la question d'avant le jugement (§18.110) : sa fiche LinkedIn seule, sans GitHub proposé. */
+  /** « Je n'en ai pas » à la question d'avant le jugement (§18.111) : sa fiche LinkedIn seule, sans GitHub proposé. */
   noGithub?: boolean;
 }
 
@@ -293,7 +293,7 @@ export interface Account {
   cardId: string | null;
   /** Le pseudo et la note de cette fiche ; null quand le serveur ne les dit pas (démo). */
   cardLogin: string | null;
-  /** Sa fiche porte un LinkedIn (§18.110) : « Se connecter avec LinkedIn » ne lui est plus proposé, comme GitHub avec `cardLogin`. */
+  /** Sa fiche porte un LinkedIn (§18.111) : « Se connecter avec LinkedIn » ne lui est plus proposé, comme GitHub avec `cardLogin`. */
   cardLinkedin?: boolean;
   overall: number | null;
   sources: AccountSource[];
@@ -308,7 +308,7 @@ let mockAccountMem: Account | null = null;
 let mockAccountUrlRead = false;
 const MOCK_ACCOUNTS: Record<string, Account> = {
   li: { cardId: "m-licmp-compte01", cardLogin: null, overall: null, sources: ["linkedin"], avatarUrl: "/mock-linkedin.svg", initial: "L", known: false },
-  /** Connecté par LinkedIn, son dossier porte déjà son GitHub (§18.110). */
+  /** Connecté par LinkedIn, son dossier porte déjà son GitHub (§18.111). */
   ligh: { cardId: "m-licmp-compte02", cardLogin: "camroux", cardLinkedin: true, overall: null, sources: ["linkedin"], avatarUrl: "/mock-linkedin.svg", initial: "L", known: false },
   gh: { cardId: "m-gold-compte01", cardLogin: null, overall: null, sources: ["github"], avatarUrl: null, initial: "L", known: false },
   /** Connecté par LinkedIn, sa fiche partie (§18.105). */

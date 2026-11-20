@@ -250,7 +250,7 @@ function accountCard(row: CardRow | null): { cardId: string | null; cardLogin: s
   if (!row) return { cardId: null, cardLogin: null, cardLinkedin: false, overall: null, avatarUrl: null, initial: null };
   const main = row.kind === "comparison" ? fileOf(row.data as ComparisonData) : (row.data as CardData);
   const initial = (main.name || main.login || "").trim().charAt(0).toLocaleUpperCase("fr") || null;
-  // Les sources déjà sur sa fiche ne lui sont plus proposées (§18.110) : son GitHub (`cardLogin`), son LinkedIn.
+  // Les sources déjà sur sa fiche ne lui sont plus proposées (§18.111) : son GitHub (`cardLogin`), son LinkedIn.
   const cardLinkedin = !!main.linkedinUrl || (row.kind === "comparison" && (row.data as ComparisonData).declaredSource === "linkedin");
   return { cardId: row.id, cardLogin: main.login ? main.login.toLowerCase() : null, cardLinkedin, overall: main.overall, avatarUrl: main.avatarUrl || null, initial };
 }

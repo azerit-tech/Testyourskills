@@ -1,4 +1,4 @@
-// Avant de juger (§18.110) : au retour de LinkedIn, son GitHub, pour que la première
+// Avant de juger (§18.111) : au retour de LinkedIn, son GitHub, pour que la première
 // fiche soit le dossier LinkedIn + GitHub. Le compte trouvé à son nom : « C'est ton
 // GitHub ? », « Oui » en rose, « Non » en lien. Rien trouvé, ou « Non » : « Ajoute ton
 // GitHub », un champ (les comptes à ce nom dessous) et « Je n'en ai pas ».
