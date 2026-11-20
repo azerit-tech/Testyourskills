@@ -11,7 +11,7 @@ import { aliasFor } from "../../shared/punchline";
 import type { CardData } from "../../shared/types";
 import { createApp, purge } from "./app";
 import { SESSION_COOKIE, signSession } from "./auth";
-import { bandBoard, bandsTop, bandStanding, forgetBands, FORMING_SIZE, joinBand } from "./bands";
+import { bandBoard, bandsTop, bandStanding, forgetBands, joinBand } from "./bands";
 import { migrate, RETENTION_MS, Store } from "./db";
 import type { Deps } from "./pipeline";
 
@@ -145,7 +145,7 @@ describe("entrer et sortir : les droits", () => {
     expect((await join_(ctx, id, { type: "ecole", id: "epitech" }, { token: "tok-autre" })).status).toBe(403);
     const ok = await join_(ctx, id, { type: "ecole", id: "epitech" });
     expect(ok.status).toBe(200);
-    expect(ok.json.ecole).toMatchObject({ id: "epitech", label: "Epitech", members: 1, rank: null, missing: 2 });
+    expect(ok.json.ecole).toMatchObject({ id: "epitech", label: "Epitech", members: 1, rank: 1, missing: 0 });
     expect(ctx.store.listEvents("band_join")).toMatchObject([{ cardId: id, meta: { type: "ecole" } }]);
   });
 
@@ -268,41 +268,41 @@ describe("le score d'une bande", () => {
     expect(bandStanding(ctx.store.db, "ecole", "epitech")!.score).toBe(120);
   });
 
-  it("à égalité : le plus de dossiers, puis la bande la plus ancienne ; au tableau à partir de trois", () => {
+  it("à égalité : le plus de dossiers, puis la bande la plus ancienne ; au tableau dès la première fiche (§18.38, 20 novembre)", () => {
     const ctx = setup();
     const t = 1_800_000_000_000;
     const add = (band: string, stars: (1 | 2 | 3 | 4 | 5 | 6)[], at: number) => stars.forEach((s, i) => put(ctx.store, insert(ctx.store, { stars: s }), school(band), at + i));
     add("epita", [6, 6, 6], t); // 18, 3 dossiers, la plus ancienne
     add("epitech", [5, 5, 4, 4], t + 100); // 18, 4 dossiers
     add("efrei", [6, 6, 6], t + 200); // 18, 3 dossiers, plus récente
-    add("esiea", [6, 6], t + 300); // en formation
+    add("esiea", [6, 6], t + 300); // deux dossiers : au tableau aussi
     const board = bandBoard(ctx.store.db, "ecole");
-    expect(board.total).toBe(3);
+    expect(board.total).toBe(4);
     expect(board.entries.map((e) => [e.id, e.rank, e.score, e.gap])).toEqual([
       ["epitech", 1, 18, null],
       ["epita", 2, 18, 0],
       ["efrei", 3, 18, 0],
+      ["esiea", 4, 12, 6],
     ]);
     expect(board.entries[1]!.ahead).toEqual({ id: "epitech", label: "Epitech", rank: 1 });
-    expect(bandStanding(ctx.store.db, "ecole", "esiea")).toMatchObject({ rank: null, missing: 1, members: 2, score: 12, gap: null, ahead: null });
-    // Sa propre bande, plus bas ou en formation, vient en plus.
-    expect(bandBoard(ctx.store.db, "ecole", "esiea").extra).toMatchObject({ id: "esiea", missing: 1 });
-    expect(bandBoard(ctx.store.db, "ecole", "epita").extra).toBeNull();
-    // L'accueil : le tableau d'abord, puis la bande en formation pour une place qui reste.
+    expect(board.forming).toEqual([]);
+    expect(bandStanding(ctx.store.db, "ecole", "esiea")).toMatchObject({ rank: 4, missing: 0, members: 2, score: 12, gap: 6, ahead: { id: "efrei", rank: 3 } });
+    // Déjà au tableau : rien en plus.
+    expect(bandBoard(ctx.store.db, "ecole", "esiea").extra).toBeNull();
     expect(bandsTop(ctx.store.db).ecole.map((e) => [e.id, e.rank])).toEqual([
       ["epitech", 1],
       ["epita", 2],
       ["efrei", 3],
-      ["esiea", null],
+      ["esiea", 4],
     ]);
     expect(bandsTop(ctx.store.db).boite).toEqual([]);
   });
 
-  it("l'accueil (§18.92) : cinq lignes par ligue, le tableau puis les bandes en formation, les plus étoilées d'abord ; la sienne en plus si elle est plus bas", () => {
+  it("l'accueil (§18.92) : cinq lignes par ligue, les plus étoilées d'abord, une fiche suffit ; la sienne en plus si elle est plus bas", () => {
     const ctx = setup();
     const t = 1_800_000_000_000;
     const add = (ref: BandRef, stars: (1 | 2 | 3 | 4 | 5 | 6)[], at: number) => stars.forEach((s, i) => put(ctx.store, insert(ctx.store, { stars: s }), ref, at + i));
-    add(school("epitech"), [2, 2, 2], t); // au tableau, 6 étoiles : devant toute bande en formation, même plus étoilée
+    add(school("epitech"), [2, 2, 2], t); // 3 dossiers, 6 étoiles : derrière Epita, plus étoilée avec deux
     add(school("centralesupelec"), [3], t + 100); // 1 dossier, 3 étoiles
     add(school("esiea"), [1, 1], t + 200); // 2 dossiers, 2 étoiles
     add(school("epita"), [6, 4], t + 300); // 2 dossiers, 10 étoiles
@@ -310,64 +310,64 @@ describe("le score d'une bande", () => {
     add(school("utc"), [2], t + 500); // 1 dossier, 2 étoiles
     add(school("ensimag"), [1], t + 600);
     const top = bandsTop(ctx.store.db);
-    // les étoiles d'abord (pas les dossiers, l'ordre de /bandes) ; à égalité, le plus de dossiers, puis la plus ancienne
+    // les étoiles d'abord ; à égalité, le plus de dossiers, puis la plus ancienne
     expect(top.ecole.map((e) => [e.id, e.rank, e.score])).toEqual([
-      ["epitech", 1, 6],
-      ["epita", null, 10],
-      ["centralesupelec", null, 3],
-      ["efrei", null, 3],
-      ["esiea", null, 2],
+      ["epita", 1, 10],
+      ["epitech", 2, 6],
+      ["centralesupelec", 3, 3],
+      ["efrei", 4, 3],
+      ["esiea", 5, 2],
     ]);
     expect(top.mine).toBeUndefined();
     // sa bande, plus bas que les cinq lignes : en plus, avec sa place dans le même ordre
-    expect(bandsTop(ctx.store.db, Date.now(), { ecole: "ensimag" }).mine).toMatchObject({ ecole: { place: 7, band: { id: "ensimag", rank: null, members: 1 } } });
+    expect(bandsTop(ctx.store.db, Date.now(), { ecole: "ensimag" }).mine).toMatchObject({ ecole: { place: 7, band: { id: "ensimag", rank: 7, members: 1 } } });
     // déjà dans la liste, ou inconnue : rien de plus
     expect(bandsTop(ctx.store.db, Date.now(), { ecole: "epita", boite: "inconnue" }).mine).toBeUndefined();
 
-    // une boîte de la table d'alias se voit en formation ; une boîte au nom libre reste cachée avant trois dossiers
+    // une boîte au nom libre se voit dès sa première fiche, comme une boîte de la table d'alias (20 novembre)
     add({ type: "boite", id: "azerit", label: "Azerit" }, [4], t);
     add({ type: "boite", id: "petite-boite", label: "Petite Boîte" }, [6, 6], t);
+    add({ type: "boite", id: "quandela", label: "Quandela" }, [5], t + 100);
     forgetBands(ctx.store.db);
-    expect(bandsTop(ctx.store.db).boite.map((e) => e.id)).toEqual(["azerit"]);
-    expect(bandsTop(ctx.store.db, Date.now(), { boite: "petite-boite" }).mine).toBeUndefined();
-    // /bandes ne change pas : ses bandes en formation, les plus avancées d'abord
-    expect(bandBoard(ctx.store.db, "ecole").forming.map((e) => e.id).slice(0, 2)).toEqual(["epita", "esiea"]);
+    expect(bandsTop(ctx.store.db).boite.map((e) => [e.id, e.rank])).toEqual([
+      ["petite-boite", 1],
+      ["quandela", 2],
+      ["azerit", 3],
+    ]);
+    expect(bandBoard(ctx.store.db, "ecole").forming).toEqual([]);
   });
 
-  it("les bandes en formation suivent le tableau : les plus avancées d'abord, sans la sienne, dix au plus", () => {
+  it("plus de bande en formation : toutes au tableau dès leur première fiche, les plus étoilées d'abord", () => {
     const ctx = setup();
     const t = 1_800_000_000_000;
     const add = (band: string, stars: (1 | 2 | 3 | 4 | 5 | 6)[], at: number) => stars.forEach((s, i) => put(ctx.store, insert(ctx.store, { stars: s }), school(band), at + i));
-    add("epitech", [5, 5, 5], t); // au tableau
+    add("epitech", [5, 5, 5], t);
     add("centralesupelec", [3], t + 100); // 1 dossier, 3 étoiles
-    add("esiea", [2, 2], t + 200); // 2 dossiers : devant, malgré moins d'étoiles par tête
-    add("efrei", [6], t + 300); // 1 dossier, 6 étoiles : devant CentraleSupélec
+    add("esiea", [2, 2], t + 200); // 2 dossiers, 4 étoiles : devant CentraleSupélec
+    add("efrei", [6], t + 300); // 1 dossier, 6 étoiles
     add("epita", [3], t + 400); // 1 dossier, 3 étoiles, plus récente que CentraleSupélec
     const board = bandBoard(ctx.store.db, "ecole");
-    expect(board.entries.map((e) => e.id)).toEqual(["epitech"]);
-    expect(board.forming.map((b) => [b.id, b.members, b.missing, b.rank])).toEqual([
-      ["esiea", 2, 1, null],
-      ["efrei", 1, 2, null],
-      ["centralesupelec", 1, 2, null],
-      ["epita", 1, 2, null],
+    expect(board.entries.map((b) => [b.id, b.members, b.missing, b.rank])).toEqual([
+      ["epitech", 3, 0, 1],
+      ["efrei", 1, 0, 2],
+      ["esiea", 2, 0, 3],
+      ["centralesupelec", 1, 0, 4],
+      ["epita", 1, 0, 5],
     ]);
-    expect(board.forming.every((b) => b.hasPage && b.gap === null && b.ahead === null)).toBe(true);
-    // Sa propre bande en formation sort de la liste : elle vient dans `extra`.
-    const mine = bandBoard(ctx.store.db, "ecole", "efrei");
-    expect(mine.extra).toMatchObject({ id: "efrei", members: 1, missing: 2 });
-    expect(mine.forming.map((b) => b.id)).toEqual(["esiea", "centralesupelec", "epita"]);
-    // Une bande au tableau demandée par `with` ne retire rien.
-    expect(bandBoard(ctx.store.db, "ecole", "epitech").forming).toHaveLength(4);
+    expect(board.entries.every((b) => b.hasPage)).toBe(true);
+    expect(board.forming).toEqual([]);
+    expect(bandBoard(ctx.store.db, "ecole", "efrei").extra).toBeNull();
     // Une ligue sans bande : une liste vide, pas une absence.
     expect(bandBoard(ctx.store.db, "boite")).toMatchObject({ entries: [], forming: [], extra: null });
   });
 
-  it("dix bandes en formation au plus", () => {
+  it("douze bandes à une fiche : douze au tableau, aucune en formation", () => {
     const ctx = setup();
     const ids = ["epitech", "epita", "efrei", "esiea", "esilv", "isep", "supinfo", "centralesupelec", "ensimag", "utc", "ecole-42", "insa-lyon"];
-    expect(ids.length).toBeGreaterThan(FORMING_SIZE);
     for (const id of ids) put(ctx.store, insert(ctx.store), school(id));
-    expect(bandBoard(ctx.store.db, "ecole").forming).toHaveLength(FORMING_SIZE);
+    const board = bandBoard(ctx.store.db, "ecole");
+    expect(board).toMatchObject({ total: ids.length, forming: [] });
+    expect(board.entries).toHaveLength(ids.length);
   });
 
   it("l'écart avec la bande de devant", () => {
@@ -391,7 +391,7 @@ describe("retrait", () => {
     expect(bandStanding(ctx.store.db, "ecole", "epitech")!.rank).toBe(1);
     const res = await ctx.app.request(`/api/card/${ids[0]}?token=tok-${ids[0]}`, { method: "DELETE" });
     expect(res.status).toBe(200);
-    expect(bandStanding(ctx.store.db, "ecole", "epitech")).toMatchObject({ members: 2, rank: null, missing: 1 });
+    expect(bandStanding(ctx.store.db, "ecole", "epitech")).toMatchObject({ members: 2, rank: 1, missing: 0 });
     expect(ctx.store.db.prepare(`SELECT COUNT(*) AS n FROM band_members WHERE card_id = ?`).get(ids[0])).toEqual({ n: 0 });
   });
 
@@ -473,9 +473,9 @@ describe("pages publiques", () => {
     expect(JSON.stringify(before)).not.toMatch(/Partie Loin|"parti"/);
   });
 
-  it("une école de la liste sans membre existe, en formation ; une boîte inconnue non", async () => {
+  it("une école de la liste sans membre existe, hors classement ; une boîte inconnue non", async () => {
     const ctx = setup();
-    expect((await call<BandPage>(ctx, "/api/bands/ecole/epitech")).json.band).toMatchObject({ members: 0, missing: 3, rank: null });
+    expect((await call<BandPage>(ctx, "/api/bands/ecole/epitech")).json.band).toMatchObject({ members: 0, missing: 1, rank: null });
     expect((await call(ctx, "/api/bands/boite/inconnue")).status).toBe(404);
     expect((await call(ctx, "/api/bands/ville/paris")).status).toBe(404);
   });
@@ -520,22 +520,19 @@ describe("le nom libre d'une boîte", () => {
       .prepare(`INSERT INTO band_members (person_key, kind, band_id, label, card_id, login, stars, joined_at) VALUES (?, 'boite', ?, ?, ?, NULL, 4, ?)`)
       .run(`card:${cardId}`, bandId, label, cardId, Date.now());
 
-  it("avant trois dossiers : ni fiches publiques, ni tableau ; sous sa fiche, la personne la voit", async () => {
+  it("dès la première fiche : sa page, ses fiches publiques et le tableau, comme une boîte de la table d'alias (20 novembre)", async () => {
     const ctx = setup();
     const a = insert(ctx.store);
-    const r = await join_(ctx, a, { type: "boite", name: "🚀 PETITE BOÎTE ★" });
+    const r = await join_(ctx, a, { type: "boite", name: "\u{1F680} PETITE BOÎTE \u2605" });
     expect(r.status).toBe(200);
-    expect(r.json.boite).toMatchObject({ id: "petite-boite", label: "Petite Boîte", members: 1, rank: null, hasPage: false });
-    expect((await call(ctx, "/api/bands/boite/petite-boite")).status).toBe(404);
-    expect((await call<BandBoard>(ctx, "/api/bands?type=boite&with=petite-boite")).json.extra).toBeNull();
-    // En formation, elle reste cachée du tableau public ; une boîte de la table d'alias s'y montre.
-    expect((await join_(ctx, insert(ctx.store), { type: "boite", name: "Facebook" }, { ip: "203.0.113.200" })).status).toBe(200);
-    expect((await call<BandBoard>(ctx, "/api/bands?type=boite")).json.forming.map((b) => b.id)).toEqual(["meta"]);
-    // Trois dossiers : ses fiches publiques et le tableau.
-    for (const id of [insert(ctx.store), insert(ctx.store)]) expect((await join_(ctx, id, { type: "boite", name: "Petite boîte" }, { ip: `203.0.113.${id.slice(-2)}` })).status).toBe(200);
+    expect(r.json.boite).toMatchObject({ id: "petite-boite", label: "Petite Boîte", members: 1, rank: 1, hasPage: true });
     const page = await call<BandPage>(ctx, "/api/bands/boite/petite-boite");
     expect(page.status).toBe(200);
-    expect(page.json.band).toMatchObject({ label: "Petite Boîte", members: 3, rank: 1, hasPage: true });
+    expect(page.json.band).toMatchObject({ label: "Petite Boîte", members: 1, rank: 1, hasPage: true });
+    expect((await join_(ctx, insert(ctx.store), { type: "boite", name: "Facebook" }, { ip: "203.0.113.200" })).status).toBe(200);
+    const board = (await call<BandBoard>(ctx, "/api/bands?type=boite")).json;
+    expect(board.entries.map((b) => b.id).sort()).toEqual(["meta", "petite-boite"]);
+    expect(board.forming).toEqual([]);
   });
 
   it("une boîte de la table d'alias a sa page dès le premier dossier", async () => {

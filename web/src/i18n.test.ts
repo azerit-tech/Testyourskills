@@ -15,7 +15,7 @@ const ARGS: unknown[][] = [
   ["★★★★☆☆", 71],
   [null, 71],
   [{ type: "ecole", id: "x", label: "X", score: 6, members: 3, rank: 3, missing: 0, gap: 6, ahead: { id: "y", label: "Y", rank: 2 } }],
-  [{ type: "boite", id: "x", label: "X", score: 1, members: 1, rank: null, missing: 2, gap: null, ahead: null }],
+  [{ type: "ecole", id: "x", label: "X", score: 0, members: 0, rank: null, missing: 1, gap: null, ahead: null }],
 ];
 
 /** Toutes les chaînes d'un dictionnaire, avec leur chemin ; les fonctions sont appelées avec les arguments d'essai. */
@@ -163,8 +163,8 @@ describe("pluriels et comptes à zéro", () => {
     expect([0, 1, 2].map((k) => fr.bands.dossiers(k))).toEqual(["0 fiche", "1 fiche", "2 fiches"]);
     expect([0, 1, 2].map((k) => en.primes.page.total(k))).toEqual(["0 sheets in the race", "1 sheet in the race", "2 sheets in the race"]);
     expect([0, 1, 2].map((k) => fr.primes.page.total(k))).toEqual(["0 fiche en course", "1 fiche en course", "2 fiches en course"]);
-    expect(en.bands.home.rowLabel(1, "X", 0, 1, false).replace(/\s/g, " ")).toBe("Spot 1: X, 0 stars, 1 sheet");
-    expect(fr.bands.home.rowLabel(1, "X", 1, 3, false).replace(/\s/g, " ")).toBe("Place 1 : X, 1 étoile, 3 fiches");
+    expect(en.bands.home.rowLabel(1, "X", 0, 1).replace(/\s/g, " ")).toBe("Spot 1: X, 0 stars, 1 sheet");
+    expect(fr.bands.home.rowLabel(1, "X", 1, 3).replace(/\s/g, " ")).toBe("Place 1 : X, 1 étoile, 3 fiches");
   });
 
   it("le compte à rebours d'une prime : « 1 day left », « Terminée »", () => {

@@ -53,7 +53,7 @@ if (!list.length) {
 }
 
 const cell = (s: string) => s.replace(/\|/g, "\\|");
-console.log(`${list.length} bande(s) de boîte au nom libre. Au classement public à partir de ${BAND_MIN_MEMBERS} dossiers en ligne.\n`);
+console.log(`${list.length} bande(s) de boîte au nom libre. Au classement public dès ${BAND_MIN_MEMBERS === 1 ? "la première fiche" : `${BAND_MIN_MEMBERS} dossiers`} en ligne.\n`);
 console.log("| dossiers en ligne (total) | publique | état | id | libellé affiché | noms tapés |");
 console.log("|---|---|---|---|---|---|");
 for (const b of list) {

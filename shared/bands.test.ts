@@ -198,10 +198,10 @@ describe("le nom libre d'une boîte : refus et nettoyage", () => {
     expect(isBlockedBand("ecole", "epitech")).toBe(false);
   });
 
-  it("une page publique : toute école, toute boîte d'alias, une boîte au nom libre à trois dossiers", () => {
+  it("une page publique : toute école, toute boîte d'alias, une boîte au nom libre dès sa première fiche (20 novembre)", () => {
     expect(bandHasPage("ecole", "epitech", 0)).toBe(true);
     expect(bandHasPage("boite", "meta", 1)).toBe(true);
-    expect(bandHasPage("boite", "doctolib", 2)).toBe(false);
-    expect(bandHasPage("boite", "doctolib", 3)).toBe(true);
+    expect(bandHasPage("boite", "doctolib", 0)).toBe(false);
+    expect(bandHasPage("boite", "doctolib", 1)).toBe(true);
   });
 });

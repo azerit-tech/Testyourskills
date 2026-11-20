@@ -122,12 +122,12 @@ describe("la ligne de mémoire au-dessus du formulaire", () => {
 
 describe("les bandes sur l'accueil : un classement par ligue (§18.92, §18.101)", () => {
   const band = (type: "ecole" | "boite", id: string, label: string, score: number, members: number, rank: number | null = null) =>
-    ({ type, id, label, score, members, rank, missing: Math.max(0, 3 - members), gap: null, ahead: null, hasPage: true }) as BandStanding;
+    ({ type, id, label, score, members, rank, missing: 0, gap: null, ahead: null, hasPage: true }) as BandStanding;
   const view = (top: BandsTop | null, mine: Partial<Record<"ecole" | "boite", string | null>> = {}, language?: string) => render(createElement(BandsTopView, { top, mine, onPlay: () => undefined }), language);
-  // La prod du 20 novembre : une école au tableau, une en formation, une boîte au tableau.
+  // La prod du 20 novembre : deux écoles, et chaque boîte dès sa première fiche (§18.38, 20 novembre).
   const prod: BandsTop = {
-    ecole: [band("ecole", "centralesupelec", "CentraleSupélec", 11, 3, 1), band("ecole", "centrale-mediterranee", "Centrale Méditerranée", 7, 2)],
-    boite: [band("boite", "azerit", "Azerit", 13, 3, 1)],
+    ecole: [band("ecole", "centralesupelec", "CentraleSupélec", 11, 3, 1), band("ecole", "centrale-mediterranee", "Centrale Méditerranée", 7, 2, 2)],
+    boite: [band("boite", "azerit", "Azerit", 13, 3, 1), band("boite", "quandela", "Quandela", 5, 1, 2), band("boite", "ceva-logistics", "CEVA Logistics", 4, 1, 3)],
   };
   const league = (html: string, type: "ecole" | "boite") => html.slice(html.indexOf(`league-${type}-title`), type === "ecole" ? html.indexOf("league-boite-title") : undefined);
 
@@ -140,17 +140,21 @@ describe("les bandes sur l'accueil : un classement par ligue (§18.92, §18.101)
     expect(view(prod, {}, "en-US")).toMatch(/<h2 id="league-ecole-title">Schools<\/h2>.*>Stars<\/span>/);
   });
 
-  it("le tableau d'abord, puis la bande en formation à la place suivante : sa place, son nom, ses fiches, ses étoiles ; la ligne s'ouvre sur ses fiches, pas sur une page", () => {
+  it("chaque ligne : sa place, son nom, ses fiches, ses étoiles, sans « en formation » ; la ligne s'ouvre sur ses fiches, pas sur une page", () => {
     const html = league(view(prod), "ecole");
     expect(count(html, 'class="board-row band-row league-row has-people"')).toBe(2);
     expect(html).not.toContain("href=");
     expect(count(html, 'aria-expanded="false"')).toBe(2);
     expect(count(html, 'class="league-chev"')).toBe(2);
     expect(html).toContain('<span class="board-rank">1</span><span class="band-name"><span class="board-login">CentraleSupélec</span><span class="band-count">3 fiches</span></span><span class="band-score">11</span>');
-    expect(html).toContain('<span class="board-rank">2</span><span class="band-name"><span class="board-login">Centrale Méditerranée</span><span class="band-count">2 fiches, en formation</span></span><span class="band-score">7</span>');
-    expect(html).toMatch(/aria-label="Place 2\s: Centrale Méditerranée, 7 étoiles, 2 fiches, en formation"/);
-    expect(league(view({ ...prod, ecole: [band("ecole", "utc", "UTC", 3, 1)] }), "ecole")).toContain("1 fiche, en formation");
-    expect(league(view(prod, {}, "en-US"), "ecole")).toContain("2 sheets, forming");
+    expect(html).toContain('<span class="board-rank">2</span><span class="band-name"><span class="board-login">Centrale Méditerranée</span><span class="band-count">2 fiches</span></span><span class="band-score">7</span>');
+    expect(html).toMatch(/aria-label="Place 2\s: Centrale Méditerranée, 7 étoiles, 2 fiches"/);
+    // une boîte à une fiche est au classement, comme une école
+    const boites = league(view(prod), "boite");
+    expect(count(boites, "league-row")).toBe(3);
+    expect(boites).toContain('<span class="board-rank">2</span><span class="band-name"><span class="board-login">Quandela</span><span class="band-count">1 fiche</span></span><span class="band-score">5</span>');
+    expect(view(prod)).not.toContain("formation");
+    expect(view(prod, {}, "en-US")).not.toContain("forming");
   });
 
   it("aucune ligne de places libres ; une ligue sans bande ne s'affiche pas", () => {

@@ -22,8 +22,8 @@
 //
 // Le score d'une bande : la somme des étoiles de ses vingt meilleurs dossiers. À
 // égalité : le plus de dossiers, puis la bande la plus ancienne (son premier
-// membre encore compté). Au tableau à partir de trois dossiers ; en dessous,
-// « bande en formation ». Tout se calcule à la lecture (comme top.ts), gardé 60 s
+// membre encore compté). Au classement dès sa première fiche (§18.38, 20 novembre
+// 2026 ; trois avant). Tout se calcule à la lecture (comme top.ts), gardé 60 s
 // en mémoire et oublié à chaque entrée, sortie, suppression, purge ou masquage.
 //
 // Le rang d'école du barème n'apparaît nulle part ici. Sur la page d'une bande,
@@ -35,8 +35,8 @@
 //
 // Le nom d'une boîte hors alias vient de son premier membre (tapé, ou lu sur son
 // profil) : refusé s'il porte une insulte, une adresse, un @ ou un numéro,
-// toujours nettoyé, et sans page publique, image ni place au tableau avant trois
-// dossiers (hasPage). Une bande fermée à la main (data/bands.json, blocked)
+// toujours nettoyé ; sa page, son image et sa place au classement viennent avec sa
+// première fiche, comme une école (hasPage). Une bande fermée à la main (data/bands.json, blocked)
 // n'existe plus pour personne.
 
 import type Database from "better-sqlite3";
@@ -85,7 +85,7 @@ export const BAND_PAGE_MEMBERS = 50;
 /** Bandes du tableau d'une ligue ; l'accueil en montre cinq. */
 export const BOARD_SIZE = 20;
 export const HOME_SIZE = 5;
-/** Bandes en formation listées sous le tableau d'une ligue. */
+/** Bandes sous le seuil listées sous le tableau d'une ligue (aucune depuis le seuil d'une fiche). */
 export const FORMING_SIZE = 10;
 
 const f = (fr: string, en: string): Fact => ({ fr: frTypo(fr), en });
@@ -156,7 +156,7 @@ interface League {
 
 interface Computed {
   all: Map<string, League>;
-  /** Au tableau (trois dossiers ou plus), du premier au dernier. */
+  /** Au classement (BAND_MIN_MEMBERS dossiers ou plus : une fiche), du premier au dernier. */
   ranked: League[];
 }
 
@@ -228,7 +228,7 @@ function toStanding(c: Computed, b: League): BandStanding {
   };
 }
 
-/** Une école de la liste sans membre compté : en formation, il manque trois complices. */
+/** Une école de la liste sans membre compté : hors classement, il lui manque une fiche. */
 function emptyStanding(ref: BandRef): BandStanding {
   return { ...ref, score: 0, members: 0, rank: null, missing: BAND_MIN_MEMBERS, gap: null, ahead: null, hasPage: bandHasPage(ref.type, ref.id, 0) };
 }
@@ -243,7 +243,7 @@ export function bandStanding(db: Database.Database, type: BandType, id: string, 
   return school ? emptyStanding(school) : null;
 }
 
-/** La place d'une bande qui a sa page publique (hasPage) ; null pour une boîte au nom libre en formation. */
+/** La place d'une bande qui a sa page publique (hasPage). */
 export function publicBandStanding(db: Database.Database, type: BandType, id: string, now = Date.now()): BandStanding | null {
   const b = bandStanding(db, type, id, now);
   return b?.hasPage ? b : null;
@@ -251,8 +251,8 @@ export function publicBandStanding(db: Database.Database, type: BandType, id: st
 
 /**
  * Le tableau d'une ligue : les vingt premières ; `withId` si elle est plus bas ou en
- * formation ; puis les bandes en formation qui ont leur page publique (une boîte au
- * nom libre reste cachée avant trois dossiers), les plus avancées d'abord.
+ * formation ; puis les bandes sous le seuil qui ont leur page publique, les plus
+ * avancées d'abord (aucune depuis le seuil d'une fiche, 20 novembre 2026).
  */
 export function bandBoard(db: Database.Database, type: BandType, withId?: string | null, now = Date.now()): BandBoard {
   const c = league(db, type, now);
@@ -268,8 +268,8 @@ export function bandBoard(db: Database.Database, type: BandType, withId?: string
 }
 
 /**
- * L'ordre de l'accueil (§18.92) : les bandes au tableau, puis les bandes en formation qui
- * ont leur page publique (une boîte au nom libre reste cachée avant trois dossiers), le
+ * L'ordre de l'accueil (§18.92) : les bandes au classement, toutes dès leur première
+ * fiche (20 novembre 2026), puis celles sous le seuil qui ont leur page publique, le
  * plus d'étoiles d'abord, puis le plus de dossiers, puis la plus ancienne.
  */
 function homeOrder(c: Computed): League[] {
@@ -281,7 +281,7 @@ function homeOrder(c: Computed): League[] {
 
 /**
  * Le classement de chaque ligue pour l'accueil : cinq lignes au plus, le tableau d'abord,
- * les bandes en formation pour les places qui restent. `mine` : la bande de la personne
+ * les bandes sous le seuil pour les places qui restent. `mine` : la bande de la personne
  * dans chaque ligue ; plus bas que les cinq lignes, elle vient en plus, avec sa place.
  */
 export function bandsTop(db: Database.Database, now = Date.now(), mine: Partial<Record<BandType, string | null>> = {}): BandsTop {

@@ -96,7 +96,6 @@ function People({ b, id }: { b: BandStanding; id: string }) {
 function Row({ place, b, me }: { place: number; b: BandStanding; me: boolean }) {
   const { t } = useT();
   const th = t.bands.home;
-  const forming = b.rank === null;
   const [open, setOpen] = useState(false);
   const id = `league-${useId().replace(/:/g, "")}`;
   const toggle = () => {
@@ -111,14 +110,13 @@ function Row({ place, b, me }: { place: number; b: BandStanding; me: boolean }) 
         onClick={toggle}
         aria-expanded={open}
         aria-controls={open ? id : undefined}
-        aria-label={th.rowLabel(place, b.label, b.score, b.members, forming)}
+        aria-label={th.rowLabel(place, b.label, b.score, b.members)}
         aria-current={me ? "true" : undefined}
       >
         <span className="board-rank">{place}</span>
         <span className="band-name">
           <span className="board-login">{b.label}</span>
-          {/* en formation : la règle des trois fiches se lit là, sans phrase */}
-          <span className="band-count">{forming ? th.forming(b.members) : t.bands.dossiers(b.members)}</span>
+          <span className="band-count">{t.bands.dossiers(b.members)}</span>
         </span>
         {/* l'unité est dans l'en-tête du tableau (« Étoiles ») : la ligne porte le nombre seul */}
         <span className="band-score">{b.score}</span>
