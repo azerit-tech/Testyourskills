@@ -3,6 +3,7 @@
 // son texte, jamais les fichiers de code lus.
 
 import Database from "better-sqlite3";
+import { randomBytes } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { withCatalogProfiles } from "../../shared/profileCatalog";
@@ -530,6 +531,21 @@ export class Store {
       .run(byCardId, byLogin ? byLogin.toLowerCase() : null, born ? 1 : 0, id);
     // Une fiche née d'une dénonciation sort du top tant que son login n'est pas revendiqué (top.ts).
     forgetWeekRanks(this.db);
+  }
+
+  /**
+   * « C'est bien moi » par LinkedIn (§18.118) : la personne connectée, dont le profil est celui de
+   * cette fiche née d'une dénonciation, la reprend. Elle n'est plus « née d'une dénonciation » : elle
+   * entre dans ses bandes, la vue publique rend sa grille, et un jeton neuf,
+   * rendu à ce navigateur, remplace celui du dénonciateur. Rend le jeton, ou null (rien à reprendre).
+   */
+  claimDenouncedByLinkedin(id: string): string | null {
+    const token = randomBytes(24).toString("base64url");
+    const done = this.db.prepare(`UPDATE cards SET denounce_born = 0, delete_token = ? WHERE id = ? AND parent_id IS NULL AND denounce_born = 1`).run(token, id);
+    if (!done.changes) return null;
+    forgetWeekRanks(this.db);
+    forgetBands(this.db);
+    return token;
   }
 
   /** Remplace le JSON d'une carte ou d'une comparaison (photo LinkedIn). */

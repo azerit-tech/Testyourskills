@@ -820,6 +820,17 @@ export function createApp(opts: AppOptions) {
             await giveSignInPhoto(row, who?.picture, { store, avatarDir, baseUrl, fetchImpl, removeImages: (ids) => removeImages(ogDir, ids) });
           }
           lead(cached);
+          // « C'est bien moi » par LinkedIn (§18.118) : la personne connectée dont c'est le profil reprend
+          // la fiche que d'autres ont fait naître en la dénonçant : elle est à elle (sa grille, ses bandes) ;
+          // son navigateur reçoit un jeton neuf (celui du dénonciateur ne vaut plus rien).
+          const mineNow = who && !denounce ? store.claimDenouncedByLinkedin(cached) : null;
+          if (mineNow) {
+            store.recordEvent("denounce_claimed", cached, { via: "linkedin" });
+            const claimed = store.getCard(cached);
+            if (claimed) autoJoinBands(store, claimed);
+            await removeImages(ogDir, [cached]);
+            return c.json({ id: cached, deleteToken: mineNow, cached: true }, 200);
+          }
           return c.json({ id: cached, cached: true }, 200);
         }
       }
