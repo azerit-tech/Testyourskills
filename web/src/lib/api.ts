@@ -303,6 +303,8 @@ let mockAccountUrlRead = false;
 const MOCK_ACCOUNTS: Record<string, Account> = {
   li: { cardId: "m-licmp-compte01", cardLogin: null, overall: null, sources: ["linkedin"], avatarUrl: "/mock-linkedin.svg", initial: "L", known: false },
   gh: { cardId: "m-gold-compte01", cardLogin: null, overall: null, sources: ["github"], avatarUrl: null, initial: "L", known: false },
+  /** Connecté par LinkedIn, sa fiche partie (§18.105). */
+  li0: { cardId: null, cardLogin: null, overall: null, sources: ["linkedin"], avatarUrl: "/mock-linkedin.svg", initial: "L", known: false },
 };
 
 function parseAccount(raw: unknown): Account | null {

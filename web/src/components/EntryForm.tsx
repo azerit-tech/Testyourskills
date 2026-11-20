@@ -721,8 +721,13 @@ export function EntryForm({ inputRef, variant = "full", secondary = false, anoth
     );
   };
   /** Les deux boutons empilés, LinkedIn d'abord (le rose) ; sans LinkedIn lisible, GitHub seul, en rose. */
-  /** Connecté, une fiche au compte : « Voir ma fiche », et dessous « Refaire ma fiche · Se déconnecter ». */
-  const connected = buttonsOn && !!acct?.cardId && !another && !working && !picking && !returned;
+  /** Le compte a déjà son LinkedIn (§18.105) : « Se connecter avec LinkedIn » ne s'affiche plus, le serveur n'y renvoie plus. */
+  const liMine = !!acct?.sources.includes("linkedin");
+  /**
+   * Connecté, une fiche au compte : « Voir ma fiche », et dessous « Refaire ma fiche · Se déconnecter ».
+   * Connecté par LinkedIn, sa fiche partie : « Refaire ma fiche » en rose, refaite d'après son compte (§18.105).
+   */
+  const connected = buttonsOn && (!!acct?.cardId || liMine) && !another && !working && !picking && !returned;
   const mineHref = acct?.cardId ? `/c/${acct.cardId}` : "/";
   /** « Refaire » : le parcours de la source connectée, sans le raccourci vers la fiche ; sans connexion réglée, le champ. */
   const redo = () => {
@@ -734,26 +739,39 @@ export function EntryForm({ inputRef, variant = "full", secondary = false, anoth
     if (d === "linkedin") startLinkedinLogin({ redo: true });
     else startGithubLogin({ redo: true });
   };
-  const connectedBlock = connected && (
-    <>
-      <a className="pill pill-big entry-mine" href={mineHref} onClick={(e) => onLinkClick(e, mineHref)}>
-        {h.account.see}
-      </a>
-      <div className="entry-foot entry-or" id={`${uid}-hint`}>
-        <button type="button" className="link-alt" onClick={redo}>
+  const connectedBlock =
+    connected &&
+    (acct?.cardId ? (
+      <>
+        <a className="pill pill-big entry-mine" href={mineHref} onClick={(e) => onLinkClick(e, mineHref)}>
+          {h.account.see}
+        </a>
+        <div className="entry-foot entry-or" id={`${uid}-hint`}>
+          <button type="button" className="link-alt" onClick={redo}>
+            {h.account.redo}
+          </button>
+          <span aria-hidden>·</span>
+          <button type="button" className="link-alt" onClick={() => void signOut()}>
+            {h.account.out}
+          </button>
+        </div>
+      </>
+    ) : (
+      <>
+        <button type="button" className="pill pill-big entry-mine entry-redo" onClick={redo}>
           {h.account.redo}
         </button>
-        <span aria-hidden>·</span>
-        <button type="button" className="link-alt" onClick={() => void signOut()}>
-          {h.account.out}
-        </button>
-      </div>
-    </>
-  );
+        <div className="entry-foot entry-or" id={`${uid}-hint`}>
+          <button type="button" className="link-alt" onClick={() => void signOut()}>
+            {h.account.out}
+          </button>
+        </div>
+      </>
+    ));
   const loginBtns = buttonsOn && !connected && (
     <>
-      {liOn && loginBtn("linkedin", true)}
-      {loginBtn("github", !liOn)}
+      {liOn && !liMine && loginBtn("linkedin", true)}
+      {loginBtn("github", !liOn || liMine)}
     </>
   );
   /** Le CV : sur l'accueil, le dépôt s'ouvre sur place ; depuis une fiche, on y va. */
