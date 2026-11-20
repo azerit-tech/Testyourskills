@@ -3,7 +3,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { GithubIdentity } from "../github/identity";
-import type { RegistryPort } from "../registry/index";
+import type { Namesake, RegistryPort } from "../registry/index";
 import { AUTHORIZE_URL, LI_STATE_COOKIE, TOKEN_URL, USERINFO_URL } from "../linkedin";
 import { ENTER_COOKIE, ENTER_STARTS_PER_DAY, KNOWN_COOKIE, PEEKS_PER_IP, WHO_COOKIE, WHO_TTL_MS, employerFromEmail } from "./linkedinLogin";
 import { CAMILLE, CAMILLE_URL, HOMONYM, cardState, cookiesOf, postCard, setupEntry, type EntryCtx, type EntrySetup } from "./testing";
@@ -541,7 +541,7 @@ describe("qui s'est connecté : le navigateur s'en souvient (SPEC §18.90)", () 
 
 describe("le registre de l'App Azerit (§18.95)", () => {
   /** Un registre factice : les liens et les comptes qu'on lui verse, une photo gardée par profil. */
-  function fakeRegistry(photos: Record<string, Uint8Array> = {}) {
+  function fakeRegistry(photos: Record<string, Uint8Array> = {}, more: Partial<RegistryPort> = {}) {
     const links: { login: string; url: string; strength: number; step: string }[] = [];
     const accounts: { github?: string | null; linkedin?: string | null }[] = [];
     const registry: RegistryPort = {
@@ -554,6 +554,7 @@ describe("le registre de l'App Azerit (§18.95)", () => {
       recordProfile: () => {},
       namesakes: async () => [],
       linkedinOfEmail: async () => null,
+      ...more,
     };
     return { registry, links, accounts };
   }
@@ -612,4 +613,77 @@ describe("le registre de l'App Azerit (§18.95)", () => {
     expect(ctx.calls.peek).toEqual([bare(1).url, bare(2).url]);
   });
 
+  describe("la base de l'App avant le web (§18.96)", () => {
+    const appUrl = (n: number) => `https://www.linkedin.com/in/camille-ardent-${n}`;
+    const named = (n: number, o: Partial<Namesake> = {}): Namesake => ({ url: appUrl(n), name: "Camille Ardent", headline: `Titre ${n}`, hasPhoto: false, ...o });
+    const JPEG = (n: number) => new Uint8Array([0xff, 0xd8, 0xff, n]);
+
+    it("une seule photo gardée concorde : ce profil, sans aucune recherche web, et le lien versé", async () => {
+      const mine = JPEG(2);
+      const r = fakeRegistry({ [appUrl(1)]: JPEG(1), [appUrl(2)]: mine }, { namesakes: async () => [named(1, { hasPhoto: true }), named(2, { hasPhoto: true }), named(3, { name: null, headline: "" })] });
+      const { ctx } = setup({ app: { registry: r.registry, samePhotoBytes: async (picture, photo) => picture === PICTURE && photo.bytes === mine } });
+      const { jar } = await signIn(ctx);
+      const got = await entry(ctx, jar);
+      expect(got.auto).toEqual({ url: appUrl(2), name: "Camille Ardent", headline: "Titre 2", photo: PICTURE });
+      expect(got.candidates).toEqual([]);
+      expect(ctx.calls.byName).toEqual([]);
+      expect(ctx.calls.byEmail).toEqual([]);
+      await postCard(ctx, { linkedin: appUrl(2) }, jar);
+      expect(r.links).toEqual([{ login: "camille-dev", url: appUrl(2), strength: 2, step: "linkedin_signin:photo+github_email" }]);
+      expect(JSON.stringify(got)).not.toContain(EMAIL);
+    });
+
+    it("l'email vérifié que l'App relie à un seul profil : ce profil, sans recherche web", async () => {
+      const asked: string[] = [];
+      const r = fakeRegistry({}, { linkedinOfEmail: async (e) => (asked.push(e), appUrl(4)), namesakes: async () => [named(1), named(4)] });
+      const { ctx } = setup({ app: { registry: r.registry } });
+      const got = await entry(ctx, (await signIn(ctx)).jar);
+      expect(asked).toEqual([EMAIL]);
+      expect(got.auto).toMatchObject({ url: appUrl(4), name: "Camille Ardent", headline: "Titre 4" });
+      expect(ctx.calls.byName).toEqual([]);
+    });
+
+    it("le GitHub de l'email, que l'App relie en force 2 à l'un de ses profils : celui-là ; en force 1 : rien de sûr", async () => {
+      const proven = fakeRegistry({}, { namesakes: async () => [named(1), named(2)], linkedinOf: async (login) => (login === "camille-dev" ? { url: appUrl(1), strength: 2 } : null) });
+      const a = setup({ samePhoto: () => false, app: { registry: proven.registry } });
+      expect((await entry(a.ctx, (await signIn(a.ctx)).jar)).auto?.url).toBe(appUrl(1));
+      expect(a.ctx.calls.byName).toEqual([]);
+      const found = fakeRegistry({}, { namesakes: async () => [named(1), named(2)], linkedinOf: async () => ({ url: appUrl(1), strength: 1 }) });
+      const b = setup({ samePhoto: () => false, app: { registry: found.registry } });
+      const got = await entry(b.ctx, (await signIn(b.ctx)).jar);
+      expect(got.auto).toBeUndefined();
+      expect(b.ctx.calls.byName).toHaveLength(1);
+    });
+
+    it("plusieurs profils de l'App, rien de sûr : eux d'abord dans « C'est toi ? », puis le web, sans doublon", async () => {
+      const both = CAMILLE_URL.replace("camille-ardent", "Camille-Ardent");
+      const r = fakeRegistry({}, { namesakes: async () => [named(1), { url: both, name: "Camille Ardent", headline: "Titre de l'App", hasPhoto: false }] });
+      const { ctx } = setup({ samePhoto: () => false, app: { registry: r.registry } });
+      const got = await entry(ctx, (await signIn(ctx)).jar);
+      expect(got.auto).toBeUndefined();
+      expect(ctx.calls.byName).toHaveLength(1);
+      // Le profil des deux garde sa ligne de l'App, avec la photo que le web donne.
+      expect(got.candidates).toEqual([
+        { url: appUrl(1), name: "Camille Ardent", headline: "Titre 1" },
+        { url: both, name: "Camille Ardent", headline: "Titre de l'App", photo: CAMILLE.photoUrl },
+        { url: HOMONYM.url, name: HOMONYM.name, headline: HOMONYM.headline },
+      ]);
+    });
+
+    it("le web en panne : les profils de l'App restent proposés", async () => {
+      const r = fakeRegistry({}, { namesakes: async () => [named(1), named(2)] });
+      const { ctx } = setup({ samePhoto: () => false, people: { byName: () => ({ status: "off" }) }, app: { registry: r.registry } });
+      const got = await entry(ctx, (await signIn(ctx)).jar);
+      expect(got.off).toBeUndefined();
+      expect(got.candidates!.map((c) => c.url)).toEqual([appUrl(1), appUrl(2)]);
+    });
+
+    it("rien à son nom dans l'App : le web, exactement comme avant", async () => {
+      const r = fakeRegistry({}, { namesakes: async () => [] });
+      const { ctx } = setup({ app: { registry: r.registry } });
+      const got = await entry(ctx, (await signIn(ctx)).jar);
+      expect(got.auto?.url).toBe(CAMILLE_URL);
+      expect(ctx.calls.byName).toHaveLength(1);
+    });
+  });
 });

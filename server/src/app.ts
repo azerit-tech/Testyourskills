@@ -391,6 +391,10 @@ export function createApp(opts: AppOptions) {
           samePhoto: opts.samePhoto,
           samePhotoBytes: opts.samePhotoBytes,
           storedPhoto: opts.registry ? (url) => opts.registry!.photoOf(url) : undefined,
+          // La base de l'App avant le web (§18.96) : ses profils à ce nom, l'email qu'elle connaît, le GitHub qu'elle relie.
+          namesakes: opts.registry ? (name) => opts.registry!.namesakes(name) : undefined,
+          profileOfEmail: opts.registry ? (email) => opts.registry!.linkedinOfEmail(email) : undefined,
+          linkedinOfGithub: opts.registry ? (login) => opts.registry!.linkedinOf(login) : undefined,
         })
       : null;
 

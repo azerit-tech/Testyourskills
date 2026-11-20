@@ -39,10 +39,11 @@ import { sign, unsign } from "../auth";
 import { resolveGithubIdentity, type GithubIdentity, type IdentityInput } from "../github/identity";
 import type { GithubAuth } from "../github/http";
 import { downloadPhoto, type LinkedinEnterHook, type OidcProfile } from "../linkedin";
-import { PERSONAL_MAIL_RE, SEARCHES_PER_IP, type LinkedinCandidate, type LinkedinPeople } from "../linkedinProfile/search";
+import { mergeCandidates, PERSONAL_MAIL_RE, SEARCHES_PER_IP, type LinkedinCandidate, type LinkedinPeople } from "../linkedinProfile/search";
+import { isProven, type Namesake } from "../registry/index";
 import { nameWords, samePublicFullName } from "../names";
 import { clientIp, type RateLimiter } from "../ratelimit";
-import { toSuggestion } from "./linkedinSearch";
+import { licdnPhoto, namesakeCandidates, toSuggestion } from "./linkedinSearch";
 import { licdnImageId, photoHash, samePhotoHash } from "./photoHash";
 
 export const ENTER_COOKIE = "tys_enter";
@@ -62,6 +63,8 @@ export const PEEKS_PER_IP = 30;
 const PEEK_WAIT_MS = 20_000;
 /** Une demande du front attend la recherche ce temps-là, puis répond « pending » : il redemande. */
 export const POLL_WAIT_MS = 20_000;
+/** Des profils de l'App à son nom : le GitHub de son email est attendu ce temps-là pour en désigner un (§18.96). */
+export const GITHUB_PROOF_WAIT_MS = 2500;
 /** Au-delà (l'index lent a 90 s), la recherche est dite en panne. */
 export const RESOLVE_MAX_MS = 100_000;
 const SESSIONS_MAX = 5000;
@@ -136,6 +139,12 @@ export interface LinkedinEnterOptions {
   storedPhoto?: (url: string) => Promise<StoredPhoto | null>;
   /** « Même photo ? » entre la photo rendue par LinkedIn et une photo gardée ; les tests en donnent un faux. */
   samePhotoBytes?: (picture: string, photo: StoredPhoto) => Promise<boolean>;
+  /** Les profils de l'App Azerit à ce nom complet (§18.96), cherchés avant le web ; absent : aucun. */
+  namesakes?: (name: string) => Promise<Namesake[]>;
+  /** Le seul profil que l'App relie à cet email vérifié, ou null (§18.96). */
+  profileOfEmail?: (email: string) => Promise<string | null>;
+  /** Le LinkedIn que l'App relie à ce GitHub, avec la force du lien (§18.95). */
+  linkedinOfGithub?: (login: string) => Promise<{ url: string; strength: number } | null>;
   /** La fiche de qui s'est connecté : celle du cookie si elle existe encore, sinon la dernière de son profil. */
   knownCard?: (who: Who) => KnownCard | null;
   /** Attente d'une demande du front avant « pending » (les tests la raccourcissent). */
@@ -242,19 +251,64 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
     return session && session.exp >= now() ? { id: p.i, session } : null;
   };
 
+  /**
+   * La base de l'App Azerit d'abord (§18.96), avant toute recherche payée : l'email
+   * vérifié qu'elle connaît, sinon ses profils à ce nom, dont un seul est désigné par
+   * la photo gardée ou par le GitHub de l'email qu'elle lui relie. Rien de sûr : ses
+   * profils nommés, à montrer avant ceux du web.
+   */
+  async function fromApp(who: OidcProfile & { name: string }, githubP: Promise<GithubIdentity | null>): Promise<{ sure: LinkedinCandidate | null; how: "email" | "photo" | null; candidates: LinkedinCandidate[] }> {
+    const none = { sure: null, how: null, candidates: [] };
+    if (!o.namesakes) return none;
+    const [byMail, namesakes] = await Promise.all([who.email && o.profileOfEmail ? o.profileOfEmail(who.email).catch(() => null) : null, o.namesakes(who.name).catch(() => [])]);
+    // Le profil est le sien : le nom de son CV s'il y en a un, et la photo que LinkedIn vient de rendre.
+    const mine = (url: string): LinkedinCandidate => {
+      const n = namesakes.find((x) => x.url === url);
+      const photo = licdnPhoto(who.picture);
+      return { url, name: n?.name ?? who.name, headline: n?.headline ?? "", ...(photo ? { photoUrl: photo } : {}) };
+    };
+    if (byMail) return { sure: mine(byMail), how: "email", candidates: [] };
+    if (!namesakes.length) return none;
+    const storedPhoto = o.storedPhoto;
+    if (storedPhoto && who.picture) {
+      const picture = who.picture;
+      const sameStored = o.samePhotoBytes ?? storedPhotoMatcher(o.fetchImpl);
+      const withPhoto = namesakes.filter((n) => n.hasPhoto).slice(0, PHOTOS_COMPARED);
+      const photos = await Promise.all(withPhoto.map((n) => storedPhoto(n.url).catch(() => null)));
+      const hits = (await Promise.all(photos.map((p) => (p ? sameStored(picture, p).catch(() => false) : false)))).flatMap((ok, i) => (ok ? [withPhoto[i]!] : []));
+      if (hits.length === 1) return { sure: mine(hits[0]!.url), how: "photo", candidates: [] };
+    }
+    if (o.linkedinOfGithub) {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const gh = await Promise.race([githubP, new Promise<null>((res) => (timer = setTimeout(() => res(null), GITHUB_PROOF_WAIT_MS)))]);
+      clearTimeout(timer);
+      const link = gh?.how === "email" ? await o.linkedinOfGithub(gh.login).catch(() => null) : null;
+      if (link && isProven(link.strength) && namesakes.some((n) => n.url === link.url)) return { sure: mine(link.url), how: "email", candidates: [] };
+    }
+    return { sure: null, how: null, candidates: namesakeCandidates(namesakes) };
+  }
+
   async function resolve(who: OidcProfile & { name: string }, ip: string): Promise<Resolution> {
     const spend = () => o.limiter.take("li-search", ip, SEARCHES_PER_IP);
     // Le GitHub se cherche pendant que le profil se cherche : aucun des deux n'attend l'autre.
     const githubP = resolveGithub(o.github, { name: who.name, email: who.email }).catch(() => null);
     const out: Resolution = { sure: null, how: null, candidates: [], github: null, off: false };
+    const app = await fromApp(who, githubP);
+    if (app.sure) {
+      out.sure = app.sure;
+      out.how = app.how;
+      out.github = await githubP;
+      return out;
+    }
     const byEmail = who.email ? await o.people.byEmail(who.email, { spend }) : null;
     if (byEmail) {
       out.sure = byEmail;
       out.how = "email";
     } else {
       const found = await o.people.byName(who.name, { strict: true, company: employerFromEmail(who.email, who.name), spend });
-      if (found.status === "off") out.off = true;
-      const all = found.status === "ok" ? found.results : [];
+      // Le web en panne n'éteint rien si l'App a proposé des profils.
+      if (found.status === "off" && !app.candidates.length) out.off = true;
+      const all = mergeCandidates(app.candidates, found.status === "ok" ? found.results : []);
       let same = all.filter((c) => samePublicFullName(who.name, c.name));
       // La photo que l'App Azerit garde déjà d'un de ces profils (§18.95) : la sienne,
       // et elle seule, le désigne tout de suite, sans lire aucun profil (quatre secondes et
