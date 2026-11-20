@@ -153,7 +153,9 @@ describe("Dénoncer : le champ et le message", () => {
   it("le champ : un nom, un pseudo GitHub ou un lien LinkedIn quand le serveur lit LinkedIn, sinon GitHub seul, et il le dit", () => {
     expect(SRC).toContain("detectEntry(raw)");
     expect(SRC).toContain('if (entry.kind === "linkedin" && !liOn) return setError(d.githubOnly);');
-    expect(SRC).toMatch(/\{ linkedin: entry\.url \}\), lang, denouncedBy: cardId/);
+    expect(SRC).toMatch(/\{ linkedin: entry\.url, \.\.\.\(name \? \{ name \} : \{\}\) \}\), lang, denouncedBy: cardId/);
+    // Le nom de la suggestion touchée part avec le lien : le serveur cherche son GitHub dès le départ (§18.121).
+    expect(SRC).toContain(`item.kind === "linkedin" ? item.title : undefined`);
     expect(DICTS.fr.denounce.placeholderBoth).toBe("Son nom, son pseudo ou un lien");
     expect(DICTS.en.denounce.placeholderBoth).toBe("Their name, username or a link");
     expect(DICTS.fr.denounce.githubOnly).toBe("Pour l'instant, par pseudo GitHub seulement.");

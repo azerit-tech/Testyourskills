@@ -162,7 +162,7 @@ export function Denounce({ cardId, selfLogin, toast, initial, mine }: Props) {
    * La dénonciation part : sa ligne s'ajoute en haut, le champ se vide et garde le focus (dans le geste :
    * le clavier du téléphone reste ouvert), prêt pour le suivant. La fiche se calcule pendant ce temps.
    */
-  const send = async (entry: Entry, who: string, photo?: string) => {
+  const send = async (entry: Entry, who: string, photo?: string, name?: string) => {
     if (entry.kind === "linkedin" && !liOn) return setError(d.githubOnly);
     if (entry.kind === "github" && selfLogin && entry.login.toLowerCase() === selfLogin.toLowerCase()) return setError(d.self);
     const key = shotKey(entry);
@@ -179,7 +179,8 @@ export function Denounce({ cardId, selfLogin, toast, initial, mine }: Props) {
     setNow(Date.now());
     dispatch({ type: "add", shot: { key, who, login: entry.kind === "github" ? entry.login : undefined, photo, since: Date.now(), status: "pending" } });
     try {
-      const res = await api.createCard({ ...(entry.kind === "github" ? { login: entry.login } : { linkedin: entry.url }), lang, denouncedBy: cardId });
+      // Le nom de la suggestion touchée : le serveur y cherche son GitHub dès le départ (§18.121).
+      const res = await api.createCard({ ...(entry.kind === "github" ? { login: entry.login } : { linkedin: entry.url, ...(name ? { name } : {}) }), lang, denouncedBy: cardId });
       rememberDenounced(res.id);
       const card = await waitCard(res.id);
       if (alive.current) dispatch({ type: "done", key, card });
@@ -199,7 +200,7 @@ export function Denounce({ cardId, selfLogin, toast, initial, mine }: Props) {
   const people = useMemo(() => found.filter((p) => !(p.kind === "github" && selfLogin && p.login.toLowerCase() === selfLogin.toLowerCase())), [found, selfLogin]);
   /** Une personne touchée dans la liste : la dénonciation part, sans autre geste. */
   const pickOne = (item: Suggestion) =>
-    void send(item.kind === "github" ? { kind: "github", login: item.login } : { kind: "linkedin", url: item.url }, item.kind === "github" ? `@${item.login}` : item.title, item.photo);
+    void send(item.kind === "github" ? { kind: "github", login: item.login } : { kind: "linkedin", url: item.url }, item.kind === "github" ? `@${item.login}` : item.title, item.photo, item.kind === "linkedin" ? item.title : undefined);
   const label = liOn ? d.labelBoth : d.label;
   const box = useSuggestBox({ id: `${uid}-sg`, items: people, onPick: pickOne, mixed, label });
   const fieldRef = useRef<HTMLDivElement>(null);

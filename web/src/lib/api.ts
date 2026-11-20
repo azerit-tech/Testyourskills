@@ -23,6 +23,8 @@ export interface CreateInput {
   linkedin?: string;
   /** « Dénonce un complice » (§18.6) : l'id de la fiche du dénonciateur. */
   denouncedBy?: string;
+  /** Le nom de la personne dénoncée par LinkedIn, tel que la suggestion le montre (§18.121). */
+  name?: string;
   /** La fiche que celle-ci complète (« Ajoute ton GitHub », « Ajoute ton LinkedIn ») : ses bandes suivent (§18.82). */
   from?: string;
   /** « Je n'en ai pas » à la question d'avant le jugement (§18.111) : sa fiche LinkedIn seule, sans GitHub proposé. */
@@ -480,7 +482,7 @@ async function createCard(input: CreateInput): Promise<CreateResult> {
       res = await fetch("/api/card", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...browser, ...(held ? { "X-Card-Token": held } : {}) },
-        body: JSON.stringify({ login: input.login, linkedin: input.linkedin, lang: input.lang, ref, denouncedBy: input.denouncedBy, from: input.from, ...(input.noGithub ? { noGithub: true } : {}), ...(input.noLinkedin ? { noLinkedin: true } : {}) }),
+        body: JSON.stringify({ login: input.login, linkedin: input.linkedin, lang: input.lang, ref, denouncedBy: input.denouncedBy, ...(input.name ? { name: input.name } : {}), from: input.from, ...(input.noGithub ? { noGithub: true } : {}), ...(input.noLinkedin ? { noLinkedin: true } : {}) }),
       });
     }
   } catch {
