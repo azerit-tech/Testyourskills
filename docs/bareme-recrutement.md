@@ -1,6 +1,46 @@
 # Le barème de recrutement
 
-*Proposition du 10 novembre 2026, construite depuis (barème 0.4.0, SPEC §18.37). Le barème qui tourne est le 0.5.0 du 19 novembre : sa section, juste dessous, décrit ce qui est construit et fait foi là où elle contredit la proposition.*
+*Proposition du 10 novembre 2026, construite depuis (barème 0.4.0, SPEC §18.37). Le barème qui tourne est le 0.6.0 du 20 novembre : sa section, juste dessous, fait foi là où elle contredit la suite ; puis celle du 0.5.0, puis la proposition.*
+
+## Barème 0.6.0 : LinkedIn et GitHub au même point, la preuve en plus (20 novembre 2026)
+
+*Le moteur tel qu'il tourne (`data/grid.json`, `server/src/scoring/grid.ts`, `shared/jitter.ts`, SPEC §18.101). Document interne. Il remplace dans la section 0.5.0 : le point 5 (le déclaré ne compte plus seulement s'il fait monter), le poids du parcours (2,5), le plafond (85) ; et dans la proposition, la table « déclarée » arrêtée à 6 et la règle « aucun + n ».*
+
+Jacques : « en vrai sois pas si dur : utilise-le pour le classement quand c'est sur le CV », puis « simplifie : à chaque fois mets LinkedIn ou GitHub au même point, avec des bonus si c'est prouvé », « l'expérience compte à part entière : une bonne expérience et une bonne preuve. Un super stage, le mec est super recherché par les recruteurs », et « la réflexion, c'est : à combien de score, à quel point les recruteurs te cherchent ».
+
+**La note dit à quel point les recruteurs te cherchent.** Deux piliers de même rang : une bonne expérience (LinkedIn ou le CV) et une bonne preuve (GitHub). Chacun porte la note seul ; la preuve s'ajoute.
+
+1. **Une table par critère, quelle que soit la source.** Ce que LinkedIn ou le CV dit se lit dans la même table que ce que GitHub montre, et compte dans la moyenne comme le reste (fin de `declaredNeverLower`). Les équivalents, au niveau d'expérience de la personne (`STK.declared`, `OWN.declared`, une table pour le début de carrière, une pour le junior, une commune ensuite) :
+
+   | Note | Stack, sur LinkedIn ou le CV (sur GitHub, débutant) | Ownership, sur LinkedIn ou le CV (sur GitHub, junior) |
+   |---|---|---|
+   | 10 | se prouve sur GitHub | se prouve sur GitHub |
+   | 8 | 5 technos rattachées à un poste ou une réalisation, dont 2 dans un poste de moins de 2 ans (≈ 200 à 300 commits) | 3 résultats datés et chiffrés, ou une entreprise fondée tenue un an avec un résultat (≈ un projet porté 6 mois, prêt à mettre en production) |
+   | 6 | 3 technos rattachées (≈ 100 à 150 commits) | 2 résultats, ou une entreprise fondée tenue 6 mois (≈ un projet porté 6 mois, 50 commits) |
+   | 4 | 2 technos rattachées (≈ 25 à 50 commits) | 1 résultat, ou une entreprise fondée (≈ un projet porté 3 mois) |
+
+   À partir du niveau confirmé : 6 technos dont 3 récentes pour 8, 4 dont une récente pour 6 ; 4 résultats ou une entreprise tenue 2 ans pour 8, 2 résultats ou un an pour 6. **Une liste de compétences seule n'a pas d'équivalent** : sans techno rattachée à un poste, la stack sort de la moyenne, elle ne fait pas baisser la note. École et expérience : inchangées, lues sur LinkedIn ou le CV. **Code, activité, open source : aucun équivalent honnête sur un CV** ; sans GitHub, ils sortent de la moyenne, sans pénalité.
+
+2. **La preuve : +1, la même règle pour chaque critère** (`final.proofBonus`). Un critère montré par GitHub, ou déclaré puis recoupé par GitHub (poste confirmé par le code, technos retrouvées dans le code), prend un point de plus que sa ligne, plafonné à 10 ; un niveau 0 ne prouve rien. La fiche le dit à côté du critère, « prouvé +1 », et rien de plus. Au dossier, la stack et l'ownership prennent la plus haute des deux lectures, la preuve comprise. **Pourquoi +1 et pas +2** : à +2, la fiche GitHub de Jacques (junior, 329 commits, code lu à 3,6 sur 5) passait de 77 à 97, six étoiles, au niveau des mainteneurs les plus connus, et le haut du classement se tassait contre 99 ; à +1 elle fait 87, le stage d'exception avec un GitHub correct fait 80, et l'ordre de la 0.5.0 tient.
+
+3. **L'expérience, critère à part entière et le plus lourd** (le parcours, rebaptisé « Expérience », coefficient 2,5 → 4). C'est la qualité des expériences pour le niveau : où, quoi, à quel point l'employeur est sélectif, combien de temps pour le niveau. Toujours jugé parmi les gens du même niveau : un super stage n'est pas puni d'être court (4 à 6 mois chez un employeur très sélectif : 10 au début de carrière). **Les mois du même genre se cumulent** : deux entreprises fondées, deux équipes produit, plusieurs postes comptent ensemble, chaque mois une fois. C'est ce qui sépare deux juniors à expérience datée différente, sans jamais faire passer un junior devant un senior aussi bon : la table du senior demande plus. L'ancienne ligne « Expérience » (les années) devient « Niveau » : elle dit à quel niveau le dossier est lu, sans note dans la moyenne.
+
+4. **Les règles finales** : un critère sans information sort de la moyenne ; l'école et l'open source n'y entrent que s'ils la font monter ; 20 pour un dossier vide ; **plafond sans code prouvé : 80** (85 avant). Le plafond reste, la preuve ne suffit pas à faire la différence : une fiche LinkedIn seule se moyenne sur deux ou trois critères, et un seul 10 la mettait à 99. À 80, un super stage seul est à cinq étoiles, et la sixième se prouve.
+
+5. **Un petit aléa de ±1 à 3 points** sur la note finale, fixé par la fiche (un hachage de son id) : la même fiche a toujours la même note, deux fiches à la même grille ont le plus souvent deux notes. Les critères restent exacts. Jamais sur un dossier vide ; le plafond et les bornes 1 à 99 tiennent. **Jamais dit sur le site** : ni la note exacte ni l'écart ne sont rangés ; le détail de la note liste les critères comptés et leur poids sans imprimer de moyenne ni de calcul (SPEC §18.101).
+
+**Les dossiers de référence** (`levels.test.ts`, `grid.test.ts`), note exacte avant l'aléa :
+
+| Dossier | 0.5.0 | 0.6.0 | Les recruteurs |
+|---|---|---|---|
+| (a) Stage de 6 mois chez un employeur très sélectif, GitHub correct | 69 | 80 | le cherchent beaucoup |
+| (a) La même personne, LinkedIn seul | 85 | 80 | le cherchent beaucoup |
+| (b) Le même stage dans une entreprise que rien ne distingue, GitHub correct | 55 | 60 | le regardent |
+| (c) Douze ans dans le même poste, GitHub médiocre | 43 | 49 | peu |
+| (d) École d'ingénieurs, 6 mois en startup de produit, commits de cours | 70 | 70 | le cherchent |
+| (d') La même, deux stages que rien ne distingue | 60 | 60 | le regardent |
+| Jacques : LinkedIn seul, GitHub seul, dossier | 60, 77, 72 | 60, 87, 80 | dossier : le cherchent beaucoup |
+| Lumine : LinkedIn seul, GitHub, dossier | 66, 20, 66 | 75, 20, 75 | la cherchent |
 
 ## Barème 0.5.0 : ce qui est construit (19 novembre 2026)
 
