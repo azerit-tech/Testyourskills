@@ -65,7 +65,7 @@ export const GH_SOCIAL_URL = "https://api.github.com/user/social_accounts";
 export interface GithubSelf {
   name: string | null;
   company: string | null;
-  /** Sa ville, son site, sa bio : ce qui départage les homonymes de son LinkedIn (§18.124). */
+  /** Sa ville, son site, sa bio : ce qui départage les homonymes de son LinkedIn (§18.125). */
   location?: string | null;
   blog?: string | null;
   bio?: string | null;

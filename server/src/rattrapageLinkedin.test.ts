@@ -1,4 +1,4 @@
-// Rattrapage du §18.124 : les fiches GitHub seules du top cherchent leur LinkedIn ; un lien fort
+// Rattrapage du §18.125 : les fiches GitHub seules du top cherchent leur LinkedIn ; un lien fort
 // fait le dossier, qui remplace la fiche. Pipeline factice : le dossier qu'il rendrait.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -21,7 +21,7 @@ function githubCard(store: Store, id: string, login: string, overall: number) {
   store.insertCards([{ id, createdAt: NOW - 60_000, source: "github", login, kind: "card", data, facts: { login, profile: { login, name: null, followers: 3 } }, deleteToken: "t" }]);
 }
 
-describe("rattrapage du LinkedIn des fiches GitHub du top (§18.124)", () => {
+describe("rattrapage du LinkedIn des fiches GitHub du top (§18.125)", () => {
   it("une recherche par fiche ; le lien fort fait le dossier qui remplace la fiche ; relancé, plus rien", async () => {
     const store = new Store(":memory:");
     stores.push(store);

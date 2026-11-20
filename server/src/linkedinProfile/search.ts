@@ -74,7 +74,7 @@ export interface SearchOptions {
   strict?: boolean;
   /** Avec un nom exact : l'employeur, qui départage les homonymes. */
   company?: string | null;
-  /** Avec un nom exact : une requête, le nom seul, dont l'appelant juge les extraits (§18.124). */
+  /** Avec un nom exact : une requête, le nom seul, dont l'appelant juge les extraits (§18.125). */
   nameOnly?: boolean;
   /** Une saisie en cours : le mot-clé tapé après le nom (« criteo », §18.112). */
   context?: string;

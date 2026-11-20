@@ -126,8 +126,9 @@ describe("les deux fondateurs (§7), à un point près", () => {
   // ownership 9, open source 7) et sur le poste confirmé par le code (expérience 7) ; Azerit fondée et tenue
   // 7 mois se lit dans la table LinkedIn de l'ownership (6, compté). GitHub 77 → 87, dossier 72 → 80 ;
   // la pièce LinkedIn recoupée par le code 60 → 67 (seule, toujours 60). 0.7.0, la courbe de la note
-  // (§18.117) : la pièce LinkedIn 67 → 73, GitHub et dossier inchangés.
-  it("Jacques, niveau « Junior » : LinkedIn 73 recoupé (67 sous 0.6.0), GitHub 87, dossier 80 : la preuve +1, la courbe", () => {
+  // (§18.117) : la pièce LinkedIn 67 → 73, GitHub et dossier inchangés. 0.8.0 (§18.124) : son GitHub prouvé
+  // et actif (stack 9, code 8, activité 9, ownership 9 : 8,7 de moyenne) ajoute 4 au dossier, 80 → 84.
+  it("Jacques, niveau « Junior » : LinkedIn 73 recoupé (67 sous 0.6.0), GitHub 87, dossier 84 (80 sous 0.7.0) : la preuve +1, la courbe, la preuve du dossier +4", () => {
     expect(scores(jLinkedin)).toEqual({ EDU: 6, XP: 3, EMP: 7, STK: null, CODE: null, ACT: null, OWN: 6, OSS: null });
     expect(scores(jGithub)).toEqual({ EDU: null, XP: 4, EMP: null, STK: 9, CODE: 8, ACT: 9, OWN: 9, OSS: 7 });
     expect(scores(jCase)).toEqual({ EDU: 6, XP: 3, EMP: 7, STK: 9, CODE: 8, ACT: 9, OWN: 9, OSS: 7 });
@@ -136,7 +137,10 @@ describe("les deux fondateurs (§7), à un point près", () => {
     expect(jCase.seniority).toEqual(jLinkedin.seniority);
     expect(jLinkedin.overall).toBe(73);
     expect(jGithub.overall).toBe(87);
-    expect(jCase.overall).toBe(80);
+    expect(jCase.overall).toBe(84);
+    expect(jCase.githubBonus).toBe(4);
+    // Une pièce seule n'a pas de preuve de dossier.
+    expect([jLinkedin.githubBonus, jGithub.githubBonus]).toEqual([undefined, undefined]);
     // L'expérience ne pèse plus, nulle part : elle garde sa lecture, hors moyenne.
     for (const g of [jLinkedin, jGithub, jCase]) expect(crit(g, "XP").counted).toBe(false);
     // L'ownership déclaré compte comme le reste (0.6.0) ; l'école (6) reste hors moyenne, pas au-dessus.

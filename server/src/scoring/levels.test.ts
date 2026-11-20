@@ -59,11 +59,13 @@ describe("la note dit à quel point les recruteurs te cherchent (barème 0.6.0 ;
 
   // Jacques, 20 novembre : « un super stage, le mec est super recherché par les recruteurs ». L'expérience pèse 4
   // (2,5 sous 0.5.0) et la preuve ajoute 1 à chaque critère montré par GitHub : 69 → 80, cinq étoiles.
-  it("(a) un stage de six mois chez un employeur très sélectif et un GitHub correct : cinq étoiles, 80 (69 sous 0.5.0, deux étoiles sous 0.4.0)", () => {
+  // 0.8.0 (§18.124) : son GitHub prouvé et actif ajoute 3 au dossier, 80 → 83.
+  it("(a) un stage de six mois chez un employeur très sélectif et un GitHub correct : cinq étoiles, 83 (80 sous 0.7.0, 69 sous 0.5.0, deux étoiles sous 0.4.0)", () => {
     expect(a.dossier.seniority).toEqual({ code: "student", months: 3, source: "linkedin" });
     expect(scores(a.dossier)).toEqual({ EDU: 6, XP: 2, EMP: 10, STK: 7, CODE: 7, ACT: 5, OWN: 7, OSS: 0 });
-    // (10 × 4 + 7 × 2 + 7 × 1,5 + 7 × 1,5 + 5) ÷ 10 = 80 ÷ 10 = 8.
-    expect(a.dossier.overall).toBe(80);
+    // (10 × 4 + 7 × 2 + 7 × 1,5 + 7 × 1,5 + 5) ÷ 10 = 80 ÷ 10 = 8, puis la preuve du dossier : la moitié de 6,6, 3.
+    expect(a.dossier.overall).toBe(83);
+    expect(a.dossier.githubBonus).toBe(3);
     expect(starsFor(a.dossier.overall)).toBe(5);
     // LinkedIn seul : l'expérience à 10, plafonnée à 80 sans code prouvé (85 sous 0.5.0) ; cinq étoiles aussi.
     expect(a.linkedin.overall).toBe(80);
@@ -71,21 +73,25 @@ describe("la note dit à quel point les recruteurs te cherchent (barème 0.6.0 ;
   });
 
   // 0.7.0 (§18.117) : la courbe lève le milieu, pas le haut : (b) 60 → 69, (c) 49 → 58, (a) reste à 80.
-  it("(b) le même stage dans une entreprise que rien ne distingue : plus bas, 69 (60 sous 0.6.0, 55 sous 0.5.0)", () => {
+  // 0.8.0 : la preuve du dossier, +3 : (a) 83, (b) 72 ; (c), GitHub médiocre et peu actif, ne prend rien et ne perd plus rien : 62, sa pièce LinkedIn.
+  it("(b) le même stage dans une entreprise que rien ne distingue : plus bas, 72 (69 sous 0.7.0, 60 sous 0.6.0, 55 sous 0.5.0)", () => {
     expect(scores(b.dossier)).toMatchObject({ EMP: 5, STK: 7, CODE: 7, ACT: 5, OWN: 7 });
-    expect(b.dossier.overall).toBe(69);
+    expect(b.dossier.overall).toBe(72);
     expect(starsFor(b.dossier.overall)).toBe(4);
     expect(starsFor(a.dossier.overall) - starsFor(b.dossier.overall)).toBe(1);
     expect(a.dossier.overall - b.dossier.overall).toBeGreaterThanOrEqual(10);
     expect(a.linkedin.overall - b.linkedin.overall).toBeGreaterThanOrEqual(10);
   });
 
-  it("(c) douze ans dans le même poste et des preuves médiocres ne passent plus devant (a) par les années : 58 (49 sous 0.6.0, 43 sous 0.5.0)", () => {
+  it("(c) douze ans dans le même poste et des preuves médiocres ne passent plus devant (a) par les années : 62, sa pièce LinkedIn (58 sous 0.7.0, 49 sous 0.6.0)", () => {
     expect(c.dossier.seniority).toMatchObject({ code: "expert", source: "linkedin" });
     expect(scores(c.dossier)).toMatchObject({ XP: 10, EMP: 5, STK: 5, CODE: 5, ACT: 3, OWN: 5 });
     expect(crit(c.dossier, "XP").counted).toBe(false);
-    expect(c.dossier.overall).toBe(58);
-    expect(starsFor(c.dossier.overall)).toBe(3);
+    // GitHub ne fait que monter (0.8.0) : sans ses critères, le dossier se lit comme la pièce LinkedIn, 62.
+    expect(c.dossier.overall).toBe(62);
+    expect(c.dossier.overall).toBe(c.linkedin.overall);
+    expect(c.dossier.githubBonus).toBeUndefined();
+    for (const code of ["STK", "CODE", "ACT", "OWN"] as const) expect(crit(c.dossier, code).counted).toBe(false);
     expect(c.dossier.overall).toBeLessThan(b.dossier.overall);
     expect(c.linkedin.overall).toBeLessThan(a.linkedin.overall);
   });

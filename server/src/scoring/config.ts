@@ -227,6 +227,8 @@ export interface GridConfig {
     curve: [number, number][];
     /** 0.7.0 : le plancher d'un critère compté, par niveau d'expérience ; niveau absent, aucun plancher. */
     floors: Partial<Record<SeniorityCode, number>>;
+    /** 0.8.0 (SPEC §18.124) : la preuve au dossier, un GitHub prouvé et actif ajoute de min à max points à la note. */
+    githubBonus: { minActLevel: number; min: number; max: number };
   };
   thinGithub: { minRepos: number; repoCommits: number; minCommits: number };
   EDU: { tiers: Record<Exclude<SchoolTier, "none">, number>; selection: Record<SelectionKind, number>; githubPattern: string; githubScore: number };

@@ -1,4 +1,4 @@
-// Rattrapage du §18.124 : les fiches GitHub seules du top de la semaine, nées avant la nouvelle
+// Rattrapage du §18.125 : les fiches GitHub seules du top de la semaine, nées avant la nouvelle
 // correspondance, cherchent leur LinkedIn par le nom (une recherche par fiche, en cache un
 // jour). Un lien fort fait ce que fait « Ajoute ton LinkedIn » : le pipeline calcule le dossier
 // LinkedIn + GitHub (prouvé « match »), qui remplace la fiche (`completedBy`) et suit ses bandes.
@@ -43,7 +43,7 @@ export interface BackfillDeps {
   store: Store;
   /** Le profil GitHub frais (nom, entreprise, ville, site, bio) : les faits d'avant n'ont pas la ville. */
   hints(login: string): Promise<GithubHints | null>;
-  /** La correspondance du §18.124 : une recherche au plus. */
+  /** La correspondance du §18.125 : une recherche au plus. */
   match(gh: GithubHints): Promise<LinkedinMatch | null>;
   /** Le pipeline de l'App (`Pipeline.start` et `wait`) ; absent : rien n'est écrit. */
   pipeline?: { start(input: JobInput): { id: string }; wait(id: string): Promise<void> };

@@ -1,4 +1,4 @@
-// Le LinkedIn d'un GitHub (SPEC §18.100, §18.113, §18.121, §18.124) : trouvé par le nom,
+// Le LinkedIn d'un GitHub (SPEC §18.100, §18.113, §18.121, §18.125) : trouvé par le nom,
 // jugé sur ce que l'index en dit, attaché d'office quand le lien est fort, proposé d'un
 // toucher quand il est moyen, rien sinon.
 //
@@ -35,7 +35,7 @@ export interface GithubHints {
   login: string;
   name: string | null;
   company: string | null;
-  /** « Gif-sur-Yvette - France » ; absent des faits collectés avant le §18.124. */
+  /** « Gif-sur-Yvette - France » ; absent des faits collectés avant le §18.125. */
   location?: string | null;
   /** Le champ « site » : son domaine, dans l'adresse d'un profil, est un indice. */
   blog?: string | null;
@@ -178,7 +178,7 @@ export function pickLinkedin(gh: GithubHints, list: LinkedinCandidate[]): Linked
 }
 
 /**
- * Le jugement (§18.124) : parmi ces candidats, le LinkedIn de ce GitHub, et à quel point
+ * Le jugement (§18.125) : parmi ces candidats, le LinkedIn de ce GitHub, et à quel point
  * c'est sûr. null : rien, ou plusieurs homonymes que rien ne départage.
  */
 export function judgeLinkedin(gh: GithubHints, list: LinkedinCandidate[]): LinkedinMatch | null {
@@ -213,7 +213,7 @@ export function judgeLinkedin(gh: GithubHints, list: LinkedinCandidate[]): Linke
   return near ? { proposal: near, strength: "medium", why: ["near"] } : null;
 }
 
-/** Le profil lu nomme-t-il une école ou un employeur du GitHub (§18.124, la lecture « à vérifier ») ? */
+/** Le profil lu nomme-t-il une école ou un employeur du GitHub (§18.125, la lecture « à vérifier ») ? */
 export function profileNamesOrg(gh: GithubHints, profile: { roles?: { company?: string | null }[]; education?: { school?: string | null }[]; headline?: string | null }): boolean {
   const orgs = orgTerms(gh);
   const text = [...(profile.roles ?? []).map((r) => r.company ?? ""), ...(profile.education ?? []).map((e) => e.school ?? ""), profile.headline ?? ""].join(" ");
@@ -221,7 +221,7 @@ export function profileNamesOrg(gh: GithubHints, profile: { roles?: { company?: 
 }
 
 /**
- * Une proposition nue (d'avant le §18.124) : forte si son nom complet est celui du GitHub, ce
+ * Une proposition nue (d'avant le §18.125) : forte si son nom complet est celui du GitHub, ce
  * GitHub va avec ce nom (`githubFitsName`), et son titre nomme l'entreprise du GitHub (§18.121).
  */
 export function strongLinkedin(gh: GithubHints, p: LinkedinProposal): boolean {

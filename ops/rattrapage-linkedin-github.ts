@@ -1,4 +1,4 @@
-// Rattrapage du §18.124 : les fiches GitHub seules du top de la semaine cherchent leur LinkedIn
+// Rattrapage du §18.125 : les fiches GitHub seules du top de la semaine cherchent leur LinkedIn
 // par le nom (une recherche par fiche) ; un lien fort fait le dossier LinkedIn + GitHub, prouvé
 // « match », qui remplace la fiche comme « Ajoute ton LinkedIn ». Logique : server/src/rattrapageLinkedin.ts.
 //
@@ -40,7 +40,7 @@ if (!people) {
 }
 const tokens = tokensFromEnv(process.env);
 
-/** Le profil GitHub frais : les faits d'avant le §18.124 n'ont pas la ville. Un appel REST, gratuit. */
+/** Le profil GitHub frais : les faits d'avant le §18.125 n'ont pas la ville. Un appel REST, gratuit. */
 async function hints(login: string): Promise<GithubHints | null> {
   const res = await fetch(`https://api.github.com/users/${encodeURIComponent(login)}`, {
     headers: { accept: "application/vnd.github+json", "user-agent": "testyourskills", ...(tokens[0] ? { authorization: `Bearer ${tokens[0]}` } : {}) },

@@ -404,7 +404,7 @@ function profileOf(u: RestUser, social: unknown, defaultAvatar: boolean): Github
     blog: u.blog || null,
     socialAccounts,
     company: u.company,
-    // Sa ville : ce qui départage les homonymes de son LinkedIn (§18.124).
+    // Sa ville : ce qui départage les homonymes de son LinkedIn (§18.125).
     location: typeof u.location === "string" && u.location.trim() ? u.location.trim().slice(0, 120) : null,
     followers: u.followers,
     createdAt: u.created_at,

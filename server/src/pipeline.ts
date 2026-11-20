@@ -387,7 +387,7 @@ export interface PipelineOptions {
    */
   propose?: {
     github?: (person: PersonHints, signal: AbortSignal) => Promise<Proposal | null>;
-    /** Le LinkedIn d'un GitHub et sa force (§18.124) ; une proposition nue vaut l'ancienne règle (`strongLinkedin`). */
+    /** Le LinkedIn d'un GitHub et sa force (§18.125) ; une proposition nue vaut l'ancienne règle (`strongLinkedin`). */
     linkedin?: (gh: GithubHints, opts: { spend?: () => boolean; signal: AbortSignal }) => Promise<LinkedinMatch | Proposal | null>;
     /** Les comptes GitHub à ce nom, pas encore notés (§18.121) : la dénonciation les cherche dès son départ. */
     githubAccounts?: (name: string, signal: AbortSignal) => Promise<GithubFound | null>;
@@ -476,7 +476,7 @@ export interface JobInput {
    */
   match?: { name?: string };
   /**
-   * Le LinkedIn donné avec ce pseudo a été trouvé par le nom, en lien fort (§18.124) : l'entrée
+   * Le LinkedIn donné avec ce pseudo a été trouvé par le nom, en lien fort (§18.125) : l'entrée
    * GitHub connectée qui l'a montré (« J'ai trouvé ton LinkedIn »), ou le rattrapage des fiches du
    * top. Posé par le serveur seul, jamais par le corps d'une requête. Le dossier est prouvé
    * `"match"` si le profil lu porte le nom du GitHub.
@@ -973,7 +973,7 @@ export class Pipeline {
     const finder = !pdf ? this.opts.linkedin : undefined;
     const slow = linkedinSlow(ctx);
     // Fiche GitHub, faite pour soi ou dénoncée, dont rien n'a donné le LinkedIn (§18.100, §18.121,
-    // §18.124) : il se cherche par le nom, une recherche, pendant la collecte. Fort : lu et attaché,
+    // §18.125) : il se cherche par le nom, une recherche, pendant la collecte. Fort : lu et attaché,
     // prouvé « match ». À vérifier : le premier homonyme sans poste est lu (une lecture payée, en
     // cache, sous la limite de l'IP) et attaché s'il nomme son école ou son employeur. Moyen :
     // proposé sous la fiche (« C'est ton LinkedIn ? »). Faible : rien.
@@ -1115,7 +1115,7 @@ export class Pipeline {
     // jamais devant la fiche GitHub du pseudo et n'entre pas au top (§18.24).
     const vouchedLink = !!vouched && linkedinAsked === vouched.linkedinUrl;
     // La correspondance d'une dénonciation (§18.121) : son nom et un employeur ou une école en commun.
-    // Le LinkedIn donné avec le pseudo, trouvé par le nom en lien fort (§18.124) : le profil lu porte le nom du GitHub.
+    // Le LinkedIn donné avec le pseudo, trouvé par le nom en lien fort (§18.125) : le profil lu porte le nom du GitHub.
     const givenMatch =
       !!input.linkedinMatch && !!li && !!linkedinUrl && !!input.linkedinUrl && normalizeLinkedinUrl(linkedinUrl) === normalizeLinkedinUrl(input.linkedinUrl) && samePublicFullName(li.profile.name, githubDeclaredOf(gh.facts)?.name);
     const matchProof = !!linkedinUrl && ((!!matchedLogin && login === matchedLogin) || (!!matchedUrl && normalizeLinkedinUrl(linkedinUrl) === matchedUrl) || givenMatch) ? ("match" as const) : null;

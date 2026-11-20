@@ -140,7 +140,7 @@ export function mountGithubEnter(app: Hono, o: GithubEnterOptions): GithubEnterK
     const m = find ? await within(find.p, FIND_BUDGET_MS + 200) : null;
     const found = m?.proposal ?? null;
     // Retenu pour son compte : la fiche lancée avec ce LinkedIn est la sienne, le lien va au registre ;
-    // un lien fort (§18.124) rend le dossier prouvé « match ».
+    // un lien fort (§18.125) rend le dossier prouvé « match ».
     if (found && account) asked.set(account.id, { login: login.toLowerCase(), url: found.url, sure: found.sure, strong: m!.strength === "strong", exp: Date.now() + LOGIN_TTL_MS });
     return c.json({ signedIn: true, login, ...(found ? { found: shown(found) } : {}) });
   });

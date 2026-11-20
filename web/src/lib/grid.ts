@@ -225,7 +225,7 @@ export interface FinalLines {
 
 /**
  * La ligne finale : la note sur 100 tirée des huit critères, et la règle qui a
- * joué. Aucun « + n ». `unprovenCase` : la note du dossier face à un GitHub
+ * joué. Aucun « + n », sauf la preuve du dossier (0.8.0), dite en une ligne. `unprovenCase` : la note du dossier face à un GitHub
  * « dossier vide » — la règle dit que le code n'est pas prouvé, sur quoi la
  * note se fait, et ce qui la changerait (les critères qu'un projet public ouvre).
  */
@@ -241,14 +241,17 @@ export function finalLines(grid: Grid, g: G, lang: Lang, unprovenCase?: { src: s
   for (const why of ["unproven", "missing", "below"] as const) {
     const names = m.excluded.filter((x) => x.why === why && x.code !== "EDU").map((x) => g.names[x.code]);
     if (!names.length) continue;
-    out.push(F.outList(F.out[why], names.join(", ")) + (why === "below" ? ` ${F.belowWhy}` : ""));
+    // Au dossier, ce que seul GitHub montre ne compte que s'il fait monter la note (0.8.0, SPEC §18.124).
+    const githubBelow = why === "below" && m.excluded.some((x) => x.why === "below" && x.code !== "OSS" && x.code !== "EDU");
+    out.push(F.outList(F.out[why], names.join(", ")) + (why === "below" ? ` ${githubBelow ? F.belowWhyCase : F.belowWhy}` : ""));
   }
   const edu = grid.criteria.find((c) => c.code === "EDU");
   if (edu && schoolState(edu) === "out") out.push(F.schoolOut(g.names.EDU));
   // Le plafond de la grille (85 sous 0.5.0, 80 depuis). Ni la moyenne ni le calcul ne s'impriment :
   // la note porte un petit aléa de la fiche (§18.106) que le site ne dit pas.
   const cap = m.capHit ? m.cap : GRID_CAP_UNPROVEN;
-  let rule = m.rule === "capped_unproven" ? F.capped(cap) : null;
+  // La preuve du dossier (0.8.0) : dite, comme le plafond, en une ligne.
+  let rule = m.rule === "capped_unproven" ? F.capped(cap) : grid.githubBonus ? F.githubBonus(grid.githubBonus) : null;
   if (unprovenCase && m.rule === "capped_unproven") {
     const opens = F.opensList(m.excluded.filter((x) => x.why === "unproven").map((x) => g.names[x.code]));
     rule = (unprovenCase.shared ? F.caseUnprovenThem : F.caseUnproven)(unprovenCase.src, opens, cap);

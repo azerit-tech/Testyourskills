@@ -768,6 +768,10 @@ const fr = frTypoDeep({
       },
       outList: (label: string, names: string) => `${label} : ${names}.`,
       belowWhy: "L'open source ne fait jamais baisser la note.",
+      /** Au dossier (0.8.0) : ce que seul GitHub montre ne compte que s'il fait monter la note. */
+      belowWhyCase: "Au dossier, GitHub ne fait jamais baisser la note.",
+      /** La preuve du dossier (0.8.0, SPEC §18.124). */
+      githubBonus: (n: number) => `GitHub prouvé et actif : +${n} sur la note.`,
       /** L'école hors moyenne : sa propre ligne, jamais « sous la moyenne des autres » (§18.52). */
       schoolOut: (name: string) => `Hors moyenne : ${name}. Une école ne fait jamais baisser la note.`,
       capped: (cap: number) => `Aucun code prouvé : la note s'arrête à ${cap}. Au-delà, ça se prouve sur GitHub.`,
@@ -1564,6 +1568,8 @@ const en: Dict = {
       },
       outList: (label: string, names: string) => `${label}: ${names}.`,
       belowWhy: "Open source never lowers the rating.",
+      belowWhyCase: "In a file, GitHub never lowers the rating.",
+      githubBonus: (n: number) => `Proven, active GitHub: +${n} on the rating.`,
       schoolOut: (name: string) => `Not averaged: ${name}. A school never lowers the rating.`,
       capped: (cap: number) => `No code proven: the rating stops at ${cap}. Beyond that, it is proven on GitHub.`,
       empty: "Empty sheet: under a quarter of the weights are scored. Floor rating: 20, one star.",

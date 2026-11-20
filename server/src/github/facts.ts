@@ -14,7 +14,7 @@ export interface GithubProfile {
   /** Comptes sociaux affichés (GET /users/{login}/social_accounts), dont LinkedIn (§18.24). */
   socialAccounts?: { provider: string; url: string }[];
   company: string | null;
-  /** Sa ville, telle que GitHub l'affiche ; absente des faits collectés avant le §18.124. */
+  /** Sa ville, telle que GitHub l'affiche ; absente des faits collectés avant le §18.125. */
   location?: string | null;
   followers: number;
   createdAt: string; // ISO

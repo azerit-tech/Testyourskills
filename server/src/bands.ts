@@ -13,7 +13,12 @@
 // toute autre fiche (§18.119) ; la revendication la relance (auth.ts). Elle ne remplace jamais une bande déjà tenue, ne
 // rouvre pas une ligue quittée (band_optouts), et ne prend rien à la limite par
 // IP. Un dossier à deux pièces est une seule personne : la nouvelle fiche reprend
-// l'entrée de la pièce qu'elle complète, avec les étoiles du dossier.
+// l'entrée de la pièce qu'elle complète, avec les étoiles du dossier, et celles des
+// fiches qu'il remplace (`superseded_by`, une fiche dénoncée comprise, §18.123).
+//
+// Une ligne par personne et par ligue (§18.123, `leagueRows`) : ne comptent ni une pièce,
+// ni une fiche remplacée par le dossier de sa personne, ni une deuxième fiche de la même
+// personne (même login GitHub ou même adresse LinkedIn), au score comme sur la page.
 //
 // À la main : seul le navigateur qui a créé la fiche (son jeton) ou la personne
 // connectée comme propriétaire change de bande ou en sort (une fiche née d'une
@@ -173,17 +178,65 @@ function labelOf(type: BandType, id: string, first: string): string {
   return companyAliasLabel(id) ?? (cleanCompanyLabel(first) || id);
 }
 
-function compute(db: Database.Database, type: BandType, now: number): Computed {
+/** Une entrée d'une ligue, avec ce qu'il faut pour savoir si elle compte. */
+export interface LeagueRow {
+  personKey: string;
+  id: string;
+  label: string;
+  stars: number;
+  joinedAt: number;
+  cardId: string;
+  /** Le login rangé avec l'entrée (en minuscules), null pour une fiche LinkedIn seule. */
+  memberLogin: string | null;
+  /** Le login de la personne : celui de l'entrée, sinon celui de la fiche, en minuscules. */
+  login: string | null;
+  /** La fiche porte la note d'un dossier à deux pièces. */
+  dossier: boolean;
+  /** L'adresse LinkedIn de la fiche, s'il y en a une. */
+  linkedinUrl: string | null;
+  /** Pourquoi elle ne compte pas : une pièce, une fiche remplacée, la même personne déjà comptée. */
+  out?: "piece" | "superseded" | "duplicate";
+}
+
+/**
+ * Les entrées d'une ligue (§18.123) : une ligne par personne. Ne comptent pas : une fiche sans
+ * lecture IA, expirée ou masquée (comme avant) ; une pièce de dossier ; une fiche remplacée par
+ * un dossier que sa personne a fait (`superseded_by`, la règle du top) ; une deuxième fiche de
+ * la même personne (même login GitHub ou même adresse LinkedIn) dans la ligue : son dossier
+ * d'abord, puis la plus étoilée, puis la plus ancienne. Les entrées qui ne comptent pas sont
+ * rendues avec leur raison (`out`), pour le nettoyage (nettoyageBandes.ts).
+ */
+export function leagueRows(db: Database.Database, type: BandType, now: number): LeagueRow[] {
   const rows = db
     .prepare(
-      `SELECT m.band_id AS id, m.label, m.stars, m.joined_at AS joinedAt
+      `SELECT m.person_key AS personKey, m.band_id AS id, m.label, m.stars, m.joined_at AS joinedAt, m.card_id AS cardId, m.login AS memberLogin,
+              LOWER(COALESCE(m.login, c.login)) AS login, c.kind = 'comparison' AS dossier,
+              COALESCE(json_extract(c.facts_json, '$.linkedinUrl'), json_extract(c.json, '$.linkedinUrl')) AS linkedinUrl,
+              CASE WHEN c.parent_id IS NOT NULL THEN 'piece'
+                   WHEN EXISTS (SELECT 1 FROM cards s WHERE s.id = c.superseded_by AND s.denounce_born = 0) THEN 'superseded'
+                   END AS out
        FROM band_members m JOIN cards c ON c.id = m.card_id
        WHERE m.kind = ? AND c.degraded = 0
          AND (c.expires_at IS NULL OR c.expires_at > ?)
          AND NOT EXISTS (SELECT 1 FROM owners o WHERE o.login = m.login AND o.hidden = 1)
-       ORDER BY m.band_id, m.stars DESC, m.joined_at ASC`,
+       ORDER BY dossier DESC, m.stars DESC, m.joined_at ASC, m.person_key ASC`,
     )
-    .all(type, now) as { id: string; label: string; stars: number; joinedAt: number }[];
+    .all(type, now) as (Omit<LeagueRow, "dossier" | "out"> & { dossier: number; out: LeagueRow["out"] | null })[];
+  const seen = new Set<string>();
+  return rows.map(({ dossier, out, ...r }) => {
+    const row: LeagueRow = { ...r, dossier: dossier === 1, ...(out ? { out } : {}) };
+    if (row.out) return row;
+    const ids = [`key:${r.personKey}`, ...(r.login ? [`gh:${r.login}`] : []), ...(typeof r.linkedinUrl === "string" && r.linkedinUrl ? [`li:${r.linkedinUrl}`] : [])];
+    if (ids.some((x) => seen.has(x))) return { ...row, out: "duplicate" };
+    for (const x of ids) seen.add(x);
+    return row;
+  });
+}
+
+function compute(db: Database.Database, type: BandType, now: number): Computed {
+  const rows = leagueRows(db, type, now)
+    .filter((r) => !r.out)
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0) || b.stars - a.stars || a.joinedAt - b.joinedAt);
   const groups = new Map<string, { stars: number[]; first: { label: string; at: number } }>();
   for (const r of rows) {
     let g = groups.get(r.id);
@@ -301,17 +354,11 @@ export function bandsTop(db: Database.Database, now = Date.now(), mine: Partial<
  * fiche (§18.88), une fiche née d'une dénonciation comprise (§18.119).
  */
 function bandMembers(store: Store, type: BandType, id: string, now: number): BandMember[] {
-  const rows = store.db
-    .prepare(
-      `SELECT m.card_id AS cardId, m.login, m.stars
-       FROM band_members m JOIN cards c ON c.id = m.card_id
-       WHERE m.kind = ? AND m.band_id = ? AND c.degraded = 0
-         AND (c.expires_at IS NULL OR c.expires_at > ?)
-         AND NOT EXISTS (SELECT 1 FROM owners o WHERE o.login = m.login AND o.hidden = 1)
-       ORDER BY m.stars DESC, m.joined_at ASC
-       LIMIT ?`,
-    )
-    .all(type, id, now, BAND_PAGE_MEMBERS) as { cardId: string; login: string | null; stars: number }[];
+  // Une ligne par personne, comme le score de la bande (§18.123).
+  const rows = leagueRows(store.db, type, now)
+    .filter((r) => !r.out && r.id === id)
+    .sort((a, b) => b.stars - a.stars || a.joinedAt - b.joinedAt)
+    .slice(0, BAND_PAGE_MEMBERS);
   return rows.map((r) => {
     const row = store.getCard(r.cardId);
     const card = row ? mainCard(row) : null;
@@ -319,7 +366,7 @@ function bandMembers(store: Store, type: BandType, id: string, now: number): Ban
     // Le poste, déjà sur la fiche publique : deux dossiers du même profil ne se lisent plus comme un doublon.
     const position = card?.position;
     const root = row ? rootOf(store, row) : null;
-    const login = r.login ?? (root ? store.loginOf(root) : null);
+    const login = r.memberLogin ?? (root ? store.loginOf(root) : null);
     // Son LinkedIn (§18.108), revendiquée ou non : ce ne sont que des données publiques.
     const linkedinUrl = root ? linkedinOf(root) : null;
     return { stars: r.stars, profile, ...(position ? { position } : {}), ...(card && root ? boardPerson(card, r.cardId, login, linkedinUrl) : {}) };
@@ -478,6 +525,37 @@ function adoptKey(db: Database.Database, from: string, to: string): void {
   }
 }
 
+/**
+ * Les fiches que ce dossier remplace (`superseded_by` : son dossier prouvé, « Ajoute ton GitHub »,
+ * une fiche née d'une dénonciation comprise) : leurs entrées et leurs sorties passent sous sa
+ * personne, la sienne gardée si elle en a une, et rapportent ses étoiles (§18.123). Rien pour un
+ * dossier né d'une dénonciation : il ne prend pas la place de la fiche que la personne a faite
+ * (db.ts, fileRow). Rend le nombre de lignes touchées, 0 s'il n'y avait rien à faire. Idempotent.
+ */
+export function adoptSuperseded(store: Store, root: CardRow, now = Date.now()): number {
+  if (root.parentId || root.denounceBorn || !counts(root, now)) return 0;
+  const key = personKey(store, root);
+  const ids = (store.db.prepare(`SELECT id FROM cards WHERE superseded_by = ? AND parent_id IS NULL`).all(root.id) as { id: string }[]).map((r) => r.id);
+  if (!ids.length) return 0;
+  let n = 0;
+  for (const id of ids) {
+    const old = store.getCard(id);
+    const k = old ? personKey(store, old) : null;
+    if (!k || k === key) continue;
+    const held = store.db.prepare(`SELECT (SELECT COUNT(*) FROM band_members WHERE person_key = ?) + (SELECT COUNT(*) FROM band_optouts WHERE person_key = ?) AS n`).get(k, k) as { n: number };
+    if (!held.n) continue;
+    adoptKey(store.db, k, key);
+    n += held.n;
+  }
+  // Une entrée reprise rapporte les étoiles du dossier, pas celles de la fiche remplacée.
+  const marks = ids.map(() => "?").join(", ");
+  const r = store.db
+    .prepare(`UPDATE band_members SET card_id = ?, stars = ?, login = ? WHERE person_key = ? AND card_id IN (${marks})`)
+    .run(root.id, starsOfRow(root), store.loginOf(root)?.toLowerCase() ?? null, key, ...ids);
+  if (n || r.changes) forgetBands(store.db);
+  return n + r.changes;
+}
+
 export interface AutoJoinOptions {
   now?: number;
   /**
@@ -518,6 +596,7 @@ export function autoJoinBands(store: Store, row: CardRow, o: AutoJoinOptions = {
     const old = personKey(store, from);
     if (old !== key) adoptKey(store.db, old, key);
   }
+  adoptSuperseded(store, root, now);
 
   const suggest = suggestions(root);
   const stars = starsOfRow(root);

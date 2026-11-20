@@ -27,6 +27,8 @@
     "_curveDoc": "0.7.0 (SPEC §18.117) : la moyenne pondérée des critères (sur 100) passe par cette courbe, points [moyenne, note], interpolation linéaire, avant le plafond et les bornes. Le milieu des tables de son niveau (5 sur 10 : de vrais petits projets, un stage, une école) se lit 4 étoiles, pas 3 : de 35 à 55 la note monte plus vite que la moyenne, de 55 à 77 moins vite, et à partir de 77 elle est la moyenne. Un dossier presque vide (moins de 35) et un dossier fort (77 et plus) ne bougent pas.",
     "curve": [[0, 0], [35, 35], [55, 67], [77, 77], [100, 100]],
     "_floorsDoc": "0.7.0 : au début de carrière et au junior, un critère compté ne descend pas sous ce plancher : à ce niveau, un signal absent (aucune semaine active, aucune PR) ne vaut pas 0. Les niveaux absents de la liste gardent leurs tables telles quelles.",
+    "_githubBonusDoc": "0.8.0 (SPEC §18.124) : au dossier, un GitHub prouvé (code lu) et actif (activité lue au moins minActLevel avant la preuve : 13 semaines actives sur 52) ajoute à la note, après la courbe, la moitié de sa moyenne (stack, code, activité, ownership, preuve comprise), bornée de min à max points. Seulement quand LinkedIn ou le CV porte déjà un critère compté : la preuve s'ajoute à l'expérience.",
+    "githubBonus": { "minActLevel": 4, "min": 3, "max": 5 },
     "floors": { "student": 2, "junior": 2 }
   },
 

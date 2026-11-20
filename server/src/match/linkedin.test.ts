@@ -70,7 +70,7 @@ describe("findLinkedinFor", () => {
   });
 });
 
-// --- Le jugement (§18.124) : nom exact, puis école ou employeur, ville, pseudo, nom rare -------
+// --- Le jugement (§18.125) : nom exact, puis école ou employeur, ville, pseudo, nom rare -------
 
 describe("judgeLinkedin", () => {
   /** Ce que Brave rendait le 20 novembre 2026 pour `site:linkedin.com/in "Enzo Le Van"` (le titre, l'extrait coupé). */

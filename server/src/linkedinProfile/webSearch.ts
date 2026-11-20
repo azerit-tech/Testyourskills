@@ -322,7 +322,7 @@ export interface PeopleQuery {
   strict: boolean;
   /**
    * Avec un nom exact : une seule requête, le nom seul (`site:linkedin.com/in "Nom"`), dont
-   * l'appelant juge lui-même les extraits (le LinkedIn d'un GitHub, §18.124). Mesuré : une
+   * l'appelant juge lui-même les extraits (le LinkedIn d'un GitHub, §18.125). Mesuré : une
    * école de plusieurs mots ajoutée au nom vide la page de Brave.
    */
   nameOnly?: boolean;
@@ -395,7 +395,7 @@ export class WebPeopleSearch implements PeopleSearchProvider {
         // Le nom doit être celui du profil (son titre ou son adresse), pas un nom cité dans l'extrait d'un autre.
         if (!samePublicFullName(name.full, c.name) && !nameInUrl(name.full, c.url)) continue;
         const prev = best.get(c.url);
-        // L'extrait, pour qui juge lui-même (§18.124) : l'école, l'employeur, le lieu qu'il nomme.
+        // L'extrait, pour qui juge lui-même (§18.125) : l'école, l'employeur, le lieu qu'il nomme.
         const snippet = plain(hit.description).slice(0, 300);
         if (!prev || score > prev.score) best.set(c.url, { ...c, score, ...(snippet ? { snippet } : {}) });
       }

@@ -247,7 +247,7 @@ describe("dénonciation par GitHub : le LinkedIn trouvé d'office", () => {
     expect(row).toMatchObject({ kind: "card", source: "github" });
   });
 
-  // §18.124 : la même correspondance pour la fiche faite pour soi, et sa force dite par le chercheur.
+  // §18.125 : la même correspondance pour la fiche faite pour soi, et sa force dite par le chercheur.
   const proposal = { kind: "linkedin" as const, url: CAMILLE_URL, name: "Camille Ardent", headline: "Paris", sure: false };
 
   it("sa propre fiche GitHub, un lien fort (nom rare, même ville) : lu et attaché, prouvé « match »", async () => {
