@@ -26,7 +26,7 @@ describe("connexion = compte", () => {
     // Le nom et une copie de la photo sont gardés depuis le §18.105 ; jamais le sub, l'email ni l'adresse signée de LinkedIn.
     const dump = JSON.stringify(ctx.store.db.prepare(`SELECT * FROM accounts`).all());
     for (const secretBit of [SUB, EMAIL, PICTURE]) expect(dump).not.toContain(secretBit);
-    expect(await me(ctx, jar)).toEqual({ login: null, hidden: false, cardId: null, cardLogin: null, overall: null, avatarUrl: null, initial: null, sources: ["linkedin"] });
+    expect(await me(ctx, jar)).toEqual({ login: null, hidden: false, cardId: null, cardLogin: null, cardLinkedin: false, overall: null, avatarUrl: null, initial: null, sources: ["linkedin"] });
   });
 
   it("LinkedIn : la fiche lancée par l'entrée connectée va au compte ; revenir mène droit dessus, sans recherche ni calcul", async () => {
@@ -35,7 +35,8 @@ describe("connexion = compte", () => {
     const { json, status } = await linkedinCard(ctx, first.jar);
     expect(status).toBe(202);
     expect(rows(ctx)[0]!.card_id).toBe(json.id);
-    expect(await me(ctx, first.jar)).toMatchObject({ cardId: json.id, initial: expect.any(String), sources: ["linkedin"] });
+    // Son LinkedIn est sur sa fiche : il ne lui est plus proposé (§18.111).
+    expect(await me(ctx, first.jar)).toMatchObject({ cardId: json.id, cardLinkedin: true, initial: expect.any(String), sources: ["linkedin"] });
 
     // Un autre téléphone, sans rien : la même personne retrouve le même compte, et sa fiche.
     const searches = ctx.calls.byName.length;

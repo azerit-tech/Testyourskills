@@ -147,6 +147,15 @@ export interface GithubSuggestion {
   avatarUrl: string;
 }
 
+/**
+ * Avant de juger (§18.111) : au retour de LinkedIn, son GitHub est demandé, pour que la
+ * première fiche soit le dossier LinkedIn + GitHub. `candidate` : le compte que la
+ * recherche a trouvé (« C'est ton GitHub ? ») ; null : « Ajoute ton GitHub », un champ.
+ */
+export interface GithubAsk {
+  candidate: GithubSuggestion | null;
+}
+
 /** Frappes minimales avant une recherche, et délai après la dernière frappe (ms). */
 export const SUGGEST_MIN_CHARS = 3;
 export const SUGGEST_DEBOUNCE_MS = 400;

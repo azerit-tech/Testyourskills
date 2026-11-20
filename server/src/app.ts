@@ -121,6 +121,8 @@ export interface AppOptions {
   githubIdentity?: LinkedinEnterOptions["resolveGithub"];
   samePhoto?: LinkedinEnterOptions["samePhoto"];
   samePhotoBytes?: LinkedinEnterOptions["samePhotoBytes"];
+  /** Les comptes GitHub à un nom, avant le jugement (§18.111). Absent : la vraie recherche (match/github.ts). */
+  githubAccounts?: LinkedinEnterOptions["githubAccounts"];
   /** Attente d'une demande de /api/entry/linkedin avant « pending » (tests). */
   entryPollWaitMs?: number;
   /** La trace du film (FILM_TRACE=1, filmTrace.ts) : le fichier où l'écrire. Absent : pas de route. */
@@ -431,6 +433,11 @@ export function createApp(opts: AppOptions) {
           namesakes: opts.registry ? (name) => opts.registry!.namesakes(name) : undefined,
           profileOfEmail: opts.registry ? (email) => opts.registry!.linkedinOfEmail(email) : undefined,
           linkedinOfGithub: opts.registry ? (login) => opts.registry!.linkedinOf(login) : undefined,
+          // Son GitHub avant le jugement (§18.111) : celui que le registre relie à son profil n'est pas redemandé,
+          // et le profil se lit pendant la question (la fiche le trouve au cache).
+          githubAccounts: opts.githubAccounts,
+          githubOfLinkedin: opts.registry ? async (url) => (await opts.registry!.githubOf(url))?.login ?? null : undefined,
+          warmProfile: (url, ip) => opts.linkedinProfiles!.warm?.(url, { spend: () => limiter.take("linkedin", ip, PAID_CALLS_PER_IP) }),
         })
       : null;
 
@@ -671,6 +678,8 @@ export function createApp(opts: AppOptions) {
       // La fiche que celle-ci complète (« Ajoute ton GitHub », « Ajoute ton LinkedIn ») : ses bandes suivent (§18.82).
       let from: unknown;
       let linkedinUrl: string | undefined;
+      // « Je n'en ai pas » (§18.111) : sa fiche LinkedIn sort seule, sans GitHub proposé dessous.
+      let noGithub = false;
 
       if (ct.startsWith("multipart/form-data")) {
         const body = await c.req.parseBody();
@@ -704,6 +713,7 @@ export function createApp(opts: AppOptions) {
         ref = parseRef((raw as { ref?: unknown }).ref, store);
         denouncedBy = (raw as { denouncedBy?: unknown }).denouncedBy;
         from = (raw as { from?: unknown }).from;
+        noGithub = (raw as { noGithub?: unknown }).noGithub === true;
         // Entrée LinkedIn (§18.24) : une adresse de profil, rien d'autre.
         if (parsed.data.linkedin !== undefined) {
           linkedinUrl = normalizeLinkedinUrl(parsed.data.linkedin) ?? undefined;
@@ -753,9 +763,15 @@ export function createApp(opts: AppOptions) {
       // « Se connecter avec LinkedIn » (§18.80) : le profil lancé est celui de la personne
       // connectée (le profil sûr, ou l'un des homonymes proposés). Sa fiche reçoit le
       // GitHub retrouvé d'après son identité, et son email vérifié comme contact.
-      const who = linkedinUrl && !login && !pdf && !denounce ? (linkedinEnter?.identityFor(c, linkedinUrl) ?? null) : null;
+      // Avec un pseudo (§18.111) : son GitHub, donné ou confirmé avant le jugement ; le dossier LinkedIn + GitHub part
+      // d'emblée, avec son contact et son compte. « Je n'en ai pas » : le GitHub trouvé par le nom n'est pas attaché.
+      const signedIn = linkedinUrl && !pdf && !denounce ? (linkedinEnter?.identityFor(c, linkedinUrl) ?? null) : null;
+      const who = signedIn && (login || noGithub) && signedIn.github?.how !== "email" ? { ...signedIn, github: null } : signedIn;
       // Le registre de l'App (§18.95) : le lien que la connexion LinkedIn établit.
       if (who?.github && linkedinUrl) opts.registry?.recordLink({ login: who.github.login, url: linkedinUrl, ...signInSignal(who.profileHow, who.github.how) });
+      // « Oui » à « C'est ton GitHub ? » avant le jugement : le lien confirmé, comme sous une fiche (§18.100).
+      const saidYes = !!who && !!login && !!linkedinUrl && who.asked?.login.toLowerCase() === login.toLowerCase();
+      if (saidYes) opts.registry?.recordLink({ login: login!, url: linkedinUrl!, ...proposalSignal(who!.asked!.sure) });
       /** L'email de la personne connectée, posé sur sa fiche dès qu'elle existe ; jamais sur une fiche qui en porte déjà un. */
       const lead = (id: string) => {
         if (!denounce) linkedinEnter?.rememberCard(c, id, linkedinUrl, !!who);
@@ -764,8 +780,12 @@ export function createApp(opts: AppOptions) {
         // La fiche de l'entrée connectée va à son compte (§18.91).
         const accountId = who?.accountId;
         if (!email && !accountId) return;
-        // Le profil qu'elle vient de lancer : son compte le retient, pour ne plus la renvoyer chez LinkedIn (§18.105).
-        if (accountId && linkedinUrl && who) account?.rememberProfile(accountId, { url: linkedinUrl, how: who.profileHow, github: who.github });
+        // Le profil qu'elle vient de lancer : son compte le retient, pour ne plus la renvoyer chez LinkedIn (§18.105),
+        // avec le GitHub qu'elle a donné ou son « Je n'en ai pas » (§18.111).
+        if (accountId && linkedinUrl && who) {
+          const github = login ? { login, how: "name" as const } : who.github;
+          account?.rememberProfile(accountId, { url: linkedinUrl, how: who.profileHow, github, noGithub: noGithub && !login });
+        }
         const tie = () => {
           const row = store.getCard(id);
           if (!row) return;
@@ -874,8 +894,9 @@ export function createApp(opts: AppOptions) {
         linkedinSpend: () => limiter.take("linkedin", ip, PAID_CALLS_PER_IP),
         ...(who?.github ? { identity: { githubLogin: who.github.login, how: who.github.how, sureProfile: who.sureProfile } } : {}),
         ...(who?.picture ? { photo: who.picture } : {}),
-        // Sa propre fiche, jamais une dénonciation : l'autre source se cherche pour la lui proposer (§18.100).
-        ...(!denounce && !pdf ? { propose: true, searchSpend: () => limiter.take("li-search", ip, SEARCHES_PER_IP) } : {}),
+        // Sa propre fiche, jamais une dénonciation : l'autre source se cherche pour la lui proposer (§18.100) ;
+        // jamais après « Je n'en ai pas » (§18.111).
+        ...(!denounce && !pdf && !noGithub ? { propose: true, searchSpend: () => limiter.take("li-search", ip, SEARCHES_PER_IP) } : {}),
         ...(shownBefore ? { colorway: colorwayOf(shownBefore) } : {}),
       });
       denounced(id, true);

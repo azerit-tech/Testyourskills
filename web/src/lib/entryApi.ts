@@ -2,7 +2,7 @@
 // les deux connexions (« Se connecter avec LinkedIn », « Se connecter avec GitHub »).
 // Aucune de ces fonctions ne lève : au moindre doute, une liste vide, et le
 // champ reste celui où un lien ou un pseudo se tape.
-import type { GithubSuggestion, LinkedinSuggestion } from "../../../shared/entry";
+import type { GithubAsk, GithubSuggestion, LinkedinSuggestion } from "../../../shared/entry";
 import { api, isMock } from "./api";
 import { fileOf } from "../../../shared/caseFile";
 import { loadAccount, mockSignIn, resetAccount } from "./account";
@@ -22,6 +22,8 @@ const MOCK_ACCOUNTS: GithubSuggestion[] = [
   { login: "leamartin-dev", name: "Léa M.", avatarUrl: "" },
 ];
 const mockDelay = () => new Promise((r) => setTimeout(r, 250));
+/** Le GitHub que la démo trouve à son nom (§18.111), comme la proposition sous une fiche (§18.100). */
+const MOCK_ASK: GithubAsk = { candidate: { login: "camroux", name: "Camille Roux", avatarUrl: "https://github.com/camroux.png?size=96" } };
 
 // --- Suggestions ----------------------------------------------------------------
 
@@ -102,8 +104,10 @@ export type ReturnPhase =
   | { s: "finding"; via: "linkedin" | "github"; since: number }
   /** Le profil est sûr : la fiche part. */
   | { s: "auto"; name: string; url: string }
-  /** Rien de sûr : « C'est toi ? ». */
-  | { s: "pick"; name: string; candidates: LinkedinSuggestion[] }
+  /** Le profil est le sien, son GitHub est à demander avant de juger (§18.111). */
+  | { s: "ask"; name: string; url: string; candidate: GithubSuggestion | null }
+  /** Rien de sûr : « C'est toi ? ». `ask` : son GitHub sera demandé après son choix. */
+  | { s: "pick"; name: string; candidates: LinkedinSuggestion[]; ask?: GithubAsk }
   /** GitHub a rendu le pseudo : la fiche part. */
   | { s: "github"; login: string }
   /** « none » : personne à ce nom, ou la recherche est en panne. « error » : la connexion n'a pas abouti. */
@@ -136,23 +140,36 @@ interface EntryAnswer {
   auto?: LinkedinSuggestion;
   candidates?: LinkedinSuggestion[];
   pending?: boolean;
+  ask?: GithubAsk;
+}
+
+/** La question lue telle quelle : un compte complet, ou aucun. */
+function askOf(a: GithubAsk | undefined): GithubAsk | undefined {
+  if (!a || typeof a !== "object") return undefined;
+  const c = a.candidate;
+  return { candidate: c && typeof c.login === "string" ? { login: c.login, name: typeof c.name === "string" ? c.name : null, avatarUrl: typeof c.avatarUrl === "string" ? c.avatarUrl : "" } : null };
 }
 
 /** Ce que le serveur a retrouvé, mis en phase. null : il cherche encore. */
 export function phaseOfAnswer(b: EntryAnswer | null): ReturnPhase | null {
   if (!b?.signedIn || typeof b.name !== "string") return { s: "lost", via: "linkedin", why: "error" };
   if (b.pending) return null;
-  if (b.auto?.url) return { s: "auto", name: b.auto.name || b.name, url: b.auto.url };
+  const ask = askOf(b.ask);
+  if (b.auto?.url) return ask ? { s: "ask", name: b.auto.name || b.name, url: b.auto.url, candidate: ask.candidate } : { s: "auto", name: b.auto.name || b.name, url: b.auto.url };
   const candidates = Array.isArray(b.candidates) ? b.candidates.filter((c) => c && typeof c.url === "string").slice(0, 3) : [];
-  return candidates.length ? { s: "pick", name: b.name, candidates } : { s: "lost", via: "linkedin", why: "none" };
+  return candidates.length ? { s: "pick", name: b.name, candidates, ...(ask ? { ask } : {}) } : { s: "lost", via: "linkedin", why: "none" };
 }
 
 async function findLinkedin(since: number, mock: string | null): Promise<ReturnPhase> {
   if (isMock()) {
     await new Promise((r) => setTimeout(r, mock === "slow" ? 60_000 : 1400));
     if (mock === "none") return { s: "lost", via: "linkedin", why: "none" };
-    if (mock === "auto") return { s: "auto", name: MOCK_PEOPLE[0]!.name, url: MOCK_PEOPLE[0]!.url };
-    return { s: "pick", name: "Léa Martin", candidates: MOCK_PEOPLE.slice(0, 3) };
+    // `auto` : son GitHub trouvé ; `nogh` : rien trouvé, le champ ; `known` : son GitHub déjà connu, la fiche part.
+    const me = MOCK_PEOPLE[0]!;
+    if (mock === "auto") return { s: "ask", name: me.name, url: me.url, candidate: MOCK_ASK.candidate };
+    if (mock === "nogh") return { s: "ask", name: me.name, url: me.url, candidate: null };
+    if (mock === "known") return { s: "auto", name: me.name, url: me.url };
+    return { s: "pick", name: "Léa Martin", candidates: MOCK_PEOPLE.slice(0, 3), ask: MOCK_ASK };
   }
   let misses = 0;
   while (Date.now() - since < FIND_GIVE_UP_MS) {
@@ -199,7 +216,7 @@ function begin(): void {
   const via = li !== null ? "linkedin" : "github";
   const value = li ?? gh;
   if (value === "cancel") return;
-  const mockOnly = isMock() && (value === "none" || value === "auto" || value === "slow");
+  const mockOnly = isMock() && (value === "none" || value === "auto" || value === "slow" || value === "nogh" || value === "known");
   if (value !== "1" && !mockOnly) {
     phase = { s: "lost", via, why: "error" };
     return;
@@ -224,6 +241,11 @@ export function subscribeReturn(listener: () => void): () => void {
 export function getReturn(): ReturnPhase | null {
   begin();
   return phase;
+}
+
+/** « C'est toi ? » : son profil choisi, son GitHub demandé avant de juger (§18.111). */
+export function askGithub(name: string, url: string, ask: GithubAsk): void {
+  setPhase({ s: "ask", name, url, candidate: ask.candidate });
 }
 
 /** Le formulaire a agi (la fiche part, « C'est toi ? » est fermé, la phrase est à l'écran) : le retour est consommé. */

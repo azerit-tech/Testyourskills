@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 interface World {
   lang?: "fr" | "en";
   /** Ce que la dernière visite a appris de /api/me (l'indice local du compte). */
-  account?: { cardId: string | null; sources: string[]; avatarUrl: string | null; initial: string | null; known?: boolean };
+  account?: { cardId: string | null; sources: string[]; avatarUrl: string | null; initial: string | null; known?: boolean; cardLogin?: string | null; cardLinkedin?: boolean };
   /** L'entrée ouverte par « Faire une autre fiche ». */
   another?: boolean;
   mine?: { id: string; login: string | null; overall: number };
@@ -96,6 +96,41 @@ describe("l'entrée connectée", () => {
       // Connecté par GitHub seul : le bouton LinkedIn reste, il ajoute LinkedIn au compte.
       expect(await render(which, { account: GH, another: true })).toContain("Se connecter avec LinkedIn");
     }
+  });
+
+  describe("une source déjà sur sa fiche n'est jamais reproposée (§18.111)", () => {
+    /** Connecté par LinkedIn, son dossier porte déjà son GitHub. */
+    const BOTH = { ...LI, cardLogin: "camroux", cardLinkedin: true };
+
+    it("l'accueil et « À ton tour » sous une fiche : « Voir ma fiche », aucune connexion", async () => {
+      for (const which of ["entry", "inline"] as const) {
+        const html = await render(which, { account: BOTH });
+        expect(html).toContain("Voir ma fiche");
+        expect(html).not.toContain("Se connecter avec");
+      }
+    });
+
+    it("« Faire une autre fiche » : ni LinkedIn ni GitHub, le champ d'emblée, sans « ← Se connecter »", async () => {
+      for (const which of ["entry", "inline"] as const) {
+        const html = await render(which, { account: BOTH, another: true });
+        expect(html).not.toContain("Se connecter avec");
+        expect(html).not.toContain("← Se connecter");
+        expect(html).not.toContain("entry-mine");
+        expect(html).toContain('placeholder="Lien LinkedIn, GitHub ou pseudo"');
+      }
+    });
+
+    it("connecté par GitHub, son LinkedIn déjà au dossier : « Se connecter avec LinkedIn » n'y est plus", async () => {
+      const html = await render("entry", { account: { ...GH, cardLogin: "leamd", cardLinkedin: true }, another: true });
+      expect(html).not.toContain("Se connecter avec");
+      // Sa fiche n'a que GitHub : LinkedIn reste proposé, il manque à son dossier.
+      expect(await render("entry", { account: { ...GH, cardLogin: "leamd" }, another: true })).toContain("Se connecter avec LinkedIn");
+      expect(await render("entry", { account: { ...GH, cardLogin: "leamd" }, another: true })).not.toContain("Se connecter avec GitHub");
+    });
+
+    it("la barre du haut : jamais un bouton de connexion", async () => {
+      expect(await render("topbar", { account: BOTH })).not.toContain("Se connecter avec");
+    });
   });
 
   it("pas connecté : « Se connecter avec LinkedIn » d'abord, en rose", async () => {

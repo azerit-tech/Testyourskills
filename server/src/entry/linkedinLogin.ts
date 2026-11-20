@@ -28,17 +28,25 @@
 // le navigateur a vidé sa mémoire. Ni email, ni photo, rien côté serveur. À côté,
 // `tys_known=1`, lisible par le front : il ne demande /api/entry/me que s'il est là.
 // Sa fiche supprimée, les deux cookies partent.
+//
+// Son GitHub avant le jugement (§18.111) : dès le retour de LinkedIn, les comptes
+// GitHub à son nom se cherchent (match/github.ts, un appel, deux secondes) en même
+// temps que son profil. Le profil trouvé, et sans GitHub déjà connu (l'email, le
+// registre de l'App, son compte), la réponse porte `ask` : le front demande
+// « C'est ton GitHub ? » (le compte trouvé) ou « Ajoute ton GitHub » avant de lancer
+// la fiche, et le profil LinkedIn se lit pendant la question.
 
 import { randomBytes } from "node:crypto";
 import type { Context, Hono } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
-import type { LinkedinSuggestion } from "../../../shared/entry";
+import type { GithubAsk, LinkedinSuggestion } from "../../../shared/entry";
 import type { ProfilePeek } from "../linkedinProfile/index";
 import { confidenceFor } from "../linkedinProfile/webSearch";
 import { sign, unsign } from "../auth";
 import { resolveGithubIdentity, type GithubIdentity, type IdentityInput } from "../github/identity";
 import type { GithubAuth } from "../github/http";
 import { downloadPhoto, type LinkedinEnterHook, type OidcProfile } from "../linkedin";
+import { fetchGithubAccounts, pickGithub, type GithubFound, type GithubProposal } from "../match/github";
 import { mergeCandidates, PERSONAL_MAIL_RE, SEARCHES_PER_IP, type LinkedinCandidate, type LinkedinPeople } from "../linkedinProfile/search";
 import { isProven, type Namesake } from "../registry/index";
 import { nameWords, samePublicFullName } from "../names";
@@ -67,6 +75,8 @@ export const POLL_WAIT_MS = 20_000;
 export const GITHUB_PROOF_WAIT_MS = 2500;
 /** Au-delà (l'index lent a 90 s), la recherche est dite en panne. */
 export const RESOLVE_MAX_MS = 100_000;
+/** Le registre de l'App est attendu ce temps-là pour dire le GitHub d'un profil (§18.111). */
+const REGISTRY_WAIT_MS = 800;
 const SESSIONS_MAX = 5000;
 
 /** Ce que la recherche a établi pour une personne connectée. */
@@ -83,6 +93,8 @@ export interface Resolution {
   github: GithubIdentity | null;
   /** La recherche n'a pas pu se faire (plafond, panne) : le champ redevient un lien à coller. */
   off: boolean;
+  /** Son GitHub est à demander avant le jugement (§18.111) ; absent : il est connu, ou rien n'est à juger. */
+  ask?: { candidate: GithubProposal | null };
 }
 
 interface Session {
@@ -123,6 +135,8 @@ export interface EntryIdentity {
   accountId?: string;
   /** La photo que LinkedIn vient de rendre (§18.99) : la photo de sa fiche, d'office. */
   picture?: string;
+  /** Le compte que « C'est ton GitHub ? » lui a proposé avant le jugement (§18.111), sinon null. */
+  asked: GithubProposal | null;
 }
 
 export interface LinkedinEnterOptions {
@@ -150,6 +164,12 @@ export interface LinkedinEnterOptions {
   profileOfEmail?: (email: string) => Promise<string | null>;
   /** Le LinkedIn que l'App relie à ce GitHub, avec la force du lien (§18.95). */
   linkedinOfGithub?: (login: string) => Promise<{ url: string; strength: number } | null>;
+  /** Les comptes GitHub à ce nom (§18.111) ; absent : la vraie recherche (match/github.ts). */
+  githubAccounts?: (name: string) => Promise<GithubFound | null>;
+  /** Le GitHub que le registre de l'App relie à ce profil (§18.95) : connu, il est pris sans rien demander. */
+  githubOfLinkedin?: (url: string) => Promise<string | null>;
+  /** Lit le profil pendant la question (§18.111) : la fiche qui part ensuite le trouve au cache. */
+  warmProfile?: (url: string, ip: string) => void;
   /** La fiche de qui s'est connecté : celle du cookie si elle existe encore, sinon la dernière de son profil. */
   knownCard?: (who: Who) => KnownCard | null;
   /** Attente d'une demande du front avant « pending » (les tests la raccourcissent). */
@@ -374,19 +394,60 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
 
   const failed = (): Resolution => ({ sure: null, how: null, candidates: [], github: null, off: true });
 
+  /** Les comptes GitHub à ce nom, cherchés dès le retour de LinkedIn ; jamais d'erreur. */
+  const accountsOf = (name: string): Promise<GithubFound | null> =>
+    (o.githubAccounts ?? ((n: string) => fetchGithubAccounts(o.github, n)))(name).catch(() => null);
+
+  /**
+   * Faut-il lui demander son GitHub avant de juger (§18.111) ? Non s'il n'y a rien à juger, ou si son
+   * GitHub est déjà connu : l'email (une preuve), le registre de l'App, son compte. Sinon le compte à
+   * proposer : celui que la connexion a trouvé par le nom, ou le seul assez proche (§18.100) ; null,
+   * un champ. Le profil sûr se lit pendant la question.
+   */
+  async function decide(r: Resolution, name: string, email: string | undefined, found: Promise<GithubFound | null>, ip: string): Promise<Resolution> {
+    if (r.off || (!r.sure && !r.candidates.length) || r.github?.how === "email") return r;
+    const url = r.sure?.url ?? "";
+    if (url && o.githubOfLinkedin) {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const known = await Promise.race([o.githubOfLinkedin(url).catch(() => null), new Promise<null>((res) => (timer = setTimeout(() => res(null), REGISTRY_WAIT_MS)))]);
+      clearTimeout(timer);
+      if (known) return r;
+    }
+    if (url) o.warmProfile?.(url, ip);
+    const accounts = await found;
+    let candidate: GithubProposal | null;
+    if (r.github) {
+      // Le seul compte à son nom complet (§18.80) : on lui demande au lieu de l'attacher.
+      const gh = r.github;
+      const a = accounts?.accounts.find((x) => x.login.toLowerCase() === gh.login.toLowerCase());
+      candidate = { kind: "github", login: gh.login, name: a?.name ?? null, avatarUrl: a?.avatarUrl || `https://github.com/${gh.login}.png?size=96`, sure: false };
+    } else {
+      const employer = employerFromEmail(email, name);
+      const companies = [employer, r.sure?.headline].filter((x): x is string => !!x);
+      candidate = accounts ? pickGithub({ name, url, companies }, accounts.accounts, accounts.namesakes) : null;
+    }
+    return { ...r, ask: { candidate } };
+  }
+
   const hook: LinkedinEnterHook = {
     allow: (c) => o.limiter.take("li-enter", clientIp(c), ENTER_STARTS_PER_DAY),
     finish(c, returnPath, profile, accountId) {
       sweep();
       const id = randomBytes(18).toString("base64url");
       const who = { ...profile, name: profile.name ?? "" };
+      const ip = clientIp(c);
+      // Ses comptes GitHub se cherchent en même temps que son profil (§18.111).
+      const accounts = accountsOf(who.name);
       const session: Session = {
         name: who.name,
         email: profile.email,
         picture: profile.picture,
         exp: now() + ENTER_TTL_MS,
         // La recherche part tout de suite : elle tourne pendant que la page se recharge.
-        resolving: Promise.race([resolve(who, clientIp(c)), new Promise<Resolution>((res) => setTimeout(() => res(failed()), RESOLVE_MAX_MS).unref?.())]).catch(failed),
+        resolving: Promise.race([
+          resolve(who, ip).then((r) => decide(r, who.name, who.email, accounts, ip)),
+          new Promise<Resolution>((res) => setTimeout(() => res(failed()), RESOLVE_MAX_MS).unref?.()),
+        ]).catch(failed),
         ...(accountId ? { accountId } : {}),
       };
       void session.resolving.then((r) => (session.resolved = r));
@@ -409,14 +470,17 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
         github: memo.github ?? null,
         off: false,
       };
+      // Son GitHub ni connu ni refusé : demandé avant de refaire sa fiche (§18.111).
+      const asking = !memo.github && !memo.noGithub;
       const session: Session = {
         name,
         exp: now() + ENTER_TTL_MS,
-        resolving: Promise.resolve(resolved),
-        resolved,
+        resolving: asking ? decide(resolved, name, undefined, accountsOf(name), clientIp(c)).catch(() => resolved) : Promise.resolve(resolved),
+        ...(asking ? {} : { resolved }),
         accountId: memo.accountId,
         ...(memo.photo ? { picture: memo.photo } : {}),
       };
+      if (asking) void session.resolving.then((r) => (session.resolved = r));
       sessions.set(id, session);
       setCookie(c, ENTER_COOKIE, sign(secret, "enter", { i: id, e: session.exp }), { ...cookieBase, maxAge: ENTER_TTL_MS / 1000 });
       remember(c, { name, url: memo.url }, true);
@@ -442,12 +506,14 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
     if (!r) return c.json({ signedIn: true, name: session.name, candidates: [], pending: true });
     // Le profil est sûr : le navigateur s'en souvient, sa fiche se retrouvera sans nouvelle connexion.
     if (r.sure) remember(c, { name: session.name, url: r.sure.url });
+    const ask: GithubAsk | null = r.ask ? { candidate: r.ask.candidate ? { login: r.ask.candidate.login, name: r.ask.candidate.name, avatarUrl: r.ask.candidate.avatarUrl } : null } : null;
     return c.json({
       signedIn: true,
       name: session.name,
       ...(r.sure ? { auto: show(r.sure) } : {}),
       candidates: r.sure ? [] : r.candidates.map(show),
       ...(r.off ? { off: true } : {}),
+      ...(ask ? { ask } : {}),
     });
   });
 
@@ -478,6 +544,7 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
       profileHow: sure && r.how ? r.how : "picked",
       ...(found.session.accountId ? { accountId: found.session.accountId } : {}),
       ...(found.session.picture ? { picture: found.session.picture } : {}),
+      asked: r.ask?.candidate ?? null,
       used() {
         sessions.delete(found.id);
         deleteCookie(c, ENTER_COOKIE, cookieBase);

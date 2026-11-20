@@ -434,3 +434,24 @@ describe("profil → texte, et « CV » devient « LinkedIn »", () => {
     expect(en("résuméd")).toBe("résuméd");
   });
 });
+
+describe("la lecture d'avance (§18.111)", () => {
+  it("lu pendant la question : la fiche qui le demande ensuite l'attend, une seule lecture payée", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const t = setup(async (u) => {
+      await gate;
+      return { profile: profile(u), githubLogin: null, githubChecked: true };
+    });
+    const spend = vi.fn(() => true);
+    t.finder.warm("https://linkedin.com/in/Camille-Ardent/", { spend });
+    t.finder.warm(CAMILLE, { spend });
+    const byUrl = t.finder.forUrl(CAMILLE);
+    const byGithub = t.finder.forGithub(facts(), { url: CAMILLE });
+    release();
+    expect((await byUrl).status).toBe("found");
+    expect((await byGithub)?.profile.name).toBe("Camille Ardent");
+    expect(t.calls).toHaveLength(1);
+    expect(spend).toHaveBeenCalledTimes(1);
+  });
+});
