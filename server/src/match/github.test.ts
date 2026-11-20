@@ -5,7 +5,7 @@
 // son site azerit.tech), puis des homonymes inventés.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { buildQuery, findGithubFor, loginsFromName, pickGithub, scoreGithub, type GithubAccount, type PersonHints } from "./github";
+import { buildQuery, findGithubFor, loginsFromName, matchGithub, nameFromSlug, pickGithub, scoreGithub, type GithubAccount, type PersonHints } from "./github";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -170,5 +170,26 @@ describe("findGithubFor", () => {
     });
     vi.spyOn(console, "warn").mockImplementation(() => {});
     expect(await findGithubFor("ghp_t", JACQUES)).toBeNull();
+  });
+});
+
+describe("matchGithub : le GitHub d'une personne dénoncée (§18.121)", () => {
+  it("son nom et son employeur : attaché ; son nom seul : proposé ; un autre nom : rien", () => {
+    expect(matchGithub(JACQUES, { accounts: [JMOUGEOT], namesakes: 0 }).strong?.login).toBe("jmougeot");
+    const nameOnly = matchGithub(JACQUES, { accounts: [acct("jacques-dev", { name: "Jacques Mougeot" })], namesakes: 1 });
+    expect(nameOnly).toMatchObject({ strong: null, weak: { login: "jacques-dev" } });
+    expect(matchGithub(JACQUES, { accounts: [acct("jmougeot", { name: "Julien Mougeot", websiteUrl: "https://azerit.tech" })], namesakes: 0 })).toEqual({ strong: null, weak: null });
+  });
+
+  it("son école vaut un employeur, pas les mots « École » ou « Université » seuls", () => {
+    const student = { ...JACQUES, companies: [], schools: ["Université Paris-Saclay"] };
+    expect(matchGithub(student, { accounts: [acct("jmougeot", { name: "Jacques", bio: "Student at Paris-Saclay" })], namesakes: 0 }).strong?.login).toBe("jmougeot");
+    expect(matchGithub(student, { accounts: [acct("jmougeot", { name: "Jacques", bio: "Université de Lyon" })], namesakes: 0 }).strong).toBeNull();
+  });
+
+  it("nameFromSlug : deux mots sans chiffres, sinon rien", () => {
+    expect(nameFromSlug("jean-dupont-4a5b6c7")).toBe("jean dupont");
+    expect(nameFromSlug("jacquesmougeot")).toBeNull();
+    expect(nameFromSlug("florent-delorme")).toBe("florent delorme");
   });
 });
