@@ -3,7 +3,37 @@
    aucune lueur, aucun dégradé (celui de la fiche suffit). Tailles, rayons et
    couleurs de rôle : les jetons de styles.css. Téléphone d'abord ; 44 px à toucher. */
 
-/* ---------- le bloc, premier sous le verdict (§18.83) ---------- */
+/* ---------- le bloc, premier sous le verdict (§18.83), en grand (§18.118) ---------- */
+
+/* un titre de page, pas de bloc : la dénonciation est le geste de la fiche */
+.after-block.denounce {
+  gap: 14px;
+}
+.after-block.denounce h2 {
+  font: var(--font-page);
+  font-size: clamp(2.25rem, 11vw, var(--t-44));
+}
+.after-block.denounce .denounce-intro {
+  font: 500 var(--t-16) / 1.4 var(--f-text);
+  color: var(--c-emphasis);
+}
+.denounce-form .field-input {
+  min-height: var(--h-main);
+}
+/* « Dénoncer », le rose du bloc ; dès qu'une fiche est prête, son envoi le prend et le bouton passe en contour */
+.denounce-form .denounce-go {
+  background: var(--c-action);
+  box-shadow: none;
+  color: var(--c-on-action);
+  font: 700 var(--t-22) / 1 var(--f-name);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.denounce.is-done .denounce-form .denounce-go {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--cream);
+  color: var(--cream);
+}
 
 .denounce-form {
   display: grid;
@@ -154,9 +184,9 @@
 .denounce-line > :not(.board-avatar, .denounce-line-who, .denounce-line-send) {
   grid-column: 1 / -1;
 }
-/* une fiche de complice prête à envoyer : son envoi est le rose de l'écran ; le partage, juste dessous
-   depuis le §18.83, passe en contour tant qu'elle est là (§18.48, un seul rose par écran) */
-.after-block.denounce.is-done ~ .after-block.out .out-main {
+/* « Dénoncer », puis l'envoi d'une fiche de complice prête, est le rose de l'écran ; le partage, juste
+   dessous depuis le §18.83, passe en contour (§18.48, un seul rose par écran ; §18.118) */
+.after-block.denounce ~ .after-block.out .out-main {
   background: transparent;
   box-shadow: inset 0 0 0 1.5px var(--cream);
   color: var(--cream);
@@ -228,6 +258,43 @@
   .denounced .pill {
     width: auto;
     justify-self: start;
+  }
+}
+
+/* « C'est bien moi » (§18.118) : le premier bloc sous la fiche, un bouton rose de toute la largeur,
+   en lettres de titre de page ; on ne peut pas le manquer. Une ligne dessous, puis les liens. */
+.denounced .denounced-me {
+  width: 100%;
+  min-height: 84px;
+  padding: 12px 20px;
+  gap: 14px;
+  border-radius: var(--r-item);
+  background: var(--c-action);
+  box-shadow: none;
+  color: var(--c-on-action);
+  font: 700 clamp(2.25rem, 11vw, var(--t-44)) / 0.95 var(--f-name);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.denounced .denounced-me svg {
+  width: 30px;
+  height: 30px;
+}
+.denounced-why {
+  margin: -2px 0 0;
+  font: 500 var(--t-16) / 1.35 var(--f-text);
+  color: var(--cream);
+  text-align: center;
+  text-wrap: balance;
+}
+.denounced .denounced-also,
+.denounced.has-claim .denounced-notme {
+  justify-self: center;
+}
+@media (min-width: 561px) {
+  .denounced .denounced-me {
+    width: 100%;
+    justify-self: stretch;
   }
 }
 

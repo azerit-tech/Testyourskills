@@ -201,7 +201,7 @@ describe("barre du pouce (§18.27)", () => {
     }
     // La barre s'efface aussi devant le bloc de la source, dont le bouton est le rose.
     // Et devant « Oui, ajoute-le » de la proposition sous la fiche (§18.100).
-    expect(readFileSync(join(__dirname, "ShareDock.tsx"), "utf8")).toContain('".after-block.out .out-main, .after-block.denounce .is-lead, .after-block.propose .propose-yes, .after-block.add-source .entry-submit"');
+    expect(readFileSync(join(__dirname, "ShareDock.tsx"), "utf8")).toContain('".after-block.out .out-main, .after-block.denounce .is-lead, .after-block.denounce .denounce-go, .after-block.propose .propose-yes, .after-block.add-source .entry-submit"');
   });
 
   it("pas pendant la révélation, pas sur ordinateur", () => {

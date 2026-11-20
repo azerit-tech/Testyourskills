@@ -414,6 +414,29 @@ describe("la fiche de la personne connectée", () => {
     expect(ctx.store.getCard(redone.json.id)?.email).toBe(EMAIL);
   });
 
+  it("« C'est bien moi » par LinkedIn (§18.118) : la fiche dénoncée devient la sienne, avec un jeton neuf", async () => {
+    const { ctx } = setup({ github: null });
+    const by = await postCard(ctx, { login: "moi" });
+    const denounced = await postCard(ctx, { linkedin: CAMILLE_URL, denouncedBy: by.json.id });
+    const before = ctx.store.getCard(denounced.json.id)!;
+    expect(before.denounceBorn).toBe(true);
+    // Un visiteur sans connexion qui relance le même lien : rien ne change.
+    const anon = await postCard(ctx, { linkedin: CAMILLE_URL });
+    expect(anon.json).toEqual({ id: denounced.json.id, cached: true });
+    expect(ctx.store.getCard(denounced.json.id)!.denounceBorn).toBe(true);
+
+    const { jar } = await signIn(ctx, `/c/${denounced.json.id}`);
+    expect((await entry(ctx, jar)).auto?.url).toBe(CAMILLE_URL);
+    const back = await postCard(ctx, { linkedin: CAMILLE_URL }, jar);
+    expect(back.status).toBe(200);
+    expect(back.json.id).toBe(denounced.json.id);
+    expect(typeof back.json.deleteToken).toBe("string");
+    const after = ctx.store.getCard(denounced.json.id)!;
+    expect(after.denounceBorn).toBe(false);
+    expect(after.deleteToken).toBe(back.json.deleteToken);
+    expect(after.deleteToken).not.toBe(before.deleteToken);
+  });
+
   it("une dénonciation ne prend jamais l'identité de qui dénonce", async () => {
     const { ctx } = setup();
     const mine = await postCard(ctx, { login: "moi" });

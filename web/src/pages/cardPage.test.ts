@@ -549,25 +549,25 @@ describe("ligne repliée", () => {
 });
 
 describe("qui reçoit sa fiche : sa note d'abord, puis la vérifier soi-même (§18.104)", () => {
-  // Dénoncée par son lien LinkedIn : « Vérifie-la toi-même » la refait depuis ce lien.
+  // Dénoncée par son lien LinkedIn : « C'est bien moi » (§18.118) ; sans connexion LinkedIn, la refait depuis ce lien.
   const denounced = () => card({ id: "DenCard0001", login: undefined, name: "Maxime Bernard", linkedinUrl: "https://www.linkedin.com/in/maxime-bernard" });
   const kase = { denounced: true, by: "leamd", jury: null } as unknown as ResultProps["kase"];
   const mine = { id: "MyCard00001", login: "nour-rs", overall: 83 };
   // Le rose avant « À ton tour » (son formulaire, en fin de page sur téléphone, a le sien).
-  const pinks = (html: string) => [...html.slice(0, html.indexOf('id="you"') >>> 0).matchAll(/<(?:button|a)[^>]*class="(?:pill pill-big|btn-primary)[^"]*"[^>]*>([^<]*)</g)].map((m) => m[1]);
+  const pinks = (html: string) => [...html.slice(0, html.indexOf('id="you"') >>> 0).matchAll(/<(?:button|a)[^>]*class="(?:pill pill-big|pill denounced-me|btn-primary)[^"]*"[^>]*>(?:<svg[^]*?<\/svg>)?(?:<span>)?([^<]*)</g)].map((m) => m[1]);
 
-  it("sans fiche dans ce navigateur : la fiche, puis « Vérifie-la toi-même », seul rose ; rien à envoyer", () => {
+  it("sans fiche dans ce navigateur : la fiche, puis « C'est bien moi », en grand, seul rose ; rien à envoyer", () => {
     const html = renderResult(denounced(), { owner: false, kase }).replace(/&#x27;/g, "'");
-    expect(ascending(at(html, ['class="result-stage"', 'class="denounced"', ">Vérifie-la toi-même<"]))).toBe(true);
-    expect(pinks(html)).toEqual(["Vérifie-la toi-même"]);
+    expect(ascending(at(html, ['class="result-stage"', 'class="denounced', ">C'est bien moi<", 'class="jury"']))).toBe(true);
+    expect(pinks(html)).toEqual(["C'est bien moi"]);
     expect(html).not.toContain("Lui envoyer ma note");
   });
 
   it("avec une autre fiche dans ce navigateur : le même rose ; le duel plus bas, l'écart seul, sans envoi", () => {
     const html = renderResult(denounced(), { owner: false, kase, mine }).replace(/&#x27;/g, "'").replace(/\u00a0/g, " ");
-    expect(pinks(html)).toEqual(["Vérifie-la toi-même"]);
+    expect(pinks(html)).toEqual(["C'est bien moi"]);
     expect(html).not.toContain("Lui envoyer ma note");
-    expect(ascending(at(html, ['class="denounced"', 'class="you duel"']))).toBe(true);
+    expect(ascending(at(html, ['class="denounced', 'class="you duel"']))).toBe(true);
     expect(html).toMatch(/class="you duel"[^]*83\/100 contre/);
   });
 

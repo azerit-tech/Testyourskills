@@ -1,4 +1,5 @@
-// « Dénonce un complice » (§18.6, §18.48, §18.83, §18.114), le premier bloc sous le verdict.
+// « Dénonce un complice » (§18.6, §18.48, §18.83, §18.114, §18.118), le premier bloc sous le verdict,
+// en grand : un titre de page, le champ et « Dénoncer » en rose.
 // Rien à coller : on tape un nom, des comptes GitHub et des profils LinkedIn sortent sous le
 // champ, on touche la personne et la dénonciation part. Un lien LinkedIn collé ou un pseudo
 // GitHub tapé en entier marchent toujours. Le champ reste là : il se vide et garde le focus,
@@ -265,7 +266,8 @@ export function Denounce({ cardId, selfLogin, toast, initial, mine }: Props) {
           />
           {box.list}
         </div>
-        <button type="submit" className="pill">
+        {/* Le rose du bloc (§18.118) tant qu'aucune fiche n'est prête ; ensuite, l'envoi de la dernière le prend. */}
+        <button type="submit" className="pill pill-big denounce-go">
           {d.btn}
         </button>
       </form>

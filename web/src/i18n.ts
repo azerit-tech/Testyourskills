@@ -486,6 +486,8 @@ const fr = frTypoDeep({
       claimed: (login: string) => `Fiche revendiquée. Bienvenue au commissariat, @${login}.`,
       /** En haut de la fiche reprise par « C'est moi » (§18.52), au-dessus de « Voir ma poursuite ». */
       claimedBanner: (login: string) => `Fiche reprise : elle est à ton nom, @${login}.`,
+      /** La même, reprise par LinkedIn (§18.118) : pas de pseudo à dire. */
+      claimedBannerLi: "Fiche reprise : elle est à ton nom.",
       mismatch: (login: string) => `Ce n'est pas ta fiche : tu es sur le compte GitHub @${login}.`,
       error: "GitHub n'a pas confirmé. Réessaie dans un instant.",
       limited: "Trop de tentatives aujourd'hui. Reviens demain.",
@@ -826,10 +828,14 @@ const fr = frTypoDeep({
     /* un titre qui vaut pour la personne visée comme pour un tiers ; qui a dénoncé est dit une fois, au-dessus (§18.52) */
     isYou: "C'est toi ?",
     /**
-     * Le seul rose de qui reçoit sa fiche (§18.104), au bloc comme dans la barre du téléphone : la reprendre
-     * par GitHub, ou la refaire depuis son lien LinkedIn ; la nouvelle est la sienne. Aucune ligne dessous.
+     * Le seul rose de qui reçoit sa fiche (§18.104, §18.118), en très grand sous la fiche comme dans la barre du
+     * téléphone : la connexion de la fiche (GitHub, LinkedIn), et la fiche est la sienne. Une ligne dessous.
      */
-    verify: "Vérifie-la toi-même",
+    itsMe: "C'est bien moi",
+    itsMeVia: (via: string) => `\u00a0: connexion ${via}`,
+    itsMeWhy: "Pour la faire tienne\u00a0: la refaire, la cacher, la partager.",
+    /** Un dossier qui porte les deux : l'autre connexion, en lien sous le bouton. */
+    itsMeAlso: (via: string) => `Ou avec ${via}`,
     notMe: "Ce n'est pas moi : faire la mienne",
     andYou: "À ton tour",
     mine: "Ma fiche",
@@ -1297,6 +1303,7 @@ const en: Dict = {
       loggedOut: "Signed out. The sheet is still yours.",
       claimed: (login) => `Sheet claimed. Welcome to the station, @${login}.`,
       claimedBanner: (login) => `Sheet claimed: it's in your name now, @${login}.`,
+      claimedBannerLi: "Sheet claimed: it's in your name now.",
       mismatch: (login) => `Not your sheet: you're on the GitHub account @${login}.`,
       error: "GitHub didn't confirm. Try again in a moment.",
       limited: "Too many attempts today. Come back tomorrow.",
@@ -1594,7 +1601,10 @@ const en: Dict = {
     sendTie: "a dead heat",
     sendCopied: (who) => `Message copied: send it to ${who}.`,
     isYou: "Is this you?",
-    verify: "Check it yourself",
+    itsMe: "That's me",
+    itsMeVia: (via) => `: sign in with ${via}`,
+    itsMeWhy: "To make it yours: redo it, hide it, share it.",
+    itsMeAlso: (via) => `Or with ${via}`,
     notMe: "Not me: get mine",
     andYou: "Your turn",
     mine: "My sheet",
