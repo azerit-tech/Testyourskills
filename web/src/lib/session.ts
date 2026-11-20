@@ -375,6 +375,37 @@ function removeSession(key: string) {
   }
 }
 
+// --- Le face-à-face reçu (§18.115) ---------------------------------------------
+// /c/{X}?r={S} : la fiche X ouverte par le lien que S a envoyé. La page de X montre
+// alors les deux fiches côte à côte. Gardé pour l'onglet (un rechargement le garde),
+// lié à l'adresse d'arrivée : une autre fiche ouverte ensuite reste seule.
+
+const VS_KEY = "tys_vs";
+/** Les ids de la démo (`m-gold-…`) : la page de démo montre aussi le face-à-face. */
+const MOCK_ID_RE = /^m-[a-zA-Z]+-[A-Za-z0-9]{1,24}$/;
+let memVs: { path: string; r: string } | null = null;
+
+function rememberArrival(path: string, r: string) {
+  if (!CARD_ID_RE.test(r) && !MOCK_ID_RE.test(r)) return;
+  memVs = { path, r };
+  writeSession(VS_KEY, JSON.stringify(memVs));
+}
+
+/** La fiche de qui a envoyé le lien de la fiche `pageId` (son ?r=), ou null : aucune, ou elle-même. */
+export function vsSender(pageId: string): string | null {
+  let vs = memVs;
+  if (!vs) {
+    try {
+      const raw = JSON.parse(readSession(VS_KEY) ?? "null") as { path?: unknown; r?: unknown } | null;
+      if (raw && typeof raw.path === "string" && typeof raw.r === "string") vs = { path: raw.path, r: raw.r };
+    } catch {
+      /* rien */
+    }
+  }
+  if (!vs || vs.path !== `/c/${pageId}` || vs.r === pageId) return null;
+  return CARD_ID_RE.test(vs.r) || MOCK_ID_RE.test(vs.r) ? vs.r : null;
+}
+
 /** Origine de la session : l'id de la fiche par le lien de laquelle on est arrivé. */
 export function currentRef(): string | null {
   const stored = readSession(REF_KEY);
@@ -402,6 +433,7 @@ export function captureRef(): string | null {
   } catch {
     /* rien */
   }
+  rememberArrival(url.pathname, r);
   if (!CARD_ID_RE.test(r)) return null;
   if (!currentRef()) {
     memRef = r;

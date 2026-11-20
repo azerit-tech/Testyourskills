@@ -1,0 +1,138 @@
+/* Le face-à-face reçu (§18.115) : deux fiches côte à côte, « VS » sur un disque sirène entre elles,
+   le verdict en une ligne au-dessus. Téléphone : deux fiches d'environ 170 px dans la gouttière ;
+   bureau : deux fiches de 360 px, la page passe sur une colonne centrée sous elles. */
+
+.vs-stage {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.vs-line {
+  margin: 0;
+  font: 700 var(--t-22) / 1.05 var(--f-name);
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  color: var(--c-emphasis);
+  text-align: center;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+.vs-pair {
+  --vs-gap: 20px;
+  --vs-w: min(360px, calc((100% - var(--vs-gap)) / 2));
+  position: relative;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  gap: var(--vs-gap);
+}
+.vs-card {
+  display: block;
+  width: var(--vs-w);
+  aspect-ratio: 360 / 520;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+  -webkit-tap-highlight-color: transparent;
+  border-radius: 14px;
+}
+.vs-card .tys-card {
+  width: 100%;
+}
+.vs-card:focus-visible {
+  outline: 2px solid var(--c-action);
+  outline-offset: 3px;
+}
+.vs-card-wait {
+  border-radius: 14px;
+  background: var(--s-item);
+  cursor: default;
+}
+.vs-disk {
+  position: absolute;
+  left: 50%;
+  /* sous le niveau, sur le décor : ni la note ni le nom n'y passent */
+  top: calc(var(--vs-w) * 520 / 360 * 0.42);
+  transform: translate(-50%, -50%);
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--siren);
+  box-shadow: 0 0 0 3px var(--ink-0);
+  font: 800 var(--t-14) / 1 var(--f-name);
+  letter-spacing: 0.04em;
+  color: var(--cream);
+  pointer-events: none;
+}
+
+/* Une fiche en grand : l'encre par-dessus la page, la fiche au centre, « Fermer » dessous. */
+.vs-zoom {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(12, 13, 27, 0.92);
+  overflow-y: auto;
+}
+.vs-zoom-in {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(360px, 100%, calc((100svh - 140px) * 360 / 520));
+}
+.vs-zoom-in .tys-card {
+  width: 100%;
+  margin-bottom: 44px;
+}
+.vs-zoom-close {
+  min-height: var(--h-tap);
+}
+
+/* le premier écran du téléphone : la ligne et les deux fiches sous la barre du haut, le bloc dessous visible */
+@media (max-width: 899px) {
+  .page-result .result-stage:has(> .vs-stage) {
+    padding-top: 12px;
+  }
+}
+
+@media (min-width: 900px) {
+  .vs-stage {
+    gap: 16px;
+  }
+  .vs-line {
+    font-size: var(--t-28);
+  }
+  .vs-pair {
+    --vs-gap: 72px;
+  }
+  .vs-disk {
+    top: 50%;
+    width: 56px;
+    height: 56px;
+    font-size: var(--t-22);
+  }
+  /* Les deux fiches sur toute la largeur, puis la page sur une colonne centrée de 648 px : la grille à
+     deux colonnes (§18.51) n'a plus de fiche à gauche. #main l'emporte sur les placements du visiteur. */
+  #main.has-vs > .result-top > .result-stage {
+    grid-column: 2 / 5;
+    grid-row: auto;
+    position: static;
+    padding-bottom: 24px;
+  }
+  #main.has-vs > .result-top > :is(.you, .visitor-col, .removal),
+  #main.has-vs > .after {
+    grid-column: 2 / 5;
+    grid-row: auto;
+    justify-self: center;
+    width: min(648px, 100%);
+    margin-top: 0;
+  }
+}

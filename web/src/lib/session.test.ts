@@ -175,3 +175,30 @@ describe("le film joue une fois (§18.48)", () => {
     expect(s.filmOwed("AbCdEf1234")).toBe(false);
   });
 });
+
+describe("vsSender (§18.115)", () => {
+  it("la fiche de qui envoie, seulement sur la fiche d'arrivée ; gardée au rechargement", async () => {
+    const b = browser("https://skills.test/c/AbCdEf1234?r=ZyXwVu9876");
+    const s = await fresh();
+    s.captureRef();
+    expect(s.vsSender("AbCdEf1234")).toBe("ZyXwVu9876");
+    // une autre fiche ouverte ensuite reste seule
+    expect(s.vsSender("QwErTy5678")).toBeNull();
+    // rechargement : l'adresse n'a plus r, l'onglet s'en souvient
+    b.go("https://skills.test/c/AbCdEf1234");
+    const again = await fresh();
+    again.captureRef();
+    expect(again.vsSender("AbCdEf1234")).toBe("ZyXwVu9876");
+  });
+
+  it("r = la fiche elle-même (son propre partage) : pas de face-à-face ; un id de démo compte", async () => {
+    browser("https://skills.test/c/AbCdEf1234?r=AbCdEf1234");
+    const s = await fresh();
+    s.captureRef();
+    expect(s.vsSender("AbCdEf1234")).toBeNull();
+    browser("https://skills.test/c/m-silver-x1?r=m-gold-a1&mock=1");
+    const demo = await fresh();
+    demo.captureRef();
+    expect(demo.vsSender("m-silver-x1")).toBe("m-gold-a1");
+  });
+});
