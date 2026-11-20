@@ -38,11 +38,13 @@ describe("le top de la semaine sur l'accueil", () => {
     expect(board(4)).not.toContain("is-free");
   });
 
-  it("top 5 complet : plus de place libre ; au-delà, les lignes sortent de l'aplat", () => {
+  it("« Top 10 » : jusqu'à dix lignes d'un seul bloc, ce que l'étiquette dit", () => {
     expect(board(5)).not.toContain("is-free");
-    const html = board(7);
-    expect(count(html, 'class="board-row"')).toBe(7);
-    expect(html).toContain("is-rest");
+    const html = board(12);
+    expect(count(html, 'class="board-row"')).toBe(10);
+    expect(html).not.toContain("is-rest");
+    expect(html).toContain('<p class="board-tag">Top 10</p>');
+    expect(html).not.toContain("Top 5");
   });
 
   it("chaque ligne est la vraie personne : le nom de la fiche, ses initiales, le lien vers elle ; sans nom, le @pseudo (§18.88)", () => {
