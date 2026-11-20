@@ -7,7 +7,9 @@ import { FIXTURE_COMPARISON, FIXTURES } from "../../shared/fixtures";
 import { fileOf } from "../../shared/caseFile";
 import { IMAGE_QUERY } from "../../shared/images";
 import { publicView } from "../../shared/publicView";
-import { HOME_PROMISE, homeTitle, pageTitle, promiseTitle } from "../../shared/promise";
+import { HOME_PROMISE, heroTitleEm, homeTitle, pageTitle, promiseSentence, promiseTitle } from "../../shared/promise";
+import { measure, upper } from "../../shared/card/text";
+import { frTypo } from "../../shared/typo";
 import type { CardData, ComparisonData, Grid } from "../../shared/types";
 import { genericMeta, homeImageAlt, injectHomeImage, metaFor, requestLang, staticPageMeta } from "./html";
 
@@ -171,10 +173,17 @@ describe("le titre de l'accueil, en un seul endroit (shared/promise.ts)", () => 
       expect(`${m.title} ${m.description} ${m.imageAlt}`).not.toMatch(/Testyourskills/);
       expect(m.description).toBe(HOME_PROMISE[lang].description);
     }
-    expect(promiseTitle("fr")).toBe("Ta fiche de dev. Combien d'étoiles\u00a0?");
-    expect(promiseTitle("en")).toBe("Your dev rap sheet. How many stars?");
+    expect(promiseTitle("fr")).toBe("Découvre à quel point tu es recherché par les recruteurs\u00a0!");
+    expect(promiseTitle("en")).toBe("See how much recruiters want your profile!");
+    // La taille du héros se tire de sa plus longue ligne, la chute comptée entière (§18.103).
+    for (const lang of ["fr", "en"] as const) {
+      const p = HOME_PROMISE[lang];
+      const em = (l: string) => measure(upper(lang === "fr" ? frTypo(l) : l, lang), "display-700", 1);
+      const longest = Math.max(...[...p.claim, ...p.proof, promiseSentence(p.proof)].map(em));
+      expect(heroTitleEm(lang)).toBeCloseTo(longest, 2);
+    }
     expect(pageTitle("Vie privée")).toBe("Vie privée · Azerit");
-    // L'apostrophe de « d'étoiles » sort échappée dans la balise.
+    // Une apostrophe dans le titre sortirait échappée dans la balise.
     expect(injectHomeImage("<html><head></head></html>", "https://s.test")).toContain(`content="${homeImageAlt().replace(/'/g, "&#39;")}"`);
   });
 

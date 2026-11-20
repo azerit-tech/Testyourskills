@@ -46,8 +46,8 @@ const fr = frTypoDeep({
       until: (day: string) => `jusqu'au ${day}`,
       over: (n: number) => `Saison ${n} terminée`,
     },
-    /** Le titre, deux phrases de deux lignes chacune (shared/promise.ts, sa seule source).
-     * Insécables : une seule coupure possible par phrase, jamais un mot seul. */
+    /** Le titre, deux moitiés de deux lignes chacune (shared/promise.ts, sa seule source).
+     * Insécables : une seule coupure possible par moitié, jamais un mot seul. */
     titleClaim: heroSentence(HOME_PROMISE.fr.claim),
     titleProof: heroSentence(HOME_PROMISE.fr.proof),
     /** La ligne sous le titre, choisie par web/src/lib/season.ts : l'entretien seulement si une prime est ouverte. */
