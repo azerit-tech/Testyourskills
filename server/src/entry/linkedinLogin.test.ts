@@ -6,7 +6,7 @@ import type { GithubIdentity } from "../github/identity";
 import type { Namesake, RegistryPort } from "../registry/index";
 import { AUTHORIZE_URL, LI_STATE_COOKIE, TOKEN_URL, USERINFO_URL } from "../linkedin";
 import { ENTER_COOKIE, ENTER_STARTS_PER_DAY, KNOWN_COOKIE, PEEKS_PER_IP, WHO_COOKIE, WHO_TTL_MS, employerFromEmail } from "./linkedinLogin";
-import { CAMILLE, CAMILLE_URL, HOMONYM, cardState, cookiesOf, postCard, setupEntry, type EntryCtx, type EntrySetup } from "./testing";
+import { CAMILLE, CAMILLE_URL, HOMONYM, PROFILE, cardState, cookiesOf, postCard, setupEntry, type EntryCtx, type EntrySetup } from "./testing";
 
 const BASE = "https://skills.test";
 const EMAIL = "camille@ardent.dev";
@@ -685,5 +685,68 @@ describe("le registre de l'App Azerit (§18.95)", () => {
       expect(got.auto?.url).toBe(CAMILLE_URL);
       expect(ctx.calls.byName).toHaveLength(1);
     });
+  });
+});
+
+describe("son GitHub avant le jugement (§18.110)", () => {
+  const account = (login: string, name: string | null) => ({ login, name, avatarUrl: `https://avatars.test/${login}`, bio: null, company: null, websiteUrl: null, socialAccounts: [] });
+  const found = (...accounts: ReturnType<typeof account>[]) => async () => ({ accounts, namesakes: accounts.length });
+  const asked = async (ctx: EntryCtx, jar: string) => ((await entry(ctx, jar)) as { ask?: { candidate: { login: string; name: string | null; avatarUrl: string } | null } }).ask;
+  const registry = (links: { login: string; url: string; step: string }[], known: string | null = null): RegistryPort => ({
+    linkedinOf: async () => null,
+    githubOf: async () => (known ? { login: known, strength: 1 } : null),
+    profileOf: async () => null,
+    photoOf: async () => null,
+    recordLink: (l) => void links.push(l),
+    recordAccounts: () => {},
+    recordProfile: () => {},
+    namesakes: async () => [],
+    linkedinOfEmail: async () => null,
+  });
+
+  it("un compte trouvé à son nom : « C'est ton GitHub ? », puis « Oui » fait d'emblée le dossier, avec son contact et le lien confirmé", async () => {
+    const links: { login: string; url: string; step: string }[] = [];
+    // Le dossier lit le profil comme « Ajoute ton GitHub » : par les faits GitHub, avec l'adresse donnée.
+    const linkedinProfiles = {
+      forGithub: async (_f: unknown, o?: { url?: string }) => (o?.url === CAMILLE_URL ? { profile: PROFILE, proven: false } : null),
+      forUrl: async () => ({ status: "found" as const, profile: PROFILE, githubLogin: null }),
+    };
+    const { ctx } = setup({ github: null, app: { githubAccounts: found(account("camille-ardent", "Camille Ardent")), registry: registry(links), linkedinProfiles } });
+    const { jar } = await signIn(ctx);
+    expect(await asked(ctx, jar)).toEqual({ candidate: { login: "camille-ardent", name: "Camille Ardent", avatarUrl: "https://avatars.test/camille-ardent" } });
+    const { json } = await postCard(ctx, { linkedin: CAMILLE_URL, login: "camille-ardent" }, jar);
+    expect(await kindOf(ctx, json.id)).toBe("comparison");
+    expect(ctx.calls.collect).toEqual(["camille-ardent"]);
+    expect(ctx.store.getCard(json.id)?.email).toBe(EMAIL);
+    expect(links).toContainEqual(expect.objectContaining({ login: "camille-ardent", url: CAMILLE_URL, step: "proposition_oui" }));
+  });
+
+  it("rien trouvé : « Ajoute ton GitHub » ; « Je n'en ai pas » fait la fiche LinkedIn seule, sans GitHub proposé dessous", async () => {
+    const propose = vi.fn(async () => ({ kind: "github" as const, login: "camille-ardent", name: null, avatarUrl: "", sure: false }));
+    const { ctx } = setup({ github: null, app: { propose: { github: propose } } });
+    const { jar } = await signIn(ctx);
+    expect(await asked(ctx, jar)).toEqual({ candidate: null });
+    const { json } = await postCard(ctx, { linkedin: CAMILLE_URL, noGithub: true }, jar);
+    const state = await cardState(ctx, json.id);
+    expect((state as { kind?: string }).kind).toBe("card");
+    expect((state as { propose?: unknown }).propose).toBeUndefined();
+    expect(propose).not.toHaveBeenCalled();
+    expect(ctx.calls.collect).toEqual([]);
+    expect(ctx.store.getCard(json.id)?.email).toBe(EMAIL);
+  });
+
+  it("le seul compte à son nom complet : demandé au lieu d'être attaché ; « Je n'en ai pas » ne l'attache pas", async () => {
+    const { ctx } = setup({ github: { login: "camille-nom", how: "name" } });
+    const { jar } = await signIn(ctx);
+    expect((await asked(ctx, jar))?.candidate?.login).toBe("camille-nom");
+    await postCard(ctx, { linkedin: CAMILLE_URL, noGithub: true }, jar);
+    expect(ctx.calls.collect).toEqual([]);
+  });
+
+  it("son GitHub déjà connu (l'email, le registre de l'App) : rien à demander", async () => {
+    const byEmail = setup({ app: { githubAccounts: found(account("camille-ardent", "Camille Ardent")) } }).ctx;
+    expect(await asked(byEmail, (await signIn(byEmail)).jar)).toBeUndefined();
+    const known = setup({ github: null, app: { githubAccounts: found(account("camille-ardent", "Camille Ardent")), registry: registry([], "camille-app") } }).ctx;
+    expect(await asked(known, (await signIn(known)).jar)).toBeUndefined();
   });
 });

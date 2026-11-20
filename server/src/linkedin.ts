@@ -432,7 +432,11 @@ export function mountLinkedin(app: Hono, o: LinkedinRoutesOptions) {
       // « Refaire ma fiche », ou sa fiche partie : le profil retenu, sans recherche.
       if (memo?.url && o.enter.resume) {
         kit.renew(c, acct);
-        return o.enter.resume(c, returnPath, { ...memo, url: memo.url, accountId: acct.id });
+        // Son GitHub déjà connu (le mémo, sinon le pseudo de sa fiche) : rien à lui redemander (§18.110).
+        const had = memo.github ? null : kit.cardOf(acct);
+        const login = had ? o.store.loginOf(had) : null;
+        const github = memo.github ?? (login ? { login, how: "name" as const } : undefined);
+        return o.enter.resume(c, returnPath, { ...memo, ...(github ? { github } : {}), url: memo.url, accountId: acct.id });
       }
     }
     if (!o.enter.allow(c)) {

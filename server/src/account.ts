@@ -74,6 +74,8 @@ export interface LinkedinMemo {
   photoId?: string;
   /** Le GitHub que la connexion avait retrouvé (l'email : une preuve ; le nom : un indice). */
   github?: { login: string; how: "email" | "name" };
+  /** « Je n'en ai pas » à la question d'avant le jugement (§18.110) : son GitHub ne lui est plus demandé. */
+  noGithub?: true;
 }
 
 const HOW = new Set(["email", "photo", "employer", "picked"]);
@@ -100,6 +102,7 @@ function parseMemo(raw: string | null): LinkedinMemo | null {
     ...(str(m.photo, 400) ? { photo: str(m.photo, 400) } : {}),
     ...(typeof m.photoId === "string" && PHOTO_ID_RE.test(m.photoId) ? { photoId: m.photoId } : {}),
     ...(gh && typeof gh.login === "string" && GH_LOGIN_RE.test(gh.login) && (gh.how === "email" || gh.how === "name") ? { github: { login: gh.login, how: gh.how } } : {}),
+    ...(m.noGithub === true ? { noGithub: true as const } : {}),
   };
   return Object.keys(out).length ? out : null;
 }
@@ -261,12 +264,15 @@ export class Accounts {
     this.db.prepare(`UPDATE accounts SET card_id = ? WHERE id = ?`).run(cardId, id);
   }
 
-  /** Complète le mémo LinkedIn (§18.105) d'un compte qui a une identité LinkedIn ; `undefined` laisse un champ tel quel. */
-  remember(id: string, patch: LinkedinMemo): LinkedinMemo | null {
+  /** Complète le mémo LinkedIn (§18.105) d'un compte qui a une identité LinkedIn ; `undefined` laisse un champ tel quel, `null` l'efface. */
+  remember(id: string, patch: { [K in keyof LinkedinMemo]?: LinkedinMemo[K] | null }): LinkedinMemo | null {
     const a = this.get(id);
     if (!a?.linkedinKey) return null;
-    const next: LinkedinMemo = { ...(a.linkedin ?? {}) };
-    for (const [k, v] of Object.entries(patch)) if (v !== undefined) (next as Record<string, unknown>)[k] = v;
+    const next: Record<string, unknown> = { ...(a.linkedin ?? {}) };
+    for (const [k, v] of Object.entries(patch)) {
+      if (v === null) delete next[k];
+      else if (v !== undefined) next[k] = v;
+    }
     const clean = parseMemo(JSON.stringify(next));
     this.db.prepare(`UPDATE accounts SET linkedin_json = ? WHERE id = ?`).run(clean ? JSON.stringify(clean) : null, id);
     return clean;
@@ -310,7 +316,7 @@ export interface AccountKit {
    */
   rememberSignIn(accountId: string, who: { name?: string; picture?: string }): Promise<void>;
   /** La fiche que l'entrée connectée lance (§18.105) : son profil, et le GitHub que la connexion a retrouvé. */
-  rememberProfile(accountId: string, p: { url: string; how: NonNullable<LinkedinMemo["how"]>; github: LinkedinMemo["github"] | null }): void;
+  rememberProfile(accountId: string, p: { url: string; how: NonNullable<LinkedinMemo["how"]>; github: LinkedinMemo["github"] | null; noGithub?: boolean }): void;
   /**
    * Ce que le compte sait de son LinkedIn (§18.105) : le mémo, et à défaut d'adresse retenue
    * (compte d'avant), celle de « Ma fiche » si elle porte un LinkedIn. Null sans identité LinkedIn.
@@ -443,7 +449,8 @@ export function createAccounts(o: AccountOptions): AccountKit | null {
       }
     },
     rememberProfile(accountId, p) {
-      accounts.remember(accountId, { url: p.url, how: p.how, ...(p.github ? { github: p.github } : {}) });
+      // Un GitHub choisi efface « Je n'en ai pas », et l'inverse (§18.110).
+      accounts.remember(accountId, { url: p.url, how: p.how, github: p.noGithub ? null : (p.github ?? undefined), noGithub: p.noGithub ? true : p.github ? null : undefined });
     },
     linkedinOf(a) {
       if (!a.linkedinKey) return null;

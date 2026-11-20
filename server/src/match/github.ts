@@ -223,12 +223,20 @@ export interface FindOptions {
   budgetMs?: number;
 }
 
+/** Ce que l'appel rend avant toute note : les comptes vus, et combien GitHub en dit au nom complet. */
+export interface GithubFound {
+  accounts: GithubAccount[];
+  namesakes: number;
+}
+
 /**
- * Le GitHub à proposer pour cette personne, ou null : rien d'assez proche,
- * plusieurs comptes possibles, pas de jeton, GitHub lent ou en panne. Jamais d'erreur.
+ * Les comptes GitHub qui pourraient être ceux de ce nom, sans encore les noter : il ne
+ * faut que le nom. La connexion LinkedIn (§18.110) les cherche dès le retour de LinkedIn,
+ * avant même de savoir quel profil est le sien, puis les note avec `pickGithub`. null :
+ * pas de jeton, GitHub lent ou en panne, nom inutilisable. Jamais d'erreur.
  */
-export async function findGithubFor(auth: GithubAuth, person: PersonHints, o: FindOptions = {}): Promise<GithubProposal | null> {
-  const built = buildQuery(person.name);
+export async function fetchGithubAccounts(auth: GithubAuth, name: string, o: FindOptions = {}): Promise<GithubFound | null> {
+  const built = buildQuery(name);
   if (!built) return null;
   const budget = o.budgetMs ?? FIND_BUDGET_MS;
   const signal = o.signal ? AbortSignal.any([o.signal, AbortSignal.timeout(budget)]) : AbortSignal.timeout(budget);
@@ -241,10 +249,19 @@ export async function findGithubFor(auth: GithubAuth, person: PersonHints, o: Fi
     const named = (search?.nodes ?? []).flatMap((u) => account(u) ?? []);
     const namesakes = typeof search?.userCount === "number" ? search.userCount : named.length;
     const direct = built.logins.flatMap((_, i) => account(data[`l${i}`] as RawUser | null) ?? []);
-    return pickGithub(person, [...direct, ...named], namesakes);
+    return { accounts: [...direct, ...named], namesakes };
   } catch (err) {
     // Le délai passé, ou la fiche coupée : rien à dire.
     if (!signal.aborted) console.warn("[proposition] GitHub non cherché :", String((err as { code?: unknown; name?: unknown })?.code ?? (err as Error)?.name ?? "erreur"));
     return null;
   }
+}
+
+/**
+ * Le GitHub à proposer pour cette personne, ou null : rien d'assez proche,
+ * plusieurs comptes possibles, pas de jeton, GitHub lent ou en panne. Jamais d'erreur.
+ */
+export async function findGithubFor(auth: GithubAuth, person: PersonHints, o: FindOptions = {}): Promise<GithubProposal | null> {
+  const found = await fetchGithubAccounts(auth, person.name, o);
+  return found ? pickGithub(person, found.accounts, found.namesakes) : null;
 }
