@@ -348,14 +348,23 @@ export interface WeekTop {
   entries: TopEntry[];
 }
 
+/**
+ * L'autre source de la personne, trouvée pendant la lecture de sa fiche (SPEC §18.100) : proposée
+ * sous sa fiche, à elle seule, et attachée seulement si elle dit oui. `sure` : son GitHub affiche ce
+ * LinkedIn ; sinon, son nom, son pseudo et son employeur concordent. Jamais un email.
+ */
+export type Proposal =
+  | { kind: "github"; login: string; name: string | null; avatarUrl: string; sure: boolean }
+  | { kind: "linkedin"; url: string; name: string; headline: string; photoUrl?: string; sure: boolean };
+
 /** Réponse de GET /api/card/:id pendant et après le traitement. */
 export type JobState =
   /** `queue` : rang dans la file d'attente (1 = la prochaine à passer). Absent dès que la fiche est en traitement. */
   /** `findings` : les trouvailles déjà sorties (§18.26), dans l'ordre où les montrer, la plus forte en dernier. */
   /** `timeLeft` : ms avant que le serveur coupe la fiche en traitement (rallonge LinkedIn comprise). Absent en file. */
   | { state: "pending"; progress: ProgressEvent[]; queue?: number; findings?: Finding[]; timeLeft?: number }
-  /** `mine` : la session GitHub est propriétaire revendiquée du login de la fiche (§18.1). */
-  | { state: "done"; kind: "card"; card: CardData; week?: WeekRank; mine?: boolean }
+  /** `mine` : la session GitHub est propriétaire revendiquée du login de la fiche (§18.1). `propose` : à la personne fichée seulement (§18.100). */
+  | { state: "done"; kind: "card"; card: CardData; week?: WeekRank; mine?: boolean; propose?: Proposal }
   | { state: "done"; kind: "comparison"; comparison: ComparisonData; week?: WeekRank; mine?: boolean }
   | { state: "error"; code: ErrorCode; message: Fact };
 

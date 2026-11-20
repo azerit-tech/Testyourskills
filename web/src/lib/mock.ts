@@ -4,7 +4,7 @@
 // LinkedIn contre GitHub (§18.24) : le pseudo "camille-ardent", ou n'importe quel
 // lien linkedin.com/in/… ; linkedin.com/in/sans-github donne la fiche LinkedIn seule ;
 // un lien LinkedIn avec le pseudo "x" : face à un GitHub vide, code non prouvé (§18.37).
-import type { CardData, ComparisonData, Finding, Grid, JobState, ProgressEvent, Stat, StatCode } from "../../../shared/types";
+import type { CardData, ComparisonData, Finding, Grid, JobState, ProgressEvent, Proposal, Stat, StatCode } from "../../../shared/types";
 import { tierFor } from "../../../shared/types";
 import { FIXTURES, FIXTURE_COMPARISON } from "../../../shared/fixtures";
 import { oneNote } from "../../../shared/caseFile";
@@ -36,6 +36,8 @@ const jobs = new Map<string, MockJob>();
 const juries = new Map<string, Jury>();
 /** Cartes dont la photo vient de LinkedIn (simulé). */
 const photos = new Set<string>();
+/** « Non » dit à la proposition d'une fiche de démo (§18.100). */
+const declined = new Set<string>();
 const MOCK_PHOTO = "/mock-linkedin.svg";
 /** La comparaison de la vitrine en démo : un id « licmp », LinkedIn contre GitHub. */
 export const MOCK_SHOWCASE_ID = "m-licmp-vitrine";
@@ -307,6 +309,19 @@ function kindFromId(id: string): Kind | null {
   return null;
 }
 
+/**
+ * La proposition de démo (§18.100) : sous une fiche LinkedIn seule, le GitHub @camroux ; sous une fiche
+ * GitHub seule, le profil LinkedIn de la démo au nom de la fiche.
+ */
+function mockProposal(card: CardData): Proposal | null {
+  if (card.linkedinUrl && !card.login) return { kind: "github", login: "camroux", name: "Camille Roux", avatarUrl: "https://github.com/camroux.png?size=96", sure: false };
+  if (card.login && !card.linkedinUrl && card.source === "github") {
+    const name = card.name.trim().split(/\s+/).length >= 2 ? card.name : "Camille Ardent";
+    return { kind: "linkedin", url: MOCK_LINKEDIN, name, headline: "Développeuse backend · Paysolde", sure: false };
+  }
+  return null;
+}
+
 export const mockApi = {
   /**
    * En démo, la maquette de la carte vitrine, jugée avec son LinkedIn (§18.35) :
@@ -361,6 +376,12 @@ export const mockApi = {
     if (typeof navigator !== "undefined" && navigator.onLine === false) throw new TypeError("Failed to fetch");
     const state = await mockApi.engineJob(id);
     if (state.state !== "done") return state;
+    // Sa propre fiche à une source (§18.100) : l'autre lui est proposée, comme le serveur le fait.
+    const job = jobs.get(id);
+    if (state.kind === "card" && job && !job.denouncedBy && !declined.has(id)) {
+      const propose = mockProposal(state.card);
+      if (propose) return { ...state, propose };
+    }
     const main = state.kind === "card" ? state.card : state.comparison.github;
     const marker = /^m-[a-zA-Z]+-([DNC])/.exec(id)?.[1];
     const denounced = !!jobs.get(id)?.denouncedBy || !!marker;
@@ -479,6 +500,11 @@ export const mockApi = {
     } catch {
       return null;
     }
+  },
+
+  async declineProposal(id: string) {
+    await sleep(120);
+    declined.add(id);
   },
 
   async deleteCard(id: string, token: string) {

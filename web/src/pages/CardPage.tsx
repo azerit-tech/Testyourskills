@@ -22,6 +22,8 @@ import { PleaStrip, PleaVerdict } from "../components/Plea";
 import { RecruiterRead } from "../components/RecruiterRead";
 import { RemovalRequest } from "../components/Removal";
 import { AddLinkedin } from "../components/AddLinkedin";
+import { Propose } from "../components/Propose";
+import { proposalToShow } from "../lib/propose";
 import { Pieces } from "../components/Pieces";
 import { ProfileSky } from "../components/ProfileTile";
 import { CardViewOptions } from "../card/CardView";
@@ -623,13 +625,18 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
   const whoShort = main.login ? `@${main.login}` : (main.name.split(/\s+/)[0] ?? main.name);
   // Sous trois étoiles (§18.48) : la source qui manque est le remède, elle remonte sous le verdict.
   const low = starsFor(main.overall) < 3;
+  // L'autre source trouvée pendant la lecture (§18.100) : « C'est ton GitHub ? », sous sa fiche, d'un toucher.
+  // Tant qu'elle est là, « Ajoute ton GitHub » (ou ton LinkedIn) attend : « Non » le fait revenir.
+  const [saidNoHere, setSaidNoHere] = useState<string | null>(null);
+  const offer = item.kind === "card" && saidNoHere !== id ? proposalToShow(api.proposalOf(id), item.card, { visitor }) : null;
+  const propose = offer && item.kind === "card" ? <Propose proposal={offer} card={item.card} onNo={() => setSaidNoHere(id)} /> : null;
   // Laquelle manque : le GitHub d'une fiche LinkedIn seule, le LinkedIn d'une fiche GitHub seule.
   const lacks: "github" | "linkedin" | null =
-    visitor || item.kind !== "card" ? null : proveFirst ? (main.linkedinUrl ? "github" : null) : item.card.source === "github" && item.card.login && liOn ? "linkedin" : null;
+    visitor || offer || item.kind !== "card" ? null : proveFirst ? (main.linkedinUrl ? "github" : null) : item.card.source === "github" && item.card.login && liOn ? "linkedin" : null;
   // Sous trois étoiles, son bouton prend le rose, de la barre comme du bloc ; le partage passe en contour (§18.52).
   const addFirst = low && lacks !== null ? lacks : null;
   const missing =
-    visitor || item.kind !== "card" ? null : proveFirst ? (
+    visitor || offer || item.kind !== "card" ? null : proveFirst ? (
       <AddSource card={main} strong={!!addFirst} />
     ) : item.card.source === "github" && item.card.login ? (
       <AddLinkedin login={item.card.login} cardId={item.card.id} strong={!!addFirst} name={item.card.name} />
@@ -790,6 +797,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
       {/* L'après-fiche entre en une fois, le dossier lu (ligne du jury) : rien ne pousse les blocs sous les yeux (CLS). */}
       <div className={`after${settled && (kase !== null || caseLate) ? " is-in" : ""}`} aria-hidden={!settled} inert={!settled ? true : undefined}>
         {/* L'après-fiche (§18.48, épurée en §18.76, §18.83) : le verdict, dénoncer, le partage, la bande, la course aux primes, puis les plis. */}
+        {/* « C'est ton GitHub ? » (§18.100) : juste sous la fiche, avant tout le reste. */}
+        {propose}
         {/* Le verdict en une ligne (§18.76) : le jury, et le pari s'il y en a un. Ni peine ni caution. */}
         {!visitor && (
           <div className="after-head">
@@ -803,7 +812,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
         {!visitor && <Denounce cardId={id} selfLogin={cardLogin} mine={main.sealed ? null : main.overall} toast={toast.show} />}
         {/* Fiche masquée : /og/* et /c/:id répondent 404 / 410 à tous, l'image ne se télécharge pas et le lien ne montre rien. */}
         {fromRival && <Duel mine={own} card={fromRival} duel={fromDuel} from />}
-        {!visitor && !(claimed && me?.hidden) && <ShareBar item={item} toast={toast.show} second={!!addFirst} />}
+        {!visitor && !(claimed && me?.hidden) && <ShareBar item={item} toast={toast.show} second={!!addFirst || !!offer} />}
         {/* La caisse du suspect (§18.79) : la berline du film, qu'on fait tourner au doigt, juste après le partage. */}
         <Spin ready={settled} />
         {/* Tu roules pour qui ? (§18.38) : l'école et la boîte, la raison de partager, juste après le partage. */}

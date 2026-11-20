@@ -3,7 +3,7 @@ import { fileOf } from "../../../shared/caseFile";
 import { IMAGE_QUERY } from "../../../shared/images";
 import { parseSeason, seasonDates, type SeasonDates } from "../../../shared/season";
 import seasonJson from "../../../data/season.json";
-import type { CardData, JobState, Lang, Piece, WeekRank, WeekTop } from "../../../shared/types";
+import type { CardData, JobState, Lang, Piece, Proposal, WeekRank, WeekTop } from "../../../shared/types";
 /** La maquette (mock.ts), chargée seulement en mode démo : le site réel ne la télécharge jamais. */
 export const demoApi = () => import("./mock").then((m) => m.mockApi);
 import { mockTop, mockWeekRank } from "./mockTop";
@@ -392,6 +392,22 @@ async function setHidden(hidden: boolean): Promise<Me> {
   return { login: body.login, hidden: body.hidden };
 }
 
+/** « Non » à la proposition sous sa fiche (§18.100) : le serveur ne la rend plus. Silencieux en cas d'échec. */
+async function declineProposal(id: string): Promise<void> {
+  proposals.delete(id);
+  if (isMock()) return (await demoApi()).declineProposal(id);
+  const token = tokens.get(id);
+  try {
+    await fetch(`/api/card/${encodeURIComponent(id)}/propose`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(token ? { "X-Card-Token": token } : {}) },
+      body: JSON.stringify({ answer: "no" }),
+    });
+  } catch {
+    /* réseau : cet appareil s'en souvient (lib/propose.ts) */
+  }
+}
+
 /** Se déconnecter : la revendication et le compte (§18.91), les deux cookies. */
 async function logout(): Promise<void> {
   mine.clear();
@@ -473,6 +489,13 @@ export function weekOf(id: string): WeekRank | null {
 const mine = new Set<string>();
 /** Fiches lues qui portent un pseudo GitHub. */
 const withGithub = new Set<string>();
+/** L'autre source proposée sous une fiche (§18.100), telle que le serveur l'a rendue à sa personne. */
+const proposals = new Map<string, Proposal>();
+
+/** La proposition que le serveur a rendue avec cette fiche, sinon null. */
+export function proposalOf(id: string): Proposal | null {
+  return proposals.get(id) ?? null;
+}
 
 /** La fiche porte un pseudo GitHub : quand la revendication est active, sa photo est au propriétaire connecté. */
 export function hasGithub(id: string): boolean {
@@ -497,6 +520,8 @@ async function getJob(id: string): Promise<JobState> {
     else mine.delete(id);
     if (main.login) withGithub.add(id);
     else withGithub.delete(id);
+    if (job.kind === "card" && job.propose) proposals.set(id, job.propose);
+    else proposals.delete(id);
   }
   return job;
 }
@@ -662,7 +687,7 @@ async function fetchTop(): Promise<WeekTop | null> {
   }
 }
 
-export const api = { createCard, getJob, getCase, vote, sendEmail, requestRemoval, deleteCard, track, getConfig, knownConfig, startLinkedInPhoto, getShowcase, getTop, getMe, getAccount, startClaim, setHidden, logout };
+export const api = { createCard, getJob, getCase, proposalOf, declineProposal, vote, sendEmail, requestRemoval, deleteCard, track, getConfig, knownConfig, startLinkedInPhoto, getShowcase, getTop, getMe, getAccount, startClaim, setHidden, logout };
 
 /** URLs des images rendues par le serveur (§7). `?v=` : le dessin en cours, servi avec un cache d'un an (shared/images.ts). */
 export const images = {

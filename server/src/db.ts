@@ -14,6 +14,7 @@ import { forgetWeekRanks } from "./top";
 import { ensureBandTables, forgetBands, removeBandMembers } from "./bands";
 import { ensurePrimeTables, removeEntriesForCards, removeEntriesForLogin } from "./primes";
 import { ensureAccountTables } from "./account";
+import { ensureProposalTables, removeProposals } from "./match/store";
 
 export const RETENTION_MS = 90 * 24 * 3600 * 1000;
 export const CACHE_MS = 24 * 3600 * 1000;
@@ -279,6 +280,8 @@ export function migrate(db: Database.Database) {
   ensurePrimeTables(db);
   // Le compte léger (§18.91) : une ligne par personne connectée, rien qui la nomme.
   ensureAccountTables(db);
+  // Les propositions sous une fiche (§18.100) : son GitHub ou son LinkedIn, à confirmer d'un toucher.
+  ensureProposalTables(db);
 }
 
 export class Store {
@@ -515,6 +518,7 @@ export class Store {
     removeBandMembers(this.db, ids);
     // Et de ses primes (§18.4) : l'inscription qu'elle portait est effacée.
     removeEntriesForCards(this.db, ids);
+    removeProposals(this.db, ids);
     return ids;
   }
 
@@ -544,6 +548,7 @@ export class Store {
     if (ids.length) forgetWeekRanks(this.db);
     removeBandMembers(this.db, ids);
     removeEntriesForCards(this.db, ids);
+    removeProposals(this.db, ids);
     return ids;
   }
 
