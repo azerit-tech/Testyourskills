@@ -2098,6 +2098,49 @@ svg {
 .gh-ask-none {
   justify-self: center;
 }
+/* « J'ai trouvé ton GitHub » (§18.113) : la phrase, une barre fine et mate qui se remplit en trois
+   secondes (arrêtée onglet caché), « Ce n'est pas moi » en lien discret. Mouvement réduit : un filet fixe. */
+.found {
+  min-height: 0;
+}
+.found-bar {
+  display: block;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--c-line);
+}
+.found-fill {
+  display: block;
+  height: 100%;
+  background: var(--cream);
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+.found-bar.is-run .found-fill,
+.found-bar.is-paused .found-fill {
+  animation: found-fill linear forwards;
+}
+.found-bar.is-paused .found-fill {
+  animation-play-state: paused;
+}
+.found-bar.is-done .found-fill {
+  transform: none;
+}
+@keyframes found-fill {
+  to {
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .found-bar .found-fill,
+  .found-bar.is-done .found-fill {
+    display: none;
+  }
+}
+.found-no {
+  justify-self: start;
+}
 /* où prendre le lien, sous la phrase qui dit que LinkedIn n'a rendu personne */
 .entry-help {
   margin-top: 0;

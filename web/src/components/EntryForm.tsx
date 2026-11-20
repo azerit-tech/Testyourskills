@@ -29,6 +29,7 @@ import type { Mode, Tab } from "../lib/session";
 import { checkPdf, isTouch, parseLogin } from "../lib/util";
 import type { PdfCheck } from "../lib/util";
 import { BusyDots, busyLabel } from "./Busy";
+import { LinkedinFound } from "./FoundConfirm";
 import { GithubAsk } from "./GithubAsk";
 import { IconClose, IconGithub, IconLinkedIn } from "./Icons";
 import { SuggestRow, fromLinkedin, useSuggestBox, useSuggestions } from "./Suggest";
@@ -185,6 +186,8 @@ export function EntryForm({ inputRef, variant = "full", secondary = false, anoth
   const picking = back?.s === "pick" ? back : null;
   /** Son profil trouvé, son GitHub demandé avant de juger (§18.111). */
   const asking = back?.s === "ask" ? back : null;
+  /** Au retour de GitHub, son LinkedIn trouvé : « J'ai trouvé ton LinkedIn », validé seul au bout de 3 s (§18.113). */
+  const linkFound = back?.s === "github" && back.found ? { login: back.login, found: back.found } : null;
   const [file, setFile] = useState<File | null>(init?.file ?? null);
   const [error, setError] = useState<string | null>(init?.error ? (typeof init.error === "string" ? init.error : pick(init.error, lang)) : null);
   /** Une limite atteinte : le même toucher échouerait encore (§18.48, un seul rose qui sert). */
@@ -225,7 +228,7 @@ export function EntryForm({ inputRef, variant = "full", secondary = false, anoth
   /** L'entrée simple, sans CV : les deux boutons, ou le champ une fois ouvert. */
   const simple = inline || (mode === "single" && tab === "github");
   /** L'attente du retour de LinkedIn, ou la question de son GitHub, est à l'écran : ni boutons, ni champ. */
-  const hold = (!!finding || !!asking) && simple;
+  const hold = (!!finding || !!asking || !!linkFound) && simple;
   // Le compte léger (§18.91), ou le repli de `tys_who` (§18.90) : connecté avec une fiche, l'entrée y
   // ramène d'abord. Pas tant qu'un retour de connexion est en cours : ce parcours-là va jusqu'au bout.
   const acct = useAccount();
@@ -277,8 +280,8 @@ export function EntryForm({ inputRef, variant = "full", secondary = false, anoth
 
   /** Lance la carte : un pseudo validé et/ou un PDF validé, ou un lien LinkedIn normalisé. */
   /** `viaLogin` : lancée par l'entrée connectée (le retour de LinkedIn ou de GitHub) ; elle va au compte (§18.91). */
-  /** `noGithub` : « Je n'en ai pas » (§18.111), sa fiche LinkedIn seule. */
-  const start = async (input: { login?: string; file?: File | null; linkedin?: string; viaLogin?: boolean; noGithub?: boolean }) => {
+  /** `noGithub` : « Je n'en ai pas » (§18.111), sa fiche LinkedIn seule. `noLinkedin` : « Ce n'est pas moi » au LinkedIn trouvé (§18.113). */
+  const start = async (input: { login?: string; file?: File | null; linkedin?: string; viaLogin?: boolean; noGithub?: boolean; noLinkedin?: boolean }) => {
     if (busyRef.current) return;
     busyRef.current = true;
     // Le geste qui lance la fiche débloque le son de la révélation (§18.27) et,
@@ -290,7 +293,7 @@ export function EntryForm({ inputRef, variant = "full", secondary = false, anoth
     // La page de l'attente se charge pendant la demande : entre l'accueil et l'attente, aucune image vide.
     const page = loadCardPage().catch(() => undefined);
     try {
-      const res = await api.createCard({ login: input.login, linkedin: input.linkedin, cv: input.file ?? undefined, lang, ...(input.noGithub ? { noGithub: true } : {}) });
+      const res = await api.createCard({ login: input.login, linkedin: input.linkedin, cv: input.file ?? undefined, lang, ...(input.noGithub ? { noGithub: true } : {}), ...(input.noLinkedin ? { noLinkedin: true } : {}) });
       await page;
       if (res.deleteToken) tokens.set(res.id, res.deleteToken);
       // « Réessayer » remet le lien LinkedIn dans le champ unique.
@@ -466,7 +469,7 @@ export function EntryForm({ inputRef, variant = "full", secondary = false, anoth
   // rien demander. Personne, ou la connexion n'a pas abouti : jamais les deux boutons revenus tels
   // quels, mais une phrase qui le dit et le champ ouvert, prêt pour un lien collé.
   useEffect(() => {
-    if (!back || back.s === "finding" || back.s === "pick" || back.s === "ask") return;
+    if (!back || back.s === "finding" || back.s === "pick" || back.s === "ask" || (back.s === "github" && back.found)) return;
     doneReturn();
     if (back.s === "auto") {
       setLogin(back.name);
@@ -873,6 +876,25 @@ export function EntryForm({ inputRef, variant = "full", secondary = false, anoth
     />
   );
 
+  /** « J'ai trouvé ton LinkedIn » (§18.113) : validé, le dossier GitHub + LinkedIn ; « Ce n'est pas moi », la fiche GitHub seule. */
+  const foundBlock = hold && linkFound && (
+    <LinkedinFound
+      key={linkFound.found.url}
+      found={linkFound.found}
+      busy={busy}
+      onConfirm={() => {
+        setVia("github");
+        setLogin(linkFound.login);
+        void start({ login: linkFound.login, linkedin: linkFound.found.url, viaLogin: true });
+      }}
+      onNotMe={() => {
+        setVia("github");
+        setLogin(linkFound.login);
+        void start({ login: linkFound.login, viaLogin: true, noLinkedin: true });
+      }}
+    />
+  );
+
   /** L'envoi en pilule, sous le champ ou le dépôt : pas avec les deux boutons, qui lancent eux-mêmes. */
   const submitBtn = (label: string) =>
     !buttonsOn &&
@@ -888,6 +910,7 @@ export function EntryForm({ inputRef, variant = "full", secondary = false, anoth
       <form ref={formRef} className="entry entry-inline is-stack" onSubmit={submit} onInput={prefetchReveal} onPointerDown={prefetchReveal} onFocus={onFocus} noValidate>
         {hold && finding && <FindWait since={finding.since} />}
         {askBlock}
+        {foundBlock}
         {connectedBlock}
         {loginBtns}
         {fieldOn && loginField}
@@ -915,6 +938,7 @@ export function EntryForm({ inputRef, variant = "full", secondary = false, anoth
 
       {hold && finding && <FindWait since={finding.since} />}
       {askBlock}
+      {foundBlock}
       {connectedBlock}
       {loginBtns}
       {fieldOn && loginField}

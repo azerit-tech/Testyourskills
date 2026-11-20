@@ -150,6 +150,14 @@ describe("le retour d'une connexion", () => {
     expect((await page("?gh=error")).api.getReturn()).toEqual({ s: "lost", via: "github", why: "error" });
   });
 
+  it("?gh=1 avec son LinkedIn trouvé (§18.113) : rendu tel quel ; incomplet, ignoré", async () => {
+    const found = { url: "https://www.linkedin.com/in/lea-martin-dev", name: "Léa Martin", headline: "Dev" };
+    const ok = await page("?gh=1", [{ signedIn: true, login: "leamd", found: { ...found, extra: 1 } }]);
+    expect(await ok.settled()).toEqual({ s: "github", login: "leamd", found });
+    const bad = await page("?gh=1", [{ signedIn: true, login: "leamd", found: { url: found.url } }]);
+    expect(await bad.settled()).toEqual({ s: "github", login: "leamd" });
+  });
+
   it("consommé une fois : la fiche partie ou la phrase affichée, le retour ne se rejoue pas", async () => {
     const p = await page("?li=1", [{ signedIn: true, name: "Léa Martin", auto: LEA, candidates: [] }]);
     await p.settled();
