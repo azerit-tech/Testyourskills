@@ -167,11 +167,13 @@ describe("weekTop", () => {
     store.insertCards([solo, gh("dev", 60, W46 + H, {}, { name: "dev", initials: "DE" })]);
     const top = weekTop(store.db, { now: NOW });
     expect(top.total).toBe(2);
-    expect(top.entries[0]).toEqual({ rank: 1, cardId: solo.id, name: FIXTURES.cv.name, initials: FIXTURES.cv.initials, overall: 70, stars: 4, ...(top.entries[0]!.profile ? { profile: top.entries[0]!.profile } : {}) });
+    // Son adresse LinkedIn, pour le logo qui y mène (§18.108) : sa fiche, faite par elle, est au top.
+    const linkedinUrl = "https://www.linkedin.com/in/camille";
+    expect(top.entries[0]).toEqual({ rank: 1, cardId: solo.id, name: FIXTURES.cv.name, linkedinUrl, initials: FIXTURES.cv.initials, overall: 70, stars: 4, ...(top.entries[0]!.profile ? { profile: top.entries[0]!.profile } : {}) });
     expect(top.entries[1]).toMatchObject({ rank: 2, login: "dev", initials: "DE" });
     expect(top.entries[1]!.name).toBeUndefined();
-    // Rien d'autre de la fiche ne part : ni l'adresse LinkedIn, ni l'employeur.
-    expect(JSON.stringify(top.entries)).not.toMatch(/linkedin\.com|"club"/);
+    // Rien d'autre de la fiche ne part : ni l'employeur, ni l'école, ni l'email.
+    expect(JSON.stringify(top.entries)).not.toMatch(/"club"|"school"|"email"/);
     expect(weekRank(store.db, solo.id, NOW)).toMatchObject({ rank: 1, total: 2 });
     // Son dossier arrive (même adresse LinkedIn, lien prouvé) : une seule ligne, celle du dossier.
     store.insertCards(dossier("cmp00004", "camille-dev", 65, W46 + 2 * H, { facts: { linkedinUrl: "https://www.linkedin.com/in/camille", linkedinProven: true } }));

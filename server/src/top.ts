@@ -49,6 +49,8 @@ interface Ranked {
   createdAt: number;
   /** Toutes ses fiches racines de la semaine qui entrent au classement. */
   ids: string[];
+  /** L'adresse LinkedIn de la fiche qui porte le rang, s'il y en a une (§18.108). */
+  linkedinUrl?: string | null;
 }
 
 /** Numéro de la semaine ISO de ce lundi (« 2026-W46 » donne 46). */
@@ -149,7 +151,7 @@ function computeWeek(db: Database.Database, monday: number, now: number): Ranked
     }
   }
   return [...best.values()]
-    .map(({ row, ids }) => ({ id: row.id, login: row.login, overall: row.overall!, createdAt: row.createdAt, ids }))
+    .map(({ row, ids }) => ({ id: row.id, login: row.login, overall: row.overall!, createdAt: row.createdAt, ids, linkedinUrl: row.linkedinUrl }))
     .sort((a, b) => b.overall - a.overall || a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1));
 }
 
@@ -170,7 +172,8 @@ export function weekTop(db: Database.Database, opts: { now?: number; limit?: num
     return {
       rank: i + 1,
       // La personne de la fiche : son nom, son visage, sa fiche (une fiche LinkedIn seule comprise).
-      ...boardPerson(card, r.id, r.login),
+      // Son LinkedIn (§18.108) : n'entre au top qu'une fiche faite ou revendiquée par sa personne (ENTERS_SQL).
+      ...boardPerson(card, r.id, r.login, r.linkedinUrl),
       overall: r.overall,
       stars: starsFor(r.overall),
       ...(profile ? { profile } : {}),

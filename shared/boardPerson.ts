@@ -9,6 +9,7 @@
 // Qui n'est pas montré se décide côté serveur (bands.ts, top.ts) : une fiche née
 // d'une dénonciation et pas encore revendiquée, un pseudo masqué.
 
+import { linkedinHref } from "./profileLinks";
 import type { BoardPerson, CardData } from "./types";
 
 /** Les initiales d'un nom, pour une fiche qui n'a pas rangé les siennes : deux parties, sinon deux lettres. */
@@ -21,15 +22,26 @@ function initialsOf(label: string): string {
   return two || "?";
 }
 
-/** La personne d'une fiche, pour une ligne de classement. `login` : celui de la ligne en base, si la fiche n'en porte pas. */
-export function boardPerson(card: Partial<Pick<CardData, "name" | "login" | "avatarUrl" | "initials">>, cardId: string, login?: string | null): BoardPerson {
+/**
+ * La personne d'une fiche, pour une ligne de classement. `login` : celui de la ligne en base, si la fiche n'en porte pas.
+ * `linkedinUrl` : l'adresse de son profil, que l'appelant ne passe que si la règle la permet (§18.108) ;
+ * gardée seulement si elle se normalise en linkedin.com/in/….
+ */
+export function boardPerson(
+  card: Partial<Pick<CardData, "name" | "login" | "avatarUrl" | "initials">>,
+  cardId: string,
+  login?: string | null,
+  linkedinUrl?: string | null,
+): BoardPerson {
   const handle = card.login || login || undefined;
   const name = card.name?.trim();
   const named = !!name && name.toLowerCase() !== handle?.toLowerCase();
+  const li = linkedinHref(linkedinUrl);
   return {
     cardId,
     ...(named ? { name } : {}),
     ...(handle ? { login: handle } : {}),
+    ...(li ? { linkedinUrl: li } : {}),
     ...(card.avatarUrl ? { avatarUrl: card.avatarUrl } : {}),
     initials: (card.initials?.trim() || initialsOf(named ? name : (handle ?? ""))).toUpperCase(),
   };
