@@ -53,3 +53,20 @@ export function parsePersonName(raw: unknown): PersonName | null {
   const full = `${first} ${last}`;
   return { first, last, full, key: nameWords(full).join(" ") };
 }
+
+/** Les particules d'un nom de famille : « Florent de La Tour », « Anna van der Berg ». */
+const PARTICLES = new Set(["de", "du", "des", "d", "da", "das", "do", "dos", "di", "del", "della", "der", "den", "van", "von", "ter", "ten", "le", "la", "les", "mac", "mc", "st", "ste", "saint", "sainte", "el", "al", "ben", "bin", "y", "zu"]);
+
+/**
+ * Ce qui est tapé sous « Ton nom » (§18.112) : le nom, puis un mot-clé qui départage
+ * les homonymes (« florent delorme criteo »). Le nom : le premier mot, les
+ * particules qui suivent, puis un mot (« jean de la fontaine » : quatre mots, sans
+ * mot-clé). Le reste, tel quel, est le mot-clé (une entreprise, une école, un métier).
+ */
+export function splitTyped(raw: string): { name: string; context: string } {
+  const ws = raw.normalize("NFC").replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
+  let i = 1;
+  while (i < ws.length && PARTICLES.has(nameWords(ws[i]).join(""))) i++;
+  const end = Math.min(ws.length, i + 1);
+  return { name: ws.slice(0, end).join(" "), context: ws.slice(end).join(" ") };
+}
