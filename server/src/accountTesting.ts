@@ -2,7 +2,8 @@
 // et GitHub, et les tours de connexion d'un navigateur. Aucun appel réel.
 
 import { expect, vi } from "vitest";
-import { GH_TOKEN_URL, GH_USER_URL } from "./auth";
+import type { AppOptions } from "./app";
+import { GH_SOCIAL_URL, GH_TOKEN_URL, GH_USER_URL } from "./auth";
 import { TOKEN_URL, USERINFO_URL } from "./linkedin";
 import type { LinkedinFinder } from "./linkedinProfile/index";
 import { CAMILLE, CAMILLE_URL, PROFILE, cookiesOf, postCard, setupEntry, type EntryCtx } from "./entry/testing";
@@ -25,7 +26,11 @@ export interface AccountSetup {
   secret?: string | null;
   /** « C'est moi » configuré (le GitHub prouvé donne un propriétaire). */
   claim?: boolean;
-  ghUser?: { login: string; id: number };
+  ghUser?: { login: string; id: number; name?: string; blog?: string };
+  /** Ses comptes sociaux sur GitHub (§18.113). */
+  ghSocial?: { provider: string; url: string }[];
+  /** Le reste des options de l'application (la recherche des propositions, le registre). */
+  app?: Partial<AppOptions>;
 }
 
 export function setupAccount(o: AccountSetup = {}) {
@@ -47,6 +52,7 @@ export function setupAccount(o: AccountSetup = {}) {
     if (url === TOKEN_URL || url === GH_TOKEN_URL) return Response.json({ access_token: "T" });
     if (url === USERINFO_URL) return Response.json({ sub: SUB, name: "Camille Ardent", picture: PICTURE, email: EMAIL, email_verified: true });
     if (url === GH_USER_URL) return Response.json(ghUser);
+    if (url === GH_SOCIAL_URL) return Response.json(o.ghSocial ?? []);
     if (url.startsWith("https://media.licdn.com/")) return new Response(new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2]), { headers: { "content-type": "image/jpeg" } });
     throw new Error(`appel réseau inattendu : ${url}`);
   }) as unknown as typeof fetch;
@@ -61,6 +67,7 @@ export function setupAccount(o: AccountSetup = {}) {
       githubIdentity: async () => null,
       samePhoto: async (a, b) => a === PICTURE && b === CAMILLE.photoUrl,
       linkedinProfiles,
+      ...o.app,
     },
   });
   read.urls = ctx.calls.forUrl;

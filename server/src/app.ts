@@ -369,7 +369,8 @@ export function createApp(opts: AppOptions) {
 
   // « Se connecter avec GitHub » (§18.80), avant la revendication : les deux partagent
   // /auth/github/callback, et l'entrée ne prend que ses propres retours.
-  mountGithubEnter(app, {
+  // Son LinkedIn cherché dès le retour de GitHub, par la recherche des propositions (§18.113).
+  const githubEnter = mountGithubEnter(app, {
     store,
     config: opts.githubLogin,
     claim: opts.githubAuth,
@@ -378,6 +379,8 @@ export function createApp(opts: AppOptions) {
     secure: opts.secureCookies ?? baseUrl.startsWith("https://"),
     limiter,
     fetchImpl,
+    findLinkedin: opts.propose?.linkedin,
+    registry: opts.registry,
   });
 
   // Revendication GitHub (§18.1), montée en tête : son middleware doit passer
@@ -680,6 +683,8 @@ export function createApp(opts: AppOptions) {
       let linkedinUrl: string | undefined;
       // « Je n'en ai pas » (§18.111) : sa fiche LinkedIn sort seule, sans GitHub proposé dessous.
       let noGithub = false;
+      // « Ce n'est pas moi » au LinkedIn trouvé avant le jugement (§18.113) : sa fiche GitHub seule, sans LinkedIn proposé dessous.
+      let noLinkedin = false;
 
       if (ct.startsWith("multipart/form-data")) {
         const body = await c.req.parseBody();
@@ -714,6 +719,7 @@ export function createApp(opts: AppOptions) {
         denouncedBy = (raw as { denouncedBy?: unknown }).denouncedBy;
         from = (raw as { from?: unknown }).from;
         noGithub = (raw as { noGithub?: unknown }).noGithub === true;
+        noLinkedin = (raw as { noLinkedin?: unknown }).noLinkedin === true;
         // Entrée LinkedIn (§18.24) : une adresse de profil, rien d'autre.
         if (parsed.data.linkedin !== undefined) {
           linkedinUrl = normalizeLinkedinUrl(parsed.data.linkedin) ?? undefined;
@@ -820,8 +826,13 @@ export function createApp(opts: AppOptions) {
 
       // « Se connecter avec GitHub » : le pseudo échangé par /api/entry/github, lancé par ce compte (§18.91).
       // Jamais pour un pseudo tapé, un lien collé ou une dénonciation : la fiche peut être celle d'un autre.
-      const ghAccount = account && login && !pdf && !linkedinUrl && !denounce ? account.fromRequest(c) : null;
+      // Avec un lien : seulement le LinkedIn que l'entrée vient de lui montrer (« J'ai trouvé ton LinkedIn », §18.113).
+      const ghAccountAny = account && login && !pdf && !denounce && !signedIn ? account.fromRequest(c) : null;
+      const ghAsked = ghAccountAny && linkedinUrl ? githubEnter.takeAsked(ghAccountAny.id, login!, linkedinUrl) : null;
+      const ghAccount = ghAccountAny && (!linkedinUrl || ghAsked) ? ghAccountAny : null;
       const ghLinked = !!ghAccount && account!.takeGithub(ghAccount.id, login!);
+      // Le lien qu'elle a validé (ou laissé valider) va au registre de l'App, comme un « Oui » sous la fiche (§18.100).
+      if (ghLinked && ghAsked) opts.registry?.recordLink({ login: login!, url: linkedinUrl!, ...proposalSignal(ghAsked.sure) });
       const linkGithub = (id: string) => {
         if (!ghLinked) return;
         const tie = () => store.getCard(id) && account!.link(ghAccount!.id, id);
@@ -896,7 +907,7 @@ export function createApp(opts: AppOptions) {
         ...(who?.picture ? { photo: who.picture } : {}),
         // Sa propre fiche, jamais une dénonciation : l'autre source se cherche pour la lui proposer (§18.100) ;
         // jamais après « Je n'en ai pas » (§18.111).
-        ...(!denounce && !pdf && !noGithub ? { propose: true, searchSpend: () => limiter.take("li-search", ip, SEARCHES_PER_IP) } : {}),
+        ...(!denounce && !pdf && !noGithub && !noLinkedin ? { propose: true, searchSpend: () => limiter.take("li-search", ip, SEARCHES_PER_IP) } : {}),
         ...(shownBefore ? { colorway: colorwayOf(shownBefore) } : {}),
       });
       denounced(id, true);
