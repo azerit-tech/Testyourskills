@@ -9,6 +9,8 @@
 //   --back : planche des dos de fiche (§18.27), plus un dos aux faits très longs.
 //   --autour : avec des clés, rend aussi les images sans fiche à soi (accueil, prime),
 //   en français et en anglais ; sans clé, elles sont toujours rendues.
+//   --coloris : planche des douze coloris (§18.102), une colonne par coloris, une rangée par
+//   niveau (★, ★★★, ★★★★★, ★★★★★★, une spéciale), plus les images de partage en trois coloris.
 //   Chaque image de partage se juge réduite à 360 px de large, sa taille dans un fil (§18.48).
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -22,6 +24,8 @@ import type { CardData, Lang } from "../shared/types";
 import { CardGraphic } from "../shared/card/Card";
 import { CardBackGraphic } from "../shared/card/CardBack";
 import { CARD_H, CARD_W } from "../shared/card/geometry";
+import { COLORWAY_KEYS } from "../shared/card/colorways";
+import { starsFor } from "../shared/types";
 import type { PrimeView } from "../shared/primes";
 import { renderImage, type ImageFormat, type RenderInput } from "../server/src/render/index";
 import { fetchAvatar } from "../server/src/render/avatar";
@@ -37,6 +41,7 @@ const sheetOnly = args.includes("--sheet-only");
 const profilesSheet = args.includes("--profiles");
 const backSheet = args.includes("--back");
 const around = args.includes("--autour");
+const colorSheet = args.includes("--coloris");
 const langArg = args.find((a) => a.startsWith("--lang="))?.slice(7) as Lang | undefined;
 
 const nightOwl = profilesJson.profiles.find((p) => p.id === "night_owl")!;
@@ -49,8 +54,8 @@ const EXTRA: Record<string, CardData> = {
 const entries = Object.entries({ ...FIXTURES, ...EXTRA }).filter(([k]) => only.length === 0 || only.includes(k)) as [string, CardData][];
 
 /** Planche contact : toutes les cartes sur fond sombre, pour juger d'un coup d'œil. */
-async function sheet(cards: [string, CardData][], lang?: Lang, label = "sheet", back = false) {
-  const cols = Math.min(4, cards.length);
+async function sheet(cards: [string, CardData][], lang?: Lang, label = "sheet", back = false, maxCols = 4, scale = 1.6) {
+  const cols = Math.min(maxCols, cards.length);
   const rows = Math.ceil(cards.length / cols);
   const pad = 28;
   const W = cols * CARD_W + (cols + 1) * pad;
@@ -77,7 +82,7 @@ async function sheet(cards: [string, CardData][], lang?: Lang, label = "sheet", 
   const svg = renderToStaticMarkup(el);
   const png = new Resvg(svg, {
     font: { fontFiles: fontFiles(), loadSystemFonts: false, defaultFontFamily: "Outfit" },
-    fitTo: { mode: "width", value: Math.round(W * 1.6) },
+    fitTo: { mode: "width", value: Math.round(W * scale) },
   })
     .render()
     .asPng();
@@ -113,6 +118,10 @@ async function main() {
     await sheet([...entries, ["longfacts", long]], langArg ?? "fr", "back", true);
     return;
   }
+  if (colorSheet) {
+    await colorways();
+    return;
+  }
   if (profilesSheet) {
     await sheet(profileCards(), langArg ?? "fr", "profiles");
     return;
@@ -140,6 +149,26 @@ async function main() {
   }
   if (only.length === 0 || around) await aroundImages();
   console.log(`Terminé en ${Date.now() - t0} ms`);
+}
+
+/** Les douze coloris (§18.102) : la même fiche à chaque niveau dans chacun, puis les images de partage en trois coloris. */
+async function colorways() {
+  const all = Object.values(FIXTURES) as CardData[];
+  const at = (n: number) => all.find((c) => !c.special && starsFor(c.overall) === n);
+  const rows = [at(1), at(3), at(5), at(6), all.find((c) => c.special === "wonderkid")].filter((c): c is CardData => !!c);
+  // Des clés de coloris en argument : la planche de ceux-là seulement.
+  const keys = COLORWAY_KEYS.filter((k) => only.length === 0 || only.includes(k));
+  const cards: [string, CardData][] = rows.flatMap((c) => keys.map((k) => [`${c.id}-${k}`, { ...c, colorway: k }] as [string, CardData]));
+  await sheet(cards, langArg ?? "fr", "coloris", false, keys.length, 1);
+  if (only.length) return;
+  const base = at(3) ?? all[0]!;
+  for (const k of ["corail", "sarcelle", "moutarde"] as const) {
+    for (const format of ["og", "portrait", "story"] as ImageFormat[]) {
+      const png = await renderImage({ format, card: { ...base, colorway: k }, lang: langArg ?? base.lang });
+      writeFileSync(resolve(OUT, `coloris-${k}-${format}.png`), png);
+      console.log(`→ coloris-${k}-${format}.png`);
+    }
+  }
 }
 
 /** Les images sans fiche à soi : l'accueil et une prime (ouverte, close), en français et en anglais. */

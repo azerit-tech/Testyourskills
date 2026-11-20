@@ -1,6 +1,7 @@
 // Contrat partagé entre le moteur (server), le rendu de carte (shared/card) et
 // le front (web). Toute carte affichée ou rendue en PNG est un `CardData`.
 // SPEC.md §3 (anatomie), §4 (jugement), §5 (statuts).
+import type { ColorwayKey } from "./card/colorways";
 
 export type Lang = "fr" | "en";
 
@@ -264,6 +265,11 @@ export interface CardData {
    * d'abord (« Pièces au dossier : LinkedIn · GitHub »). Absent d'une fiche à une seule pièce.
    */
   pieces?: Piece[];
+  /**
+   * Le coloris de la fiche (§18.102), tiré au hasard à sa naissance et rangé avec elle : il ne
+   * change plus, et l'image de partage a la couleur de l'écran. Absent (fiches d'avant) : tiré de l'id.
+   */
+  colorway?: ColorwayKey;
 }
 
 /**
@@ -292,6 +298,8 @@ export interface ComparisonData {
    * grille ne parte : un dossier fait par un tiers garde sa note. Absente : `caseCard` la calcule.
    */
   file?: CardData;
+  /** Le coloris du dossier (§18.102), celui de sa fiche ; ses pièces n'en ont pas à elles. */
+  colorway?: ColorwayKey;
   /** Dossier LinkedIn dont le lien avec le GitHub n'est pas prouvé (§18.24) : « Lien entre les deux pièces : à confirmer ». */
   linkUnproven?: boolean;
 }

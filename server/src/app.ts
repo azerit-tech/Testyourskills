@@ -10,6 +10,7 @@ import { dirname, join } from "node:path";
 import { z } from "zod";
 import { FIXTURES } from "../../shared/fixtures";
 import { fileOf, piecesOf } from "../../shared/caseFile";
+import { colorwayOf } from "../../shared/card/colorways";
 import { publicView } from "../../shared/publicView";
 import { isSitePage, isUpcomingPath } from "../../shared/routes";
 import type { CardData, ComparisonData, ErrorCode, Fact, JobState, Lang } from "../../shared/types";
@@ -825,6 +826,13 @@ export function createApp(opts: AppOptions) {
       limiter.take("card", ip, cardsPerDay);
       if (browser) limiter.take("card-browser", browser, cardsPerBrowser);
 
+      // La fiche complétée, si ce navigateur en tient le jeton (ou sa personne est connectée) : jamais pour une dénonciation.
+      const prev = !denounce && typeof from === "string" && ID_RE.test(from) ? store.getCard(from) : null;
+      const prevRoot = prev ? rootOf(store, prev) : null;
+      const completed = prevRoot && personOf(c, prevRoot, ownedBy(c, prevRoot)) ? prevRoot : null;
+      // Le dossier qui la complète garde son coloris (§18.102).
+      const shownBefore = completed ? (completed.kind === "comparison" ? fileOf(completed.data as ComparisonData) : (completed.data as CardData)) : null;
+
       const { id, deleteToken } = pipeline.start({
         lang,
         login,
@@ -836,6 +844,7 @@ export function createApp(opts: AppOptions) {
         ...(who?.picture ? { photo: who.picture } : {}),
         // Sa propre fiche, jamais une dénonciation : l'autre source se cherche pour la lui proposer (§18.100).
         ...(!denounce && !pdf ? { propose: true, searchSpend: () => limiter.take("li-search", ip, SEARCHES_PER_IP) } : {}),
+        ...(shownBefore ? { colorway: colorwayOf(shownBefore) } : {}),
       });
       denounced(id, true);
       lead(id);
@@ -853,10 +862,6 @@ export function createApp(opts: AppOptions) {
       // fiche que sa personne fait elle-même (elle reçoit le jeton), jamais pour une dénonciation,
       // et sans rien prendre à la limite par IP des entrées à la main.
       if (!denounce) {
-        // La fiche complétée, si ce navigateur en tient le jeton (ou sa personne est connectée).
-        const prev = typeof from === "string" && ID_RE.test(from) ? store.getCard(from) : null;
-        const prevRoot = prev ? rootOf(store, prev) : null;
-        const completed = prevRoot && personOf(c, prevRoot, ownedBy(c, prevRoot)) ? prevRoot : null;
         // « Oui » à la proposition de sa fiche (§18.100) : le lien qu'elle confirme va au registre de l'App (§18.95).
         const offered = completed ? openProposal(store.db, completed.id) : null;
         const said =

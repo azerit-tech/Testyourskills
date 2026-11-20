@@ -105,7 +105,7 @@ export function caseCard(cmp: ComparisonData): CardData {
     sentence = { label: sentence.label, ...(bail ? { bail } : {}) };
   }
 
-  const { rank: _rank, deleteToken: _token, special: _special, grid: _grid, sealed: _sealed, sentence: _sentence, ...rest } = base;
+  const { rank: _rank, deleteToken: _token, special: _special, grid: _grid, sealed: _sealed, sentence: _sentence, colorway: _colorway, ...rest } = base;
   const avatar = photoPiece(gh, declared);
   return {
     ...rest,
@@ -127,6 +127,8 @@ export function caseCard(cmp: ComparisonData): CardData {
     ...(gh.findings?.length ? { findings: gh.findings } : base.findings?.length ? { findings: base.findings } : {}),
     ...(grid ? { grid } : {}),
     pieces: piecesOf(cmp),
+    // Le coloris du dossier (§18.102) ; sans lui, celui que l'id du dossier donne.
+    ...(cmp.colorway ? { colorway: cmp.colorway } : {}),
   };
 }
 

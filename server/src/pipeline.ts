@@ -12,6 +12,7 @@
 // déjà connu par l'identité se collecte pendant la lecture du profil.
 
 import { randomBytes, randomInt } from "node:crypto";
+import { randomColorway, type ColorwayKey } from "../../shared/card/colorways";
 import type { CardData, ComparisonData, ErrorCode, Fact, Finding, Grid, JobState, Lang, ProgressEvent, Proposal } from "../../shared/types";
 import { tierFor } from "../../shared/types";
 import { frTypo, typoFacts } from "../../shared/typo";
@@ -423,6 +424,8 @@ export interface JobInput {
   propose?: boolean;
   /** Prend une unité de la limite par IP des recherches de profils par nom (§18.90) ; false : refusé. */
   searchSpend?: () => boolean;
+  /** Le coloris de la fiche que ce dossier complète (§18.102) : la personne garde sa couleur. Absent : tiré au hasard. */
+  colorway?: ColorwayKey;
 }
 
 /** Une proposition pas encore prête quand la fiche l'est : attendue ce temps-là au plus, puis la fiche sort sans elle. */
@@ -750,6 +753,9 @@ export class Pipeline {
       workP.catch(() => {}); // rejet tardif après le timeout : déjà traité
       const rows = await Promise.race([workP, timeoutP]);
       if (timedOut) throw new JobError("timeout", MESSAGES.timeout);
+      // Le coloris (§18.102) : tiré au hasard à la naissance, rangé sur la fiche racine (la fiche
+      // seule ou le dossier), ou repris de la fiche que ce dossier complète. Il ne change plus.
+      rows[0]!.data = { ...rows[0]!.data, colorway: input.colorway ?? randomColorway((n) => randomInt(n)) };
       this.opts.store.insertCards(rows);
       const root = rows[0]!;
       if (ctx.proposal) saveProposal(this.opts.store.db, root.id, ctx.proposal);
