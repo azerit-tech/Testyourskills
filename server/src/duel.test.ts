@@ -97,11 +97,10 @@ async function page(ctx: Ctx, path: string) {
 }
 
 describe("le duel dans l'aperçu du lien envoyé (§18.94)", () => {
-  it("og:image et twitter:image : le duel seulement quand r est le dénonciateur de la fiche", async () => {
+  it("og:image et twitter:image : le duel quand r est une autre fiche notée ; « On te dénonce » pour le dénonciateur", async () => {
     const ctx = setup();
     const by = await post(ctx, { login: "leamd" });
     const target = await post(ctx, { login: "camroux", denouncedBy: by });
-    const other = await post(ctx, { login: "ines-h" });
 
     const duel = await page(ctx, `/c/${target}?r=${by}`);
     expect(meta(duel, "og:image")).toMatch(new RegExp(`^${BASE}/og/${target}-vs-${by}\\.png\\?v=\\d+&amp;k=[0-9a-f]{12}$`));
@@ -112,16 +111,35 @@ describe("le duel dans l'aperçu du lien envoyé (§18.94)", () => {
     // og:url reste l'adresse de la fiche, sans r.
     expect(meta(duel, "og:url")).toBe(`${BASE}/c/${target}`);
 
-    // Tout autre r : l'aperçu habituel, inchangé.
+    // r = elle-même, un id mal formé ou inconnu : l'aperçu habituel, inchangé.
     const usual = await page(ctx, `/c/${target}`);
-    for (const r of [target, other, "pasunid", "zzzzzzzzzz"]) {
+    for (const r of [target, "pasunid", "zzzzzzzzzz"]) {
       const html = await page(ctx, `/c/${target}?r=${r}`);
       expect(meta(html, "og:image")).toBe(meta(usual, "og:image"));
       expect(meta(html, "og:title")).toBe(meta(usual, "og:title"));
     }
     expect(meta(usual, "og:image")).toMatch(new RegExp(`/og/${target}\\.png`));
-    // La fiche du dénonciateur avec r = elle-même, ou une fiche non dénoncée : rien ne change.
-    expect(meta(await page(ctx, `/c/${by}?r=${target}`), "og:image")).toMatch(new RegExp(`/og/${by}\\.png`));
+  });
+
+  it("« Lui envoyer ma note » (§18.115) : r une autre fiche notée, le face-à-face sans nommer qui envoie", async () => {
+    const ctx = setup();
+    const by = await post(ctx, { login: "leamd" });
+    const target = await post(ctx, { login: "camroux", denouncedBy: by });
+    const other = await post(ctx, { login: "ines-h" });
+    const html = await page(ctx, `/c/${target}?r=${other}`);
+    expect(meta(html, "og:image")).toMatch(new RegExp(`^${BASE}/og/${target}-vs-${other}\\.png\\?v=\\d+&amp;k=[0-9a-f]{12}$`));
+    expect(meta(html, "og:title")).toBe("Face-à-face\u00a0: 75 contre 67. À toi de jouer.");
+    expect(meta(html, "og:description")).toBe("@ines-h a une étoile d&#39;avance. Ouvre et compare.");
+    // Une fiche non dénoncée, ouverte avec r = une autre : le face-à-face aussi.
+    const back = await page(ctx, `/c/${by}?r=${target}`);
+    expect(meta(back, "og:image")).toMatch(new RegExp(`/og/${by}-vs-${target}\\.png`));
+    expect(meta(back, "og:title")).toBe("Face-à-face\u00a0: 67 contre 79. À toi de jouer.");
+    expect((await ctx.app.request(`/og/${target}-vs-${other}.png`)).status).toBe(200);
+    // Masquée : plus de face-à-face, l'image répond 404.
+    ctx.store.claimOwner("ines-h", 77);
+    ctx.store.setOwnerHidden("ines-h", true);
+    expect(meta(await page(ctx, `/c/${target}?r=${other}`), "og:image")).toMatch(new RegExp(`/og/${target}\\.png`));
+    expect((await ctx.app.request(`/og/${target}-vs-${other}.png`)).status).toBe(404);
   });
 
   it("le dénonciateur connecté comme propriétaire est nommé : « @leamd te dénonce : 79 contre 67 »", async () => {
@@ -144,11 +162,10 @@ describe("le duel dans l'aperçu du lien envoyé (§18.94)", () => {
     expect((await ctx.app.request(`/og/${target}-vs-${by}.png`)).status).toBe(404);
   });
 
-  it("l'image : les deux vues publiques, rendue une fois, cache court ; tout autre couple répond 404", async () => {
+  it("l'image : les deux vues publiques, rendue une fois, cache court ; une fiche face à elle-même ou inconnue répond 404", async () => {
     const ctx = setup();
     const by = await post(ctx, { login: "leamd" });
     const target = await post(ctx, { login: "camroux", denouncedBy: by });
-    const other = await post(ctx, { login: "ines-h" });
     const res = await ctx.app.request(`/og/${target}-vs-${by}.png`);
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe("image/png");
@@ -163,7 +180,7 @@ describe("le duel dans l'aperçu du lien envoyé (§18.94)", () => {
     // Du cache disque : pas de second rendu.
     await ctx.app.request(`/og/${target}-vs-${by}.png`);
     expect(ctx.rendered).toHaveLength(1);
-    for (const path of [`/og/${target}-vs-${other}.png`, `/og/${by}-vs-${target}.png`, `/og/${target}-vs-${target}.png`]) {
+    for (const path of [`/og/${target}-vs-${target}.png`, `/og/${target}-vs-zzzzzzzzzz.png`, `/og/zzzzzzzzzz-vs-${by}.png`]) {
       expect((await ctx.app.request(path)).status).toBe(404);
     }
   });

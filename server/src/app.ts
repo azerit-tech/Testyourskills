@@ -1150,8 +1150,8 @@ export function createApp(opts: AppOptions) {
   });
 
   /**
-   * Le duel d'une dénonciation (§18.94, duel.ts) : `/og/{fiche}-vs-{dénonciateur}.png`. Rien
-   * (404) si `r` n'est pas le dénonciateur de la fiche, ou si l'une des deux est masquée.
+   * Le duel d'un lien envoyé (§18.94, §18.115, duel.ts) : `/og/{fiche}-vs-{r}.png`. Rien (404) si `r`
+   * n'est pas une autre fiche notée, si l'une des deux est masquée, ou si c'est la même personne.
    * Rendu une fois par état des deux fiches (la clé du fichier), cache court : une
    * revendication change l'image.
    */
@@ -1207,7 +1207,7 @@ export function createApp(opts: AppOptions) {
     }
     // L'aperçu est lu par tout le monde : la version publique (shared/publicView.ts).
     const found = row ? metaFor(publicView(withWeekSpecial(store.db, row.data).data, { thirdParty: thirdParty(row) }), baseUrl) : genericMeta(baseUrl, `/c/${id}`, requestLang(c.req.query("lang"), c.req.header("Accept-Language")));
-    // Le lien envoyé par le dénonciateur (?r= sa fiche) : l'aperçu est le duel (§18.94) ; tout autre r, l'aperçu habituel.
+    // Le lien envoyé avec ?r= une autre fiche notée (dénonciation, « Lui envoyer ma note ») : l'aperçu est le duel (§18.94, §18.115).
     const duel = row ? duelOf(store, row, c.req.query("r"), thirdParty) : null;
     const meta = { ...(duel ? duelMeta(duel, found, baseUrl) : found), noindex: true };
     const html = template ? injectMeta(template, meta) : standalonePage(meta);

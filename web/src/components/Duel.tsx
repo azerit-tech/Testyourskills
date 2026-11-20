@@ -1,6 +1,7 @@
 // Le duel (§18.7, §18.48, §18.104) : qui a déjà sa fiche lit, plus bas sous celle d'une autre
 // personne, « 83/100 contre 68/100 : une étoile d'avance », et peut lui envoyer son score avec
-// le lien de sa propre fiche, en contour : jamais le rose, jamais dans la barre du pouce.
+// le lien de cette fiche (?r= la sienne : elle s'ouvre sur les deux fiches, §18.115), en contour :
+// jamais le rose, jamais dans la barre du pouce.
 // Sur une fiche dénoncée (qu'on vient peut-être de recevoir), l'écart seul, rien à envoyer.
 // Face à un dossier scellé, la note ne se dit pas : il ne reste que « Ma fiche ». Sur sa
 // propre fiche toute neuve, le même duel face à la fiche par laquelle on est arrivé (« Tu viens de… »).
@@ -30,7 +31,7 @@ function said(d: ReturnType<typeof useT>["t"]["denounce"], me: number, them: num
 }
 
 /** L'autre fiche : la fiche regardée, ou celle par laquelle on est arrivé. */
-export type Rival = Pick<CardData, "name" | "overall"> & { login?: string | null; sealed?: boolean };
+export type Rival = Pick<CardData, "name" | "overall"> & { id?: string; login?: string | null; sealed?: boolean };
 
 export function useDuelSend(mine: MyCard | null, card: Rival, toast: (m: string) => void): DuelSend {
   const { t } = useT();
@@ -41,7 +42,8 @@ export function useDuelSend(mine: MyCard | null, card: Rival, toast: (m: string)
     if (!mine) return;
     const { text, rel } = said(d, mine.overall, card.overall);
     const lead = d.duelText(mine.overall, card.overall, text, who, rel);
-    const url = shareUrl(mine.id);
+    // La fiche de qui reçoit, avec ?r= la sienne : elle s'ouvre sur les deux fiches côte à côte (§18.115).
+    const url = card.id ? shareUrl(card.id, mine.id) : shareUrl(mine.id);
     const track = (channel: string) => api.track("card_shared", mine.id, { channel, kind: "duel" });
     if (isTouch() && hasNativeShare()) {
       try {
@@ -56,7 +58,7 @@ export function useDuelSend(mine: MyCard | null, card: Rival, toast: (m: string)
     if (await copyText(message)) toast(d.scoreCopied);
     else setManual(message);
     track("copy");
-  }, [mine, card.overall, who, d, toast]);
+  }, [mine, card.id, card.overall, who, d, toast]);
   return { send: mine && !card.sealed ? send : null, manual };
 }
 

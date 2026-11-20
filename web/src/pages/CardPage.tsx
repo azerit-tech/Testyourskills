@@ -11,6 +11,7 @@ import { BandPick } from "../components/BandPick";
 import { Denounce } from "../components/Denounce";
 import { Denounced, useRemake } from "../components/Denounced";
 import { Duel, useDuelSend } from "../components/Duel";
+import { useVsSender, VsPair } from "../components/VsPair";
 import { EntryForm } from "../components/EntryForm";
 import { ReturnCall } from "../components/ReturnCall";
 import { PrimeRace } from "../components/Primes";
@@ -692,9 +693,12 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
   const fromRival = !visitor && fresh && rival && rival.id !== id && !(rival.login && main.login && rival.login.toLowerCase() === main.login.toLowerCase()) ? rival : null;
   const own: MyCard = { id, login: main.login ?? null, overall: main.overall };
   const fromDuel = useDuelSend(fromRival && !main.sealed ? own : null, fromRival ?? main, toast.show);
+  // Ouverte par le lien qu'une autre fiche a envoyé (?r=, §18.115) : les deux fiches côte à côte au premier écran.
+  const sender = useVsSender(main);
+  const vs = sender !== null && !animating;
 
   return (
-    <main ref={pageRef} className={`page page-card page-result${animating ? " is-animating" : ""}${visitor ? " is-visitor" : ""}${wantedYou ? " is-wanted" : ""}`} id="main">
+    <main ref={pageRef} className={`page page-card page-result${animating ? " is-animating" : ""}${visitor ? " is-visitor" : ""}${wantedYou ? " is-wanted" : ""}${vs ? " has-vs" : ""}`} id="main">
       {/* Le ciel de la page (§18.29) : derrière la barre du haut, une fois la fiche posée. */}
       {/* Le film se pose sur ce ciel : il entre sous le flash, au passage de relais. */}
       <ProfileSky card={main} shown={settled || (scene === "film" && phase === "handoff")} />
@@ -715,7 +719,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
         <WantedHead card={main} links={api.linksOf(id)}>{chase}</WantedHead>
         {/* Le visiteur, sur téléphone (§18.48) : ce qu'il regarde, au-dessus de la fiche, deux lignes au plus.
             Au bureau, la phrase entière ouvre « À ton tour », en tête de la colonne de droite. */}
-        {visitor && (
+        {/* Le face-à-face a sa propre ligne au-dessus des deux fiches : pas de phrase de plus. */}
+        {visitor && !vs && (
           <p className="visitor-lead">
             {/* Ses profils (§18.108) : sur téléphone, la tête est masquée au visiteur, ils sont au bout de la phrase qui le nomme. */}
             {wantedYou ? (
@@ -753,15 +758,19 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
           </ErrorBoundary>
         )}
         <section ref={stageRef} className="result-stage" onClick={animating && scene !== "film" ? onStageClick : undefined}>
-          <div className="single-stage">
-            {/* La fiche se retourne (§18.27). Les étoiles ne s'allument ici que sans révélation 3D : sinon elles se rallumeraient sur la carte posée. */}
-            {/* Un dossier à deux pièces : une seule fiche, et ses pièces dessous (§18.36). */}
-            <CardViewOptions.Provider value={{ flippable: true, starsIntro: !animate && !replayed }}>
-              <RevealCard card={main} lang={lang} phase={phase} idPrefix="result" staged={staged} />
-            </CardViewOptions.Provider>
-            {item.kind === "comparison" && settled && <Pieces cmp={item.comparison} />}
-          </div>
-          {chase && <div className="stage-chase">{chase}</div>}
+          {vs ? (
+            <VsPair sender={sender} card={main} />
+          ) : (
+            <div className="single-stage">
+              {/* La fiche se retourne (§18.27). Les étoiles ne s'allument ici que sans révélation 3D : sinon elles se rallumeraient sur la carte posée. */}
+              {/* Un dossier à deux pièces : une seule fiche, et ses pièces dessous (§18.36). */}
+              <CardViewOptions.Provider value={{ flippable: true, starsIntro: !animate && !replayed }}>
+                <RevealCard card={main} lang={lang} phase={phase} idPrefix="result" staged={staged} />
+              </CardViewOptions.Provider>
+              {item.kind === "comparison" && settled && <Pieces cmp={item.comparison} />}
+            </div>
+          )}
+          {chase && !vs && <div className="stage-chase">{chase}</div>}
           {animating && phase !== "ready" && (
             <button
               type="button"

@@ -100,7 +100,7 @@ describe("la barre « Faire ma fiche » du visiteur", () => {
     expect(page).toMatch(/useStageTop\(pageRef, stageRef\)/);
     // Sous 760 px de haut, la tête se masque (la plaque de la fiche dit la même chose) ; « Revoir ma poursuite » passe sous la fiche.
     expect(css).toMatch(/@media \(max-width: 640px\) and \(max-height: 759px\) \{\s*\.page-result > \.result-top > \.wanted \{[^}]*clip-path: inset\(50%\);/);
-    expect(page).toMatch(/\{chase && <div className="stage-chase">\{chase\}<\/div>\}/);
+    expect(page).toMatch(/\{chase && (!vs && )?<div className="stage-chase">\{chase\}<\/div>\}/);
   });
 
   it("le bouton de la barre, cas par cas : vérifier sa fiche reçue, faire la sienne, ou rien (§18.104)", () => {

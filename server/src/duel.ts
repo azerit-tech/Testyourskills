@@ -1,9 +1,10 @@
-// Le duel d'une dénonciation (SPEC §18.94). Le lien que le dénonciateur envoie porte
-// `?r={sa fiche}` ; quand `r` est bien `cards.denounced_by` de la fiche ouverte et que
-// la fiche du dénonciateur est visible, l'aperçu du lien devient le face-à-face :
-// og:image `/og/{fiche}-vs-{dénonciateur}.png`, og:title « @moi te dénonce : 78 contre 71 ».
-// Tout autre `r`, ou un cas douteux (fiche masquée, dénonciateur scellé, adresse d'une
-// pièce), garde l'aperçu habituel. La règle de comparaison est celle de la page
+// Le duel d'un lien envoyé (SPEC §18.94, §18.115). Le lien porte `?r={fiche de qui envoie}` :
+// une dénonciation (`r` est `cards.denounced_by` de la fiche ouverte), ou « Lui envoyer ma note »
+// (la fiche de qui reçoit, avec `r` la sienne). Quand la fiche de `r` est une autre fiche,
+// visible et notée, l'aperçu du lien devient le face-à-face : og:image
+// `/og/{fiche}-vs-{r}.png`, og:title « @moi te dénonce : 78 contre 71 » (dénonciation) ou
+// « Face-à-face : 78 contre 71 » (tout autre envoi). Un cas douteux (fiche masquée,
+// supprimée, `r` scellé, la même personne, adresse d'une pièce) garde l'aperçu habituel. La règle de comparaison est celle de la page
 // partagée (shared/versus.ts) : les étoiles d'abord, les points à étoiles égales.
 //
 // Le cache disque : `{ogDir}/vs/{fiche}-vs-{dénonciateur}-{clé}.png`, où la clé est
@@ -30,10 +31,12 @@ export const DUEL_FILE_RE = /^([A-Za-z0-9]{6,32})-vs-([A-Za-z0-9]{6,32})\.png$/;
 export const DUEL_DIR = "vs";
 
 export interface Duel {
-  /** La fiche dénoncée, en vue publique (scellée si le dossier est vide et fait par un tiers). */
+  /** La fiche ouverte, en vue publique (scellée si le dossier est vide et fait par un tiers). */
   target: CardData;
-  /** La fiche du dénonciateur, en vue publique, jamais scellée. */
+  /** La fiche de qui envoie le lien, en vue publique, jamais scellée. */
   by: CardData;
+  /** `by` a dénoncé la fiche (§18.94) : l'aperçu parle de dénonciation ; sinon, d'un face-à-face. */
+  denounce: boolean;
   /** Le dénonciateur signe (connecté comme propriétaire de sa fiche, §18.23) : l'aperçu le nomme. */
   named: boolean;
   /** Empreinte des deux vues publiques : la clé du cache disque. */
@@ -47,18 +50,24 @@ const cardOf = (data: CardData | ComparisonData): CardData => ("cv" in data && "
  * `thirdParty` : la règle d'app.ts (née d'une dénonciation, login pas revendiqué).
  */
 export function duelOf(store: Store, row: CardRow, r: string | null | undefined, thirdParty: (row: CardRow) => boolean): Duel | null {
-  if (!r || !ID_RE.test(r) || row.denouncedBy !== r || r === row.id) return null;
-  if (store.isHidden(store.loginOf(row))) return null;
-  // La fiche du dénonciateur telle qu'elle se montre à son adresse (le dossier qui l'a remplacée).
+  if (!r || !ID_RE.test(r) || r === row.id) return null;
+  const login = store.loginOf(row);
+  if (store.isHidden(login)) return null;
+  // La fiche de qui envoie telle qu'elle se montre à son adresse (le dossier qui l'a remplacée).
   const byRow = store.fileRow(r);
-  if (!byRow || byRow.id === row.id || store.isHidden(store.loginOf(byRow))) return null;
+  if (!byRow || byRow.id === row.id) return null;
+  const byLogin = store.loginOf(byRow);
+  if (store.isHidden(byLogin)) return null;
+  // La même personne des deux côtés : rien à comparer.
+  if (login && byLogin && login.toLowerCase() === byLogin.toLowerCase()) return null;
+  const denounce = row.denouncedBy === r;
   const target = cardOf(publicView(withWeekSpecial(store.db, row.data).data, { thirdParty: thirdParty(row) }));
   const by = cardOf(publicView(withWeekSpecial(store.db, byRow.data).data, { thirdParty: thirdParty(byRow) }));
   // Le dénonciateur sans note (dossier vide fait par un tiers) : rien à comparer.
   if (by.sealed) return null;
-  const named = !!row.denouncerLogin && !!store.getOwner(row.denouncerLogin) && store.loginOf(byRow)?.toLowerCase() === row.denouncerLogin;
+  const named = denounce && !!row.denouncerLogin && !!store.getOwner(row.denouncerLogin) && byLogin?.toLowerCase() === row.denouncerLogin;
   const key = createHash("sha1").update(JSON.stringify([target, by])).digest("hex").slice(0, 12);
-  return { target, by, named, key };
+  return { target, by, denounce, named, key };
 }
 
 const whoOf = (card: CardData) => (card.login ? `@${card.login}` : card.name);
@@ -97,7 +106,8 @@ export function duelMeta(d: Duel, base: PageMeta, baseUrl: string): PageMeta {
   const lang = base.lang;
   const fr = lang === "fr";
   const byWho = whoOf(d.by);
-  const lead = d.named ? (fr ? `${byWho} te dénonce` : `${byWho} turned you in`) : fr ? "On te dénonce" : "You've been turned in";
+  // Hors dénonciation (§18.115), le lien ne dit pas qui l'envoie : n'importe qui peut poser deux fiches publiques en face.
+  const lead = !d.denounce ? (fr ? "Face-à-face" : "Face-off") : d.named ? (fr ? `${byWho} te dénonce` : `${byWho} turned you in`) : fr ? "On te dénonce" : "You've been turned in";
   const sealed = !!d.target.sealed;
   const title = sealed
     ? fr
@@ -107,13 +117,21 @@ export function duelMeta(d: Duel, base: PageMeta, baseUrl: string): PageMeta {
       ? `${lead} : ${d.by.overall} contre ${d.target.overall}. À toi de jouer.`
       : `${lead}: ${d.by.overall} vs ${d.target.overall}. Your move.`;
   const line = duelVerdict(d, lang);
-  const description = sealed
-    ? fr
-      ? `${line} Reprends ta fiche.`
-      : `${line} Take your sheet back.`
-    : fr
-      ? `${line}. Reprends ta fiche et fais mieux.`
-      : `${line}. Take your sheet back and beat it.`;
+  const description = !d.denounce
+    ? sealed
+      ? fr
+        ? `${line} Ta fiche t'attend.`
+        : `${line} Your sheet is waiting.`
+      : fr
+        ? `${line}. Ouvre et compare.`
+        : `${line}. Open and compare.`
+    : sealed
+      ? fr
+        ? `${line} Reprends ta fiche.`
+        : `${line} Take your sheet back.`
+      : fr
+        ? `${line}. Reprends ta fiche et fais mieux.`
+        : `${line}. Take your sheet back and beat it.`;
   return {
     ...base,
     title,

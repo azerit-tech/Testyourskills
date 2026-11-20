@@ -911,6 +911,14 @@ const fr = frTypoDeep({
   /** Le titre de l'onglet d'une adresse inconnue (la page : components/ErrorPage.tsx, textes sous `pages.error`). */
   notFound: { title: "Page introuvable" },
   crash: { title: "La page n'a pas chargé", text: "Le réseau a peut-être coupé, ou le site vient d'être mis à jour.", reload: "Recharger" },
+  /** Le face-à-face reçu (§18.115) : la fiche de qui a envoyé le lien, « VS », la fiche de la page. */
+  vs: {
+    label: "Face-à-face",
+    line: (left: number, right: number, gap: string | null, who: string) => (gap === null ? `${left} contre ${right} : égalité` : `${left} contre ${right} : ${gap} pour ${who}`),
+    sealed: (who: string) => `Fais mieux que ${who} ?`,
+    open: (who: string) => `Voir la fiche de ${who} en grand`,
+    close: "Fermer",
+  },
   /** Les logos qui mènent à ses profils publics (§18.108) : lus, jamais écrits à l'écran. */
   profiles: {
     group: (who: string) => `Profils ${deOf(who)}`,
@@ -1652,6 +1660,13 @@ const en: Dict = {
   },
   notFound: { title: "Page not found" },
   crash: { title: "The page didn't load", text: "The network may have dropped, or the site was just updated.", reload: "Reload" },
+  vs: {
+    label: "Face-off",
+    line: (left, right, gap, who) => (gap === null ? `${left} vs ${right}: dead heat` : `${left} vs ${right}: ${who} is ${gap}`),
+    sealed: (who) => `Beat ${who}?`,
+    open: (who) => `See ${who}'s sheet full size`,
+    close: "Close",
+  },
   profiles: {
     group: (who: string) => `${who}'s profiles`,
     linkedin: (who: string) => `${who}'s LinkedIn`,
