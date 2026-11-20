@@ -420,6 +420,21 @@ export class Store {
     })();
   }
 
+  /**
+   * Le lien de ce dossier LinkedIn + GitHub prouvé après coup (rattrapage du §18.116,
+   * `ops/rattrapage-dossiers-connectes.ts`) : `linkedinProven` et sa raison, puis il
+   * remplace les fiches plus anciennes de sa personne, comme s'il était né prouvé.
+   */
+  proveLinkedin(id: string, proof: string): boolean {
+    const row = this.getCard(id);
+    if (!row || row.parentId || row.kind !== "comparison" || row.source !== "linkedin" || !row.login || row.denounceBorn) return false;
+    const facts = { ...((row.facts as Record<string, unknown> | null) ?? {}), linkedinProven: true, linkedinProof: proof };
+    this.db.prepare(`UPDATE cards SET facts_json = ? WHERE id = ?`).run(JSON.stringify(facts), id);
+    this.supersede({ id, parentId: null, createdAt: row.createdAt, source: row.source, login: row.login, kind: row.kind, data: row.data, facts, deleteToken: row.deleteToken });
+    forgetWeekRanks(this.db);
+    return true;
+  }
+
   /** Les fiches que ce dossier remplace. */
   private supersededIds(id: string): string[] {
     return (this.db.prepare(`SELECT id FROM cards WHERE superseded_by = ?`).all(id) as { id: string }[]).map((x) => x.id);

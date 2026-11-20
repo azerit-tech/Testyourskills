@@ -70,3 +70,31 @@ export function splitTyped(raw: string): { name: string; context: string } {
   const end = Math.min(ws.length, i + 1);
   return { name: ws.slice(0, end).join(" "), context: ws.slice(end).join(" ") };
 }
+
+/**
+ * Ce GitHub est-il plausiblement celui de cette personne (§18.116) ? La règle qui
+ * fait entrer au top le dossier d'une personne connectée à LinkedIn qui a donné ou
+ * confirmé son GitHub. Oui si : le nom affiché sur GitHub est son nom complet ; le
+ * pseudo contient son nom de famille (trois lettres au moins), ou son prénom suivi
+ * de l'initiale du nom (« raphael-crv ») ; le nom affiché commence par son prénom,
+ * suivi de rien ou d'un mot à l'initiale du nom (« Jacques », « Raphael Crv »).
+ */
+export function githubFitsName(person: unknown, login: unknown, githubName: unknown): boolean {
+  const p = nameWords(person);
+  if (p.length < 2) return false;
+  if (samePublicFullName(githubName, person)) return true;
+  const first = p[0]!;
+  const rest = p.slice(1).filter((w) => !PARTICLES.has(w));
+  const last = rest.length ? rest : p.slice(1);
+  const lastWord = last[last.length - 1]!;
+  const initial = last[0]![0]!;
+  const lg = nameWords(login).join("");
+  if (lg) {
+    const surname = last.join("");
+    if (surname.length >= 3 && lg.includes(surname)) return true;
+    if (lastWord.length >= 3 && lg.includes(lastWord)) return true;
+    if (first.length >= 2 && lg.includes(first + initial)) return true;
+  }
+  const g = nameWords(githubName);
+  return first.length >= 2 && g[0] === first && (g.length === 1 || g[1]![0] === initial);
+}

@@ -124,6 +124,8 @@ export interface KnownCard {
 
 /** Ce que la fiche lancée reçoit de la personne connectée (app.ts). */
 export interface EntryIdentity {
+  /** Le nom que LinkedIn a rendu à la connexion. */
+  name: string;
   /** Email vérifié par LinkedIn : le contact de la fiche, rien d'autre. */
   email?: string;
   github: GithubIdentity | null;
@@ -537,6 +539,7 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
     const sure = r.sure?.url === linkedinUrl;
     if (!sure && !r.candidates.some((x) => x.url === linkedinUrl)) return null;
     return {
+      name: found.session.name,
       email: found.session.email,
       github: r.github,
       // Le profil au seul nom et employeur, ou choisi parmi des homonymes, fait partir la fiche sans valoir une preuve.

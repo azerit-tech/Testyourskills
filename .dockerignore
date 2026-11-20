@@ -44,7 +44,10 @@ tools
 scripts/*
 !scripts/weekly.ts
 !scripts/recalcule-notes.ts
-ops
+# ops/ aussi, sauf le rattrapage du §18.116, lancé dans le conteneur :
+#   docker exec testyourskills node_modules/.bin/tsx ops/rattrapage-dossiers-connectes.ts [--oui]
+ops/*
+!ops/rattrapage-dossiers-connectes.ts
 **/*.test.ts
 vitest.config.ts
 docker-compose.yml

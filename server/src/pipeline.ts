@@ -22,6 +22,7 @@ import type { NewCardRow, Store } from "./db";
 import { TokenPool } from "./github/tokens";
 import type { GithubLookup, LinkedinFinder, LinkedinProfile } from "./linkedinProfile/index";
 import { githubDeclaredOf, githubShowsLinkedin } from "./linkedinProfile/url";
+import { githubFitsName } from "./names";
 import type { PersonHints } from "./match/github";
 import type { GithubHints } from "./match/linkedin";
 import { saveProposal } from "./match/store";
@@ -447,6 +448,13 @@ export interface JobInput {
    * (email ou photo), pas un choix parmi des homonymes.
    */
   identity?: { githubLogin: string; how: "email" | "name"; sureProfile: boolean };
+  /**
+   * Connectée à LinkedIn sur son profil sûr (email ou photo), elle a donné ou confirmé
+   * ce pseudo-là avant le jugement (§18.111, §18.113) : son nom de connexion, et
+   * `email` si ce GitHub est aussi celui de son email. Le dossier est prouvé si ce
+   * GitHub est plausiblement le sien (`signedInProof`, §18.116).
+   */
+  signedInGithub?: { name: string; email?: boolean };
   /** Entrée « Se connecter avec LinkedIn » : la photo que LinkedIn vient de rendre de la personne (§18.99). */
   photo?: string;
   /** La fiche est celle que la personne fait pour elle (jamais une dénonciation) : l'autre source se cherche pour la lui proposer (§18.100). */
@@ -488,6 +496,19 @@ function within<T>(p: Promise<T | null>, ms: number): Promise<T | null> {
     timer.unref?.();
   });
   return Promise.race([p.catch(() => null), late]).finally(() => clearTimeout(timer));
+}
+
+/**
+ * Le dossier d'une personne connectée à LinkedIn, avec le GitHub qu'elle a donné ou
+ * confirmé (§18.116) : prouvé si c'est ce pseudo et ce profil-là, et que ce GitHub est
+ * plausiblement le sien (son email y mène, ou son nom concorde). La raison, sinon null.
+ */
+export function signedInProof(input: JobInput, login: string | undefined, linkedinUrl: string, facts: unknown, profileName: string | undefined): "signin+email" | "signin+name" | null {
+  const s = input.signedInGithub;
+  if (!s || !login || !input.login || login.toLowerCase() !== input.login.toLowerCase() || linkedinUrl !== input.linkedinUrl) return null;
+  if (s.email) return "signin+email";
+  const gh = githubDeclaredOf(facts);
+  return [s.name, profileName].some((n) => githubFitsName(n, gh?.login ?? login, gh?.name)) ? "signin+name" : null;
 }
 
 /** Ce que la fiche GitHub sait de la personne, pour lui chercher son LinkedIn. */
@@ -1001,7 +1022,10 @@ export class Pipeline {
     // se lit à son adresse et par le cache de son adresse LinkedIn, mais ne passe
     // jamais devant la fiche GitHub du pseudo et n'entre pas au top (§18.24).
     const vouchedLink = !!vouched && linkedinAsked === vouched.linkedinUrl;
-    const linkedinProven = !!li && !!linkedinUrl && (li.proven || vouchedLink || identityProven || githubShowsLinkedin(gh.facts, linkedinUrl));
+    const shownProven = !!li && !!linkedinUrl && (li.proven || vouchedLink || identityProven || githubShowsLinkedin(gh.facts, linkedinUrl));
+    // Connectée à LinkedIn, elle a donné ou confirmé ce GitHub, plausiblement le sien (§18.116).
+    const signedProof = !shownProven && !!li && !!linkedinUrl ? signedInProof(input, login, linkedinUrl, gh.facts, li.profile.name) : null;
+    const linkedinProven = shownProven || !!signedProof;
 
     // Le dossier : un seul calcul sur les deux pièces, une grille, une note (SPEC §18.84).
     // Trois lignes : le dossier, qui porte la note, et ses deux pièces, qui n'en ont pas à elles.
@@ -1024,7 +1048,7 @@ export class Pipeline {
         login,
         kind: "comparison",
         data: comparison,
-        ...(linkedinUrl ? { facts: { linkedinUrl, linkedinProven } } : {}),
+        ...(linkedinUrl ? { facts: { linkedinUrl, linkedinProven, ...(signedProof ? { linkedinProof: signedProof } : {}) } } : {}),
         deleteToken,
         degraded: gh.degraded,
       },
