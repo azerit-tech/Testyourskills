@@ -66,8 +66,10 @@ export interface CardProfile {
   /** Identifiant stable (data/profiles.json). */
   id: string;
   label: Fact;
-  /** Phrase d'accroche, 60 signes au plus. */
+  /** La phrase de la fiche (§18.103) : celle de la personne à la lecture, celle du catalogue rangée. */
   tagline: Fact;
+  /** La phrase que l'IA a écrite pour cette personne, contrôlée (shared/punchline.ts). Absente : la fiche tire la sienne au recueil. */
+  line?: Fact;
 }
 
 /** D'où vient une trouvaille : GitHub, puis LinkedIn (§18.24) et les autres témoins (§18.25). */
