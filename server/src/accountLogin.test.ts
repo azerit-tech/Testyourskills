@@ -23,8 +23,9 @@ describe("connexion = compte", () => {
     expect(set).toMatch(new RegExp(`Max-Age=${ACCOUNT_TTL_MS / 1000}`));
     const [row] = rows(ctx);
     expect(row).toMatchObject({ linkedin_key: linkedinKey(SECRET, SUB), github_id: null, card_id: null });
+    // Le nom et une copie de la photo sont gardés depuis le §18.105 ; jamais le sub, l'email ni l'adresse signée de LinkedIn.
     const dump = JSON.stringify(ctx.store.db.prepare(`SELECT * FROM accounts`).all());
-    for (const secretBit of [SUB, EMAIL, "Camille", PICTURE]) expect(dump).not.toContain(secretBit);
+    for (const secretBit of [SUB, EMAIL, PICTURE]) expect(dump).not.toContain(secretBit);
     expect(await me(ctx, jar)).toEqual({ login: null, hidden: false, cardId: null, cardLogin: null, overall: null, avatarUrl: null, initial: null, sources: ["linkedin"] });
   });
 
@@ -46,10 +47,10 @@ describe("connexion = compte", () => {
     expect(ctx.calls.forUrl.length).toBe(jobs);
     expect(await me(ctx, again.jar)).toMatchObject({ cardId: json.id });
 
-    // « Refaire ma fiche » : le parcours d'aujourd'hui, la recherche comprise.
-    const redo = await linkedinIn(ctx, again.jar, "?redo=1");
-    expect(redo.location).toBe(`${BASE}/?li=1`);
-    expect(ctx.calls.byName.length).toBe(searches + 1);
+    // « Refaire ma fiche » : le profil que le compte retient, sans repasser chez LinkedIn ni rien chercher (§18.105).
+    const redo = await ctx.app.request("/auth/linkedin/enter?redo=1", { headers: { cookie: again.jar } });
+    expect(redo.headers.get("location")).toBe(`${BASE}/?li=1`);
+    expect(ctx.calls.byName.length).toBe(searches);
   });
 
   it("GitHub : un compte par l'identifiant ; la fiche du pseudo échangé y va, et revenir y mène", async () => {

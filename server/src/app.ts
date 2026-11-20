@@ -353,7 +353,14 @@ export function createApp(opts: AppOptions) {
   });
 
   // Le compte léger (§18.91), en tête : toutes les routes lisent le compte du navigateur.
-  const account = createAccounts({ store, secret: opts.accountSecret ?? opts.githubAuth?.sessionSecret, secure: opts.secureCookies ?? baseUrl.startsWith("https://") });
+  const account = createAccounts({
+    store,
+    secret: opts.accountSecret ?? opts.githubAuth?.sessionSecret,
+    secure: opts.secureCookies ?? baseUrl.startsWith("https://"),
+    // La copie de la photo de connexion (§18.105) : rangée avec les photos des fiches, sous un nom à elle.
+    keepPhoto: (url, fileId) => keepPhoto(url, fileId, { avatarDir, baseUrl, fetchImpl }),
+    dropPhoto: (fileId) => removeAvatars(avatarDir, [fileId]),
+  });
   mountAccount(app, account);
 
   // « Se connecter avec GitHub » (§18.80), avant la revendication : les deux partagent
@@ -734,6 +741,8 @@ export function createApp(opts: AppOptions) {
         // La fiche de l'entrée connectée va à son compte (§18.91).
         const accountId = who?.accountId;
         if (!email && !accountId) return;
+        // Le profil qu'elle vient de lancer : son compte le retient, pour ne plus la renvoyer chez LinkedIn (§18.105).
+        if (accountId && linkedinUrl && who) account?.rememberProfile(accountId, { url: linkedinUrl, how: who.profileHow, github: who.github });
         const tie = () => {
           const row = store.getCard(id);
           if (!row) return;
@@ -949,7 +958,7 @@ export function createApp(opts: AppOptions) {
     // Supprimée par sa personne connectée : son compte part avec, et elle sort ; tous les cookies (§18.91).
     const leaving = bySessionOk ? account?.fromRequest(c) : null;
     if (leaving) {
-      account!.accounts.remove(leaving.id);
+      await account!.remove(leaving.id);
       account!.clear(c);
       deleteCookie(c, SESSION_COOKIE, { httpOnly: true, secure: opts.secureCookies ?? baseUrl.startsWith("https://"), sameSite: "Lax", path: "/" });
       linkedinEnter?.forgetAll(c);

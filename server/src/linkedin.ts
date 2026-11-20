@@ -21,7 +21,7 @@ import type { Context, Hono } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { fileOf } from "../../shared/caseFile";
 import type { CardData, ComparisonData } from "../../shared/types";
-import { linkedinKey, type AccountKit } from "./account";
+import { linkedinKey, type AccountKit, type LinkedinMemo } from "./account";
 import { ownerFromRequest, safeReturnPath, sign, unsign } from "./auth";
 import type { CardRow, Store } from "./db";
 import { ID_RE } from "./pipeline";
@@ -83,9 +83,13 @@ export async function savePhoto(avatarDir: string, baseUrl: string, id: string, 
   return `${baseUrl}/avatar/${id}.${photo.ext}?v=${Date.now().toString(36)}`;
 }
 
-/** Télécharge une photo LinkedIn (media.licdn.com) et la range sous le nom de la fiche : son adresse chez nous. */
+/**
+ * Télécharge une photo LinkedIn (media.licdn.com) et la range sous le nom de la fiche : son adresse chez nous.
+ * Une photo déjà chez nous (la copie que le compte garde de la connexion, §18.105) est recopiée sur disque.
+ */
 export async function keepPhoto(url: string, id: string, o: { avatarDir: string; baseUrl: string; fetchImpl: typeof fetch }): Promise<string> {
-  return savePhoto(o.avatarDir, o.baseUrl, id, await downloadPhoto(url, o.fetchImpl));
+  const own = await ownPhoto(url, o.baseUrl, o.avatarDir);
+  return savePhoto(o.avatarDir, o.baseUrl, id, own ?? (await downloadPhoto(url, o.fetchImpl)));
 }
 
 /** La photo servie par nous (`{baseUrl}/avatar/{fichier}`), lue sur disque ; null pour toute autre adresse. */
@@ -239,6 +243,11 @@ export interface LinkedinEnterHook {
   allow(c: Context): boolean;
   /** Le retour de LinkedIn : ce qu'il rend de la personne, puis la page où revenir. `accountId` : son compte (§18.91). */
   finish(c: Context, returnPath: string, profile: OidcProfile, accountId?: string): Response | Promise<Response>;
+  /**
+   * Déjà connectée (§18.105) : le profil que son compte retient, sans repasser chez LinkedIn ni
+   * rien chercher. Le retour est celui d'une connexion (`?li=1`), le profil déjà sûr.
+   */
+  resume?(c: Context, returnPath: string, who: Required<Pick<LinkedinMemo, "url">> & LinkedinMemo & { accountId: string }): Response | Promise<Response>;
 }
 
 // --- Mise à jour des cartes -------------------------------------------------
@@ -349,7 +358,7 @@ export function mountLinkedin(app: Hono, o: LinkedinRoutesOptions) {
     });
   });
 
-  app.get("/auth/linkedin/start", (c) => {
+  app.get("/auth/linkedin/start", async (c) => {
     if (!o.config) return c.json({ ok: false, message: { fr: "Connexion LinkedIn désactivée.", en: "LinkedIn sign-in is disabled." } }, 404);
     const id = c.req.query("card") ?? "";
     const row = ID_RE.test(id) ? o.store.getCard(id) : null;
@@ -372,6 +381,25 @@ export function mountLinkedin(app: Hono, o: LinkedinRoutesOptions) {
       // Ni le jeton de la fiche, ni le compte dont c'est la fiche (§18.91).
       return c.json({ ok: false, message: { fr: "Changer la photo est réservé à qui a créé la fiche.", en: "Only the sheet's creator can change its photo." } }, 403);
     }
+    c.header("Cache-Control", "no-store");
+    // Sa propre fiche, déjà connectée par LinkedIn (§18.105) : la copie de la photo de sa connexion,
+    // sans repasser chez LinkedIn. Jamais sur la fiche d'un autre dont ce navigateur tient le jeton.
+    const acct = o.account?.fromRequest(c) ?? null;
+    const memo = acct ? o.account!.linkedinOf(acct) : null;
+    if (memo?.photo && o.account!.owns(c, row)) {
+      const file = o.store.fileRow(id) ?? row;
+      try {
+        if (!showsLinkedinPhoto(file)) {
+          const avatarUrl = await keepPhoto(memo.photo, file.id, o);
+          await o.removeImages(applyPhoto(o.store, file, avatarUrl, memo.name));
+        }
+        o.account!.renew(c, acct!);
+        return c.redirect(back(id, "linkedin"), 302);
+      } catch (err) {
+        // La copie a disparu : le passage chez LinkedIn d'aujourd'hui.
+        console.warn(`[linkedin ${id}] copie de la photo du compte absente :`, (err as Error).message);
+      }
+    }
     const state = states.create(id);
     setCookie(c, LI_STATE_COOKIE, sign(secret, "linkedin", { s: state, e: Date.now() + STATE_TTL_MS }), { ...cookieBase, maxAge: STATE_TTL_MS / 1000 });
     const url = new URL(AUTHORIZE_URL);
@@ -380,21 +408,39 @@ export function mountLinkedin(app: Hono, o: LinkedinRoutesOptions) {
     url.searchParams.set("redirect_uri", redirectUri);
     url.searchParams.set("state", state);
     url.searchParams.set("scope", "openid profile");
-    c.header("Cache-Control", "no-store");
     return c.redirect(url.toString(), 302);
   });
 
   // « Se connecter avec LinkedIn » (§18.80) : nom, photo et email vérifié, pour retrouver le profil.
-  app.get("/auth/linkedin/enter", (c) => {
+  app.get("/auth/linkedin/enter", async (c) => {
     c.header("Cache-Control", "no-store");
     const returnPath = safeReturnPath(c.req.query("return")) ?? "/";
     if (!o.config || !o.enter) return c.json({ ok: false, message: { fr: "Connexion LinkedIn désactivée.", en: "LinkedIn sign-in is disabled." } }, 404);
+    const redo = c.req.query("redo") === "1";
+    // Déjà connectée par LinkedIn (§18.105) : jamais un second passage chez LinkedIn quand le compte suffit.
+    const kit = o.account;
+    const acct = kit?.fromRequest(c) ?? null;
+    if (kit && acct?.linkedinKey) {
+      const memo = kit.linkedinOf(acct);
+      const mine = redo ? null : kit.cardOf(acct);
+      if (mine) {
+        kit.renew(c, acct);
+        // Sa fiche n'a pas encore de photo LinkedIn : la copie de la connexion (§18.99).
+        if (memo?.photo) await giveSignInPhoto(mine, memo.photo, o);
+        return c.redirect(`${o.baseUrl}/c/${mine.id}`, 302);
+      }
+      // « Refaire ma fiche », ou sa fiche partie : le profil retenu, sans recherche.
+      if (memo?.url && o.enter.resume) {
+        kit.renew(c, acct);
+        return o.enter.resume(c, returnPath, { ...memo, url: memo.url, accountId: acct.id });
+      }
+    }
     if (!o.enter.allow(c)) {
       const u = new URL(returnPath, o.baseUrl);
       u.searchParams.set("li", "error");
       return c.redirect(`${o.baseUrl}${u.pathname}${u.search}`, 302);
     }
-    const state = enterStates.create({ path: returnPath, redo: c.req.query("redo") === "1" });
+    const state = enterStates.create({ path: returnPath, redo });
     setCookie(c, LI_STATE_COOKIE, sign(secret, "linkedin", { s: state, e: Date.now() + STATE_TTL_MS }), { ...cookieBase, maxAge: STATE_TTL_MS / 1000 });
     const url = new URL(AUTHORIZE_URL);
     url.searchParams.set("response_type", "code");
@@ -433,6 +479,8 @@ export function mountLinkedin(app: Hono, o: LinkedinRoutesOptions) {
         // Connexion = compte (§18.91) : trouvé ou créé d'après l'empreinte du sub.
         const kit = o.account;
         const account = kit && profile.sub ? kit.signIn(c, { linkedinKey: linkedinKey(kit.secret, profile.sub) }) : null;
+        // Ce qu'il faut pour ne plus la renvoyer ici (§18.105) : son nom, une copie de sa photo. En arrière-plan.
+        if (account) void kit!.rememberSignIn(account.id, { name: profile.name, picture: profile.picture });
         // Sa fiche est en ligne : droit dessus, sans recherche ni calcul. « Refaire ma fiche » passe outre.
         const mine = account && !entering?.redo ? kit!.cardOf(account) : null;
         if (mine) {

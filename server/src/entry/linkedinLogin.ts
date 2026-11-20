@@ -73,8 +73,11 @@ const SESSIONS_MAX = 5000;
 export interface Resolution {
   /** Le profil sûr (email ou photo), sinon null. */
   sure: LinkedinCandidate | null;
-  /** « employer » : le seul profil au nom et à l'employeur de l'email. La fiche part, sans valoir une preuve. */
-  how: "email" | "photo" | "employer" | null;
+  /**
+   * « employer » : le seul profil au nom et à l'employeur de l'email. La fiche part, sans valoir une preuve.
+   * « picked » : le profil que son compte retient, choisi par elle dans « C'est toi ? » (§18.105).
+   */
+  how: "email" | "photo" | "employer" | "picked" | null;
   /** Les homonymes à proposer quand rien n'est sûr. */
   candidates: LinkedinCandidate[];
   github: GithubIdentity | null;
@@ -394,6 +397,33 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
       u.searchParams.set("li", "1");
       return c.redirect(`${o.baseUrl}${u.pathname}${u.search}`, 302);
     },
+    // Déjà connectée (§18.105) : le profil que son compte retient est sûr d'emblée, rien n'est cherché ni payé.
+    resume(c, returnPath, memo) {
+      sweep();
+      const id = randomBytes(18).toString("base64url");
+      const name = memo.name ?? "";
+      const resolved: Resolution = {
+        sure: { url: memo.url, name, headline: "" },
+        how: memo.how ?? "picked",
+        candidates: [],
+        github: memo.github ?? null,
+        off: false,
+      };
+      const session: Session = {
+        name,
+        exp: now() + ENTER_TTL_MS,
+        resolving: Promise.resolve(resolved),
+        resolved,
+        accountId: memo.accountId,
+        ...(memo.photo ? { picture: memo.photo } : {}),
+      };
+      sessions.set(id, session);
+      setCookie(c, ENTER_COOKIE, sign(secret, "enter", { i: id, e: session.exp }), { ...cookieBase, maxAge: ENTER_TTL_MS / 1000 });
+      remember(c, { name, url: memo.url }, true);
+      const u = new URL(returnPath, o.baseUrl);
+      u.searchParams.set("li", "1");
+      return c.redirect(`${o.baseUrl}${u.pathname}${u.search}`, 302);
+    },
   };
 
   // GET /api/entry/linkedin : ce que le front fait au retour de LinkedIn. `auto` :
@@ -445,8 +475,8 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
     return {
       email: found.session.email,
       github: r.github,
-      // Le profil au seul nom et employeur fait partir la fiche, sans valoir la preuve d'un email ou d'une photo.
-      sureProfile: sure && r.how !== "employer",
+      // Le profil au seul nom et employeur, ou choisi parmi des homonymes, fait partir la fiche sans valoir une preuve.
+      sureProfile: sure && r.how !== "employer" && r.how !== "picked",
       profileHow: sure && r.how ? r.how : "picked",
       ...(found.session.accountId ? { accountId: found.session.accountId } : {}),
       ...(found.session.picture ? { picture: found.session.picture } : {}),

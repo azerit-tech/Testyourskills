@@ -30,10 +30,21 @@ describe("la table et l'empreinte", () => {
   it("une table neuve, posée sans toucher une base déjà en service", () => {
     const { store } = setup();
     const cols = (store.db.prepare(`PRAGMA table_info(accounts)`).all() as { name: string }[]).map((c) => c.name);
-    expect(cols).toEqual(["id", "linkedin_key", "github_id", "card_id", "created_at", "seen_at"]);
-    store.db.prepare(`INSERT INTO accounts VALUES ('a', 'k', NULL, NULL, 1, 1)`).run();
+    expect(cols).toEqual(["id", "linkedin_key", "github_id", "card_id", "created_at", "seen_at", "linkedin_json"]);
+    store.db.prepare(`INSERT INTO accounts VALUES ('a', 'k', NULL, NULL, 1, 1, NULL)`).run();
     migrate(store.db);
     expect(store.db.prepare(`SELECT COUNT(*) AS n FROM accounts`).get()).toEqual({ n: 1 });
+  });
+
+  it("une base d'avant le §18.105 : la colonne du mémo LinkedIn s'ajoute, les comptes restent", () => {
+    const { store } = setup();
+    store.db.exec(`DROP TABLE accounts`);
+    store.db.exec(`CREATE TABLE accounts (id TEXT PRIMARY KEY, linkedin_key TEXT UNIQUE, github_id INTEGER UNIQUE, card_id TEXT, created_at INTEGER NOT NULL, seen_at INTEGER NOT NULL)`);
+    store.db.prepare(`INSERT INTO accounts VALUES ('a', 'k', NULL, NULL, 1, 1)`).run();
+    migrate(store.db);
+    const cols = (store.db.prepare(`PRAGMA table_info(accounts)`).all() as { name: string }[]).map((c) => c.name);
+    expect(cols).toContain("linkedin_json");
+    expect(store.db.prepare(`SELECT id, linkedin_json FROM accounts`).get()).toEqual({ id: "a", linkedin_json: null });
   });
 
   it("le sub LinkedIn n'est jamais rangé : son empreinte, propre au secret et à cet usage", () => {

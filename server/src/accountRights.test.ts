@@ -2,7 +2,7 @@
 // pour la personne fichée, depuis un navigateur qui n'a pas ce jeton ; jamais pour
 // la fiche d'un autre. Supprimer sa fiche par son compte emporte le compte.
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { JobState } from "../../shared/types";
 import { ACCOUNT_COOKIE } from "./account";
 import { BASE, closeAll, githubCard, githubIn, linkedinCard, linkedinIn, me, onlyAccount, rows, setupAccount } from "./accountTesting";
@@ -51,9 +51,12 @@ describe("la session du compte vaut le jeton", () => {
   it("la photo LinkedIn : sa fiche, sans jeton ; pas celle d'un autre", async () => {
     const ctx = setupAccount();
     const p = await linkedinPerson(ctx);
+    // La copie de la photo de connexion se fait en arrière-plan (§18.105) : on l'attend.
+    await vi.waitFor(() => expect((ctx.store.db.prepare(`SELECT linkedin_json FROM accounts`).get() as { linkedin_json: string | null }).linkedin_json).toContain("/avatar/"));
     const ok = await ctx.app.request(`/auth/linkedin/start?card=${p.id}`, { headers: { cookie: p.jar } });
     expect(ok.status).toBe(302);
-    expect(ok.headers.get("location")).toContain("linkedin.com");
+    // Connectée par LinkedIn : la copie de la photo de sa connexion, sans repasser chez LinkedIn (§18.105).
+    expect(ok.headers.get("location")).toBe(`${BASE}/c/${p.id}?photo=linkedin`);
     expect((await ctx.app.request(`/auth/linkedin/start?card=${p.otherId}`, { headers: { cookie: p.jar } })).status).toBe(403);
     expect((await ctx.app.request(`/auth/linkedin/start?card=${p.id}`)).status).toBe(403);
   });
