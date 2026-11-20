@@ -3,7 +3,9 @@
 
 import Database from "better-sqlite3";
 import { describe, expect, it, vi } from "vitest";
-import { LinkedinProfiles, linkedinEnv, linkedinProfilesFromEnv } from "./index";
+import { LinkedinProfiles, linkedinEnv, linkedinProfilesFromEnv, PAID_CALLS_PER_IP } from "./index";
+import { Store } from "../db";
+import { RateLimiter } from "../ratelimit";
 import type { LinkedinProfile, LinkedinProvider, ProviderResult } from "./profile";
 import { LinkedinCache } from "./store";
 import { profileToText, asLinkedinCard } from "./text";
@@ -269,8 +271,37 @@ describe("forUrl (entrée LinkedIn)", () => {
     expect(await setup().finder.forUrl("https://linkedin.com/company/brumes")).toEqual({ status: "not_found" });
     expect(await setup(() => new Error("boom")).finder.forUrl(CAMILLE)).toEqual({ status: "unavailable" });
     expect(await setup(undefined, { daily: 0 }).finder.forUrl(CAMILLE)).toEqual({ status: "unavailable" });
-    expect(await setup().finder.forUrl(CAMILLE, { spend: () => false })).toEqual({ status: "unavailable" });
+    expect(await setup().finder.forUrl(CAMILLE, { spend: () => false })).toEqual({ status: "unavailable", reason: "ip" });
     warn.mockRestore();
+  });
+
+  it("limite par IP : 40 lectures payées passent, la 41e est refusée pour l'IP ; un profil au cache ne compte pas", async () => {
+    expect(PAID_CALLS_PER_IP).toBe(40);
+    const store = new Store(":memory:");
+    const limiter = new RateLimiter(store, "sel");
+    const spend = () => limiter.take("linkedin", "1.2.3.4", PAID_CALLS_PER_IP, NOW);
+    const t = setup();
+    const url = (i: number) => `https://www.linkedin.com/in/dev-${i}`;
+    for (let i = 1; i <= PAID_CALLS_PER_IP; i++) {
+      expect(await t.finder.forUrl(url(i), { spend })).toMatchObject({ status: "found" });
+      // Relire un profil déjà au cache : gratuit, rien n'est pris à l'IP.
+      expect(await t.finder.forUrl(url(1), { spend })).toMatchObject({ status: "found" });
+    }
+    expect(t.calls).toHaveLength(PAID_CALLS_PER_IP);
+    expect(await t.finder.forUrl(url(41), { spend })).toEqual({ status: "unavailable", reason: "ip" });
+    expect(await t.finder.forUrl(url(7), { spend })).toMatchObject({ status: "found" });
+    expect(t.calls).toHaveLength(PAID_CALLS_PER_IP);
+    store.close();
+  });
+
+  it("plafond du jour : fermé pour tous, sans rien prendre à l'IP", async () => {
+    let taken = 0;
+    const spend = () => ++taken <= PAID_CALLS_PER_IP;
+    const t = setup(undefined, { daily: 2 });
+    expect(await t.finder.forUrl("https://www.linkedin.com/in/dev-a", { spend })).toMatchObject({ status: "found" });
+    expect(await t.finder.forUrl("https://www.linkedin.com/in/dev-b", { spend })).toMatchObject({ status: "found" });
+    expect(await t.finder.forUrl("https://www.linkedin.com/in/dev-c", { spend })).toEqual({ status: "unavailable" });
+    expect(taken).toBe(2);
   });
 });
 

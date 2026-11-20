@@ -187,6 +187,7 @@ type MessageKey =
   | "bad_request"
   | "linkedin_off"
   | "linkedin_busy"
+  | "linkedin_ip"
   | "linkedin_not_found"
   | "linkedin_bad_url"
   | "linkedin_unreadable";
@@ -265,6 +266,11 @@ export const MESSAGES: Record<MessageKey, Fact> = typoFacts({
   linkedin_busy: {
     fr: "LinkedIn est fermé pour aujourd'hui. Passe par ton GitHub ou ton CV, ou reviens demain.",
     en: "LinkedIn is closed for today. Use your GitHub or your résumé, or come back tomorrow.",
+  },
+  /* La limite de l'IP (PAID_CALLS_PER_IP), pas le plafond du jour. */
+  linkedin_ip: {
+    fr: "Tu as lu beaucoup de profils LinkedIn aujourd'hui. Passe par ton GitHub, ou reviens demain.",
+    en: "You've read a lot of LinkedIn profiles today. Use your GitHub, or come back tomorrow.",
   },
   linkedin_not_found: {
     fr: "Profil LinkedIn introuvable (privé ou trop récent). Vérifie le lien, ou passe par ton GitHub ou ton CV.",
@@ -1151,7 +1157,7 @@ export class Pipeline {
     if (!finder) throw new JobError("linkedin", MESSAGES.linkedin_off);
     const r = await finder.forUrl(url, { spend: input.linkedinSpend, onSlow: linkedinSlow(ctx), signal: ctx.signal });
     if (r.status === "not_found") throw new JobError("linkedin", MESSAGES.linkedin_not_found);
-    if (r.status === "unavailable") throw new JobError("linkedin", MESSAGES.linkedin_busy);
+    if (r.status === "unavailable") throw new JobError("linkedin", r.reason === "ip" ? MESSAGES.linkedin_ip : MESSAGES.linkedin_busy);
     // Le LinkedIn de la vitrine ne donne pas de GitHub : le serveur sait lequel (§18.35).
     const vouched = this.opts.vouched;
     const githubLogin = r.githubLogin ?? (vouched && url === vouched.linkedinUrl ? vouched.login : null);

@@ -31,8 +31,11 @@ export { normalizeLinkedinUrl } from "./url";
 export { profileToText, asLinkedinCard, asLinkedinComparison } from "./text";
 
 export const DEFAULT_DAILY_PROFILES = 300;
-/** Lectures par IP et par jour (une fiche en fait au plus deux). */
-export const PAID_CALLS_PER_IP = 6;
+/**
+ * Lectures payées par IP et par jour (une fiche en fait au plus deux) : dix dénonciations (§18.114),
+ * sa fiche, une reprise et la lecture d'avance y tiennent. Un profil déjà au cache ne compte pas.
+ */
+export const PAID_CALLS_PER_IP = 40;
 
 export interface LookupOptions {
   /** Prend une unité de la limite par IP juste avant une lecture payante ; false : refusé. */
@@ -46,8 +49,8 @@ export type UrlLookup =
   /** `githubProven` : le GitHub vient du registre de l'App, lien de force 2 ou plus (§18.95). */
   | { status: "found"; profile: LinkedinProfile; githubLogin: string | null; githubProven?: boolean }
   | { status: "not_found" }
-  /** Plafond du jour atteint, limite de l'IP atteinte, fournisseur en panne ou trop lent. */
-  | { status: "unavailable" };
+  /** Plafond du jour atteint, fournisseur en panne ou trop lent ; `reason: "ip"` : la limite de l'IP atteinte. */
+  | { status: "unavailable"; reason?: "ip" };
 
 /**
  * Le profil lu pour un GitHub. `proven` : le lien entre ce LinkedIn et ce GitHub
@@ -126,12 +129,15 @@ export class LinkedinProfiles implements LinkedinFinder {
     if (w) await w;
   }
 
-  /** Reste-t-il une lecture aujourd'hui, et l'IP en a-t-elle encore une ? Si oui, elle est comptée. */
-  private take(opts: LookupOptions): boolean {
-    if (this.opts.cache.readsToday(this.now()) >= this.daily) return false;
-    if (!(opts.spend?.() ?? true)) return false;
+  /**
+   * Reste-t-il une lecture aujourd'hui, et l'IP en a-t-elle encore une ? Si oui, elle est comptée.
+   * Le plafond du jour d'abord, sans rien prendre à l'IP ; sinon, ce qui manque : "day" ou "ip".
+   */
+  private take(opts: LookupOptions): "ok" | "day" | "ip" {
+    if (this.opts.cache.readsToday(this.now()) >= this.daily) return "day";
+    if (!(opts.spend?.() ?? true)) return "ip";
     this.opts.cache.addRead(this.now());
-    return true;
+    return "ok";
   }
 
   async forGithub(facts: unknown, opts: LookupOptions & { url?: string } = {}): Promise<GithubLookup | null> {
@@ -173,7 +179,7 @@ export class LinkedinProfiles implements LinkedinFinder {
         } else if (known) {
           // Trouvé par l'App, pas prouvé : rien à payer.
         } else if (search) {
-          if (this.take(opts)) {
+          if (this.take(opts) === "ok") {
             try {
               const r = await phase("linkedin_recherche", () => search.searchByGithub({ login: gh.login, name: gh.name, createdAt: gh.createdAt }, opts.signal));
               cache.putLookup(gh.login, r.url, this.now());
@@ -206,7 +212,7 @@ export class LinkedinProfiles implements LinkedinFinder {
     // Un CV que l'App a déjà lu : le jugement le prend, sans payer ni attendre Apify.
     const stored = registry ? await registry.profileOf(url) : null;
     if (stored) return { profile: stored, proven: proves };
-    if (!this.take(opts)) return null;
+    if (this.take(opts) !== "ok") return null;
     try {
       opts.onSlow?.(provider.timeoutMs);
       const r = await phase("linkedin", () => provider.fetchProfile(url, { signal: opts.signal }));
@@ -238,7 +244,7 @@ export class LinkedinProfiles implements LinkedinFinder {
     if (!url) return null;
     const hit = cache.getProfile(url, this.now());
     if (hit && !hit.found) return null;
-    if (!this.take(opts)) return null;
+    if (this.take(opts) !== "ok") return null;
     try {
       const r = await provider.fetchProfile(url, { withGithub: true, signal: opts.signal });
       // Un profil déjà gardé garde son lien avec un GitHub, que cette lecture ne sait pas prouver.
@@ -275,7 +281,8 @@ export class LinkedinProfiles implements LinkedinFinder {
     if (hit?.found && (await knownP)) return found(hit.profile, null);
     const stored = await storedP;
     if (stored) return found(stored, null);
-    if (!this.take(opts)) return { status: "unavailable" };
+    const took = this.take(opts);
+    if (took !== "ok") return took === "ip" ? { status: "unavailable", reason: "ip" } : { status: "unavailable" };
     try {
       opts.onSlow?.(provider.timeoutMs);
       const r = await phase("linkedin", () => provider.fetchProfile(url, { withGithub: true, signal: opts.signal }));

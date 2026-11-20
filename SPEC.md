@@ -988,8 +988,8 @@ Après chaque fusion, on vérifie la grille suivante. On corrige ce qui manque, 
   - La recherche payante du LinkedIn d'un GitHub qui n'en affiche pas (`/person/search` de Crustdata) n'existe que derrière `LINKEDIN_AUTOFIND=crustdata`.
 - **Garde-fous** :
   - cache de 30 jours par adresse normalisée (introuvable : 7 jours) ;
-  - au plus `LINKEDIN_DAILY_PROFILES` profils lus par jour (300 par défaut ; remplace le plafond de crédits du §18.25) ;
-  - six lectures par IP et par jour ;
+  - au plus `LINKEDIN_DAILY_PROFILES` profils lus par jour (300 par défaut ; remplace le plafond de crédits du §18.25) ; atteint : « LinkedIn est fermé pour aujourd'hui. Passe par ton GitHub ou ton CV, ou reviens demain. » ;
+  - 40 lectures payées par IP et par jour (`PAID_CALLS_PER_IP`) *(six avant le 20 novembre 2026, Jacques : dix dénonciations par jour (§18.114), sa propre fiche, une reprise et la lecture d'avance n'y tenaient pas)*. Un profil déjà au cache ne compte pas. Le plafond du jour se vérifie d'abord, sans rien prendre à l'IP. Limite de l'IP atteinte, un autre message : « Tu as lu beaucoup de profils LinkedIn aujourd'hui. Passe par ton GitHub, ou reviens demain. » ;
   - cache de 24 h des fiches, par adresse et par pseudo ;
   - la vitrine n'est jamais comparée.
 - **Gardé, et rien de plus** : le profil réduit (titre, résumé, postes, formation, compétences), sans photo, lieu ni contact, pour 30 jours. La fiche suit la règle des 90 jours. Supprimer la fiche efface le profil gardé. Un GitHub masqué par son propriétaire bloque aussi l'entrée par son LinkedIn. La page Confidentialité nomme « un service tiers de collecte de profils publics ».

@@ -509,16 +509,18 @@ describe("entrée LinkedIn (le champ unique)", () => {
     expect(ctx.calls.forUrl).toHaveLength(0);
   });
 
-  it("introuvable ou plafond du jour : une erreur claire, pas de fiche", async () => {
-    for (const [status, fr] of [
-      ["not_found", "introuvable"],
-      ["unavailable", "aujourd'hui"],
+  it("introuvable, plafond du jour ou limite de l'IP : une erreur claire, pas de fiche", async () => {
+    for (const [lookup, fr, en] of [
+      [{ status: "not_found" }, "introuvable", "not found"],
+      [{ status: "unavailable" }, "LinkedIn est fermé pour aujourd'hui", "LinkedIn is closed for today"],
+      [{ status: "unavailable", reason: "ip" }, "Tu as lu beaucoup de profils LinkedIn aujourd'hui", "You've read a lot of LinkedIn profiles today"],
     ] as const) {
-      const ctx = setup({ forUrl: async () => ({ status }) });
+      const ctx = setup({ forUrl: async () => lookup });
       const { json } = await post(ctx, { linkedin: URL_ });
       const s = await state(ctx, json.id);
       expect(s).toMatchObject({ state: "error", code: "linkedin" });
       expect(s.state === "error" && s.message.fr).toContain(fr);
+      expect(s.state === "error" && (s.message as { en?: string }).en).toContain(en);
     }
   });
 
