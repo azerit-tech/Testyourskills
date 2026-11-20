@@ -14,7 +14,7 @@
 // L'exemple est la vraie fiche de Jacques (fondateur d'Azerit) : la maquette
 // s'affiche d'abord, la fiche calculée par le serveur la remplace dès qu'elle existe.
 // Aucun dégradé dans la page : seul celui de la fiche.
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type CSSProperties } from "react";
 import { flushSync } from "react-dom";
 import { LEVEL_LABELS, starsFor, type CardData } from "../../../shared/types";
 import { fileOf, pieceLabel } from "../../../shared/caseFile";
@@ -32,6 +32,7 @@ import { useT } from "../i18n";
 import { ApiError, api, type Showcase } from "../lib/api";
 import { currentAnchor, onLinkClick } from "../lib/router";
 import { RANKING_ANCHOR } from "../../../shared/routes";
+import { heroTitleEm } from "../../../shared/promise";
 import { homeHook, useAppConfig } from "../lib/season";
 import { returnPending } from "../lib/entryApi";
 import { MINE_EVENT, clearPending, dropPrefill, filmOwed, myCard, peekPrefill, pendingFile, type MyCard } from "../lib/session";
@@ -321,7 +322,7 @@ function useHomeAnchor(topKnown: boolean) {
 }
 
 export function Home() {
-  const { t } = useT();
+  const { t, lang } = useT();
   const h = t.home;
   const inputRef = useRef<HTMLInputElement>(null);
   /** Le bas de l'accueil de qui a sa fiche : « Faire une autre fiche », puis le formulaire à sa place. */
@@ -431,8 +432,9 @@ export function Home() {
     <main className="page page-home" id="main">
       <div className="home-top">
         <section className="hero">
-          {/* Deux phrases (shared/promise.ts) : la première en lilas, la question en crème. */}
-          <h1 className="hero-title">
+          {/* Le titre en deux moitiés (shared/promise.ts) : la première en lilas, la chute en crème.
+              Sa taille suit la largeur de la colonne et la plus longue de ses lignes (§18.103). */}
+          <h1 className="hero-title" style={{ "--title-em": heroTitleEm(lang) } as CSSProperties}>
             <span className="hero-title-claim">{h.titleClaim}</span>{" "}
             <span className="hero-title-proof">{h.titleProof}</span>
           </h1>

@@ -1188,11 +1188,18 @@ svg {
   display: grid;
   gap: 8px;
   min-width: 0;
+  /* le titre se mesure à la largeur de la colonne (cqi) */
+  container-type: inline-size;
 }
-/* deux phrases (shared/promise.ts), chacune sur une ligne si elle tient, sinon coupée
-   à son seul blanc sécable. La première en lilas, la question en crème, la couleur des étoiles. */
+/* deux moitiés (shared/promise.ts), chacune sur une ligne si elle tient, sinon coupée
+   à son seul blanc sécable. La première en lilas, la chute en crème, la couleur des étoiles.
+   La taille : le cran du titre de page au plus, moins si la plus longue ligne
+   (--title-em, en tailles de police, calculé depuis le titre) ne tiendrait pas dans la
+   colonne (§18.103). --title-max baisse sur les petits écrans. */
 .hero-title {
+  --title-max: var(--t-page);
   font: var(--font-page);
+  font-size: min(var(--title-max), calc(100cqi / var(--title-em, 1)));
   text-transform: uppercase;
   color: var(--c-emphasis);
   overflow-wrap: anywhere;
@@ -1391,7 +1398,7 @@ svg {
    au-dessus du pli */
 @media (max-width: 359px) {
   .hero-title {
-    font-size: var(--t-28);
+    --title-max: var(--t-28);
   }
 }
 /* téléphone couché (640 à 899 px de large, peu de hauteur) : le titre et le formulaire à
@@ -1408,7 +1415,7 @@ svg {
     align-content: start;
   }
   .hero-title {
-    font-size: var(--t-28);
+    --title-max: var(--t-28);
   }
 }
 
