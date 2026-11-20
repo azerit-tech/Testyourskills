@@ -10,6 +10,7 @@ import { FIXTURES, FIXTURE_COMPARISON } from "../../../shared/fixtures";
 import { oneNote } from "../../../shared/caseFile";
 import { asLinkedinCard, asLinkedinComparison } from "../../../shared/linkedinText";
 import { publicView } from "../../../shared/publicView";
+import { hasLinks, profileLinks } from "../../../shared/profileLinks";
 import type { CaseInfo, CreateInput, CreateResult, Jury, Showcase, Verdict } from "./api";
 import { ApiError } from "./errors";
 
@@ -374,19 +375,23 @@ export const mockApi = {
   async getJob(id: string, me: string | null = null): Promise<JobState> {
     // Hors ligne (réseau coupé dans le navigateur) : la démo échoue comme un vrai fetch.
     if (typeof navigator !== "undefined" && navigator.onLine === false) throw new TypeError("Failed to fetch");
-    const state = await mockApi.engineJob(id);
-    if (state.state !== "done") return state;
-    // Sa propre fiche à une source (§18.100) : l'autre lui est proposée, comme le serveur le fait.
+    const engine = await mockApi.engineJob(id);
+    if (engine.state !== "done") return engine;
     const job = jobs.get(id);
-    if (state.kind === "card" && job && !job.denouncedBy && !declined.has(id)) {
+    const main = engine.kind === "card" ? engine.card : engine.comparison.github;
+    const marker = /^m-[a-zA-Z]+-([DNC])/.exec(id)?.[1];
+    const denounced = !!job?.denouncedBy || !!marker;
+    const claimed = marker === "C" || (!!me && me === main.login?.toLowerCase());
+    // Ses profils publics (§18.108), selon la règle du serveur : en démo, aucun GitHub n'affiche son LinkedIn.
+    const linkedinUrl = engine.kind === "card" ? engine.card.linkedinUrl : engine.comparison.declaredSource === "linkedin" ? (job?.linkedin ?? MOCK_LINKEDIN) : null;
+    const links = profileLinks({ login: main.login, linkedinUrl }, { anonymous: denounced && !claimed });
+    const state: JobState = hasLinks(links) ? { ...engine, links } : engine;
+    // Sa propre fiche à une source (§18.100) : l'autre lui est proposée, comme le serveur le fait.
+    if (state.state === "done" && state.kind === "card" && job && !job.denouncedBy && !declined.has(id)) {
       const propose = mockProposal(state.card);
       if (propose) return { ...state, propose };
     }
-    const main = state.kind === "card" ? state.card : state.comparison.github;
-    const marker = /^m-[a-zA-Z]+-([DNC])/.exec(id)?.[1];
-    const denounced = !!jobs.get(id)?.denouncedBy || !!marker;
-    const claimed = marker === "C" || (!!me && me === main.login?.toLowerCase());
-    if (!denounced || claimed) return state;
+    if (state.state !== "done" || !denounced || claimed) return state;
     return state.kind === "card"
       ? { ...state, card: publicView(state.card, { thirdParty: true }) }
       : { ...state, comparison: publicView(state.comparison, { thirdParty: true }) };

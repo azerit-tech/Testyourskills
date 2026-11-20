@@ -29,18 +29,20 @@ interface Player {
   login?: string;
   name?: string;
   overall: number;
+  /** L'adresse de son profil LinkedIn (§18.108) : toute fiche LinkedIn seule, et les dossiers. */
+  linkedin?: string;
 }
 
 const ALL: Player[] = [
-  { login: "svaaland", name: "Sigrun Vaaland", overall: 91 },
-  { login: "leamd", name: "Léa Martin-Dubois", overall: 84 },
+  { login: "svaaland", name: "Sigrun Vaaland", overall: 91, linkedin: "https://www.linkedin.com/in/sigrun-vaaland" },
+  { login: "leamd", name: "Léa Martin-Dubois", overall: 84, linkedin: "https://www.linkedin.com/in/lea-martin-dubois" },
   { login: "nour-rs", overall: 79 },
-  { name: "Inès Carpentier", overall: 74 },
+  { name: "Inès Carpentier", overall: 74, linkedin: "https://www.linkedin.com/in/ines-carpentier" },
   { login: "jplefevre", name: "Jean-Pierre Lefèvre", overall: 68 },
-  { name: "Yanis Belkacem", overall: 52 },
+  { name: "Yanis Belkacem", overall: 52, linkedin: "https://www.linkedin.com/in/yanis-belkacem" },
   { login: "ghost-coder", overall: 31 },
   { login: "mira-k", name: "Mira Kowalczyk", overall: 27 },
-  { name: "Théo Dubois", overall: 22 },
+  { name: "Théo Dubois", overall: 22, linkedin: "https://www.linkedin.com/in/theo-dubois" },
   { login: "pixel-ops", overall: 18 },
 ];
 
@@ -69,10 +71,10 @@ export function mockWeekRank(card: CardData, now = Date.now()): WeekRank | null 
 
 export function mockTop(now = Date.now()): WeekTop {
   const monday = mondayOf(now);
-  const entries: TopEntry[] = players().map(({ login, name, overall }, i) => ({
+  const entries: TopEntry[] = players().map(({ login, name, overall, linkedin }, i) => ({
     rank: i + 1,
     // Une fiche de démo qui s'ouvre vraiment (mock.ts lit le type dans l'id) : GitHub, ou LinkedIn seule.
-    ...boardPerson({ name, login, ...(login ? { avatarUrl: `https://github.com/${login}.png?size=64` } : {}) }, login ? `m-gold-${login.replace(/[^a-z0-9]/g, "")}` : `m-li-top${i + 1}`),
+    ...boardPerson({ name, login, ...(login ? { avatarUrl: `https://github.com/${login}.png?size=64` } : {}) }, login ? `m-gold-${login.replace(/[^a-z0-9]/g, "")}` : `m-li-top${i + 1}`, null, linkedin),
     overall,
     stars: starsFor(overall),
   }));

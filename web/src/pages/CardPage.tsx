@@ -23,6 +23,8 @@ import { RecruiterRead } from "../components/RecruiterRead";
 import { RemovalRequest } from "../components/Removal";
 import { AddLinkedin } from "../components/AddLinkedin";
 import { Propose } from "../components/Propose";
+import { ProfileLinks } from "../components/ProfileLinks";
+import type { ProfileLinks as Links } from "../../../shared/profileLinks";
 import { proposalToShow } from "../lib/propose";
 import { Pieces } from "../components/Pieces";
 import { ProfileSky } from "../components/ProfileTile";
@@ -710,16 +712,21 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
 
       <div className="result-top">
         {/* L'en-tête posé sur le ciel, puis la fiche entière au-dessus de la ligne de flottaison (§18.7, §18.29). */}
-        <WantedHead card={main}>{chase}</WantedHead>
+        <WantedHead card={main} links={api.linksOf(id)}>{chase}</WantedHead>
         {/* Le visiteur, sur téléphone (§18.48) : ce qu'il regarde, au-dessus de la fiche, deux lignes au plus.
             Au bureau, la phrase entière ouvre « À ton tour », en tête de la colonne de droite. */}
         {visitor && (
           <p className="visitor-lead">
+            {/* Ses profils (§18.108) : sur téléphone, la tête est masquée au visiteur, ils sont au bout de la phrase qui le nomme. */}
             {wantedYou ? (
-              t.result.leadDenounced(who, kase?.by ?? null)
+              <>
+                {t.result.leadDenounced(who, kase?.by ?? null)}
+                <ProfileLinks links={api.linksOf(id)} who={who} className="lead-links" />
+              </>
             ) : (
               <>
                 {t.result.leadShort(whoShort)}
+                <ProfileLinks links={api.linksOf(id)} who={who} className="lead-links" />
                 {!other && !self && (
                   <>
                     <br />
@@ -863,15 +870,18 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
  * En tête d'une fiche, posé sur le ciel : « AVIS DE RECHERCHE » dans la voix qui annonce, puis « @LOGIN ».
  * La fiche dit le reste (étoiles, profil, note) ; le texte sous la fiche, la peine. Lu « Avis de recherche : @x ».
  */
-export function WantedHead({ card, children }: { card: CardData; children?: ReactNode }) {
+export function WantedHead({ card, links, children }: { card: CardData; links?: Links | null; children?: ReactNode }) {
   const { t } = useT();
+  const who = card.login ? `@${card.login}` : card.name;
   return (
     <header className="wanted">
       <h1 className="wanted-head" tabIndex={-1}>
         <span className="wanted-kicker announce">{t.result.wanted}</span>
         <span className="sr-only">{t.result.wantedSep}</span>
-        <span className="wanted-name">{card.login ? `@${card.login}` : card.name}</span>
+        <span className="wanted-name">{who}</span>
       </h1>
+      {/* Ses profils LinkedIn et GitHub (§18.108), au bout du nom : hors de la fiche, l'image de partage ne change pas. */}
+      <ProfileLinks links={links} who={who} className="wanted-links" />
       {/* « Revoir ma poursuite » (§18.48), sur la ligne de « Avis de recherche » */}
       {children}
     </header>

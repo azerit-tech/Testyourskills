@@ -158,13 +158,14 @@ const mockJoined = new Map<string, Partial<Record<BandType, { id: string; label:
  * avec son nom et sa photo, des fiches LinkedIn seules (un nom, pas de pseudo, avec ou
  * sans photo), une fiche GitHub sans nom (son @pseudo), un nom très long.
  */
-const MOCK_PEOPLE: { name?: string; login?: string; avatarUrl?: string }[] = [
-  { name: "Léa Martin-Dubois", login: "leamd", avatarUrl: "https://avatars.githubusercontent.com/u/583231?v=4" },
-  { name: "Inès Carpentier" },
-  { name: "Yanis Belkacem", avatarUrl: "/mock-linkedin.svg" },
+// `linkedin` : l'adresse de son profil, que le serveur rend pour le logo qui y mène (§18.108).
+const MOCK_PEOPLE: { name?: string; login?: string; avatarUrl?: string; linkedin?: string }[] = [
+  { name: "Léa Martin-Dubois", login: "leamd", avatarUrl: "https://avatars.githubusercontent.com/u/583231?v=4", linkedin: "https://www.linkedin.com/in/lea-martin-dubois" },
+  { name: "Inès Carpentier", linkedin: "https://www.linkedin.com/in/ines-carpentier" },
+  { name: "Yanis Belkacem", avatarUrl: "/mock-linkedin.svg", linkedin: "https://www.linkedin.com/in/yanis-belkacem" },
   { login: "nour-rs" },
-  { name: "Théo Dubois" },
-  { name: "Marie-Charlotte Vandenberghe-Lefebvre de Montmorency" },
+  { name: "Théo Dubois", linkedin: "https://www.linkedin.com/in/theo-dubois" },
+  { name: "Marie-Charlotte Vandenberghe-Lefebvre de Montmorency", linkedin: "https://www.linkedin.com/in/marie-charlotte-vandenberghe" },
   { name: "Camille Roux", login: "camroux" },
 ];
 
@@ -234,7 +235,7 @@ const mock = {
         stars: Math.max(1, 6 - Math.floor(i / 3)),
         profile: profiles[i % profiles.length]!,
         position: positions[i % positions.length],
-        ...(i >= count - anon ? {} : boardPerson(p, cardId)),
+        ...(i >= count - anon ? {} : boardPerson(p, cardId, null, p.linkedin)),
       };
     });
     return { band, members };
