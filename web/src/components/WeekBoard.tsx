@@ -6,12 +6,14 @@
 // Le tableau porte l'ancre « semaine » ; la ligne de la fiche en mémoire y est mise en évidence.
 import { useEffect, useRef, useState } from "react";
 import { personLabel } from "../../../shared/boardPerson";
+import { personLinks } from "../../../shared/profileLinks";
 import type { TopEntry, WeekTop } from "../../../shared/types";
 import { useT } from "../i18n";
 import { api } from "../lib/api";
 import { onLinkClick } from "../lib/router";
 import { myCard, type MyCard } from "../lib/session";
 import { Avatar } from "./Avatar";
+import { ProfileLinks } from "./ProfileLinks";
 import { Stars } from "./Stars";
 
 const SIZE = 10;
@@ -49,6 +51,8 @@ function Row({ e, me }: { e: TopEntry; me: boolean }) {
         <Stars n={e.stars} size={14} />
         <span className="board-score">{e.overall}</span>
       </a>
+      {/* Ses profils LinkedIn et GitHub (§18.108), au bout de la ligne, hors du lien vers sa fiche. */}
+      <ProfileLinks links={personLinks(e)} who={who} />
     </li>
   );
 }

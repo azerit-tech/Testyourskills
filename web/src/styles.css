@@ -3396,6 +3396,18 @@ svg {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+/* le compte proposé, qui s'ouvre dans un nouvel onglet (§18.108) : souligné d'un filet discret */
+a.propose-name {
+  justify-self: start;
+  max-width: 100%;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-decoration-color: var(--c-text-2);
+  text-underline-offset: 3px;
+}
+a.propose-name:hover {
+  text-decoration-color: var(--cream);
+}
 .propose-sub {
   overflow: hidden;
   color: var(--c-text-2);

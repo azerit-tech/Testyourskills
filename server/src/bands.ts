@@ -322,7 +322,8 @@ function bandMembers(store: Store, type: BandType, id: string, now: number): Ban
     const root = row ? rootOf(store, row) : null;
     const login = r.login ?? (root ? store.loginOf(root) : null);
     const shown = !!card && !!root && (!root.denounceBorn || (!!login && !!store.getOwner(login)));
-    return { stars: r.stars, profile, ...(position ? { position } : {}), ...(shown ? boardPerson(card, r.cardId, login) : {}) };
+    // Son LinkedIn (§18.108) : la ligne montrée est celle d'une fiche faite ou revendiquée par sa personne.
+    return { stars: r.stars, profile, ...(position ? { position } : {}), ...(shown ? boardPerson(card, r.cardId, login, linkedinOf(root)) : {}) };
   });
 }
 

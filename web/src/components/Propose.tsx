@@ -5,6 +5,7 @@
 // la retire, et « Ajoute ton GitHub » revient à sa place.
 import { useId, useState } from "react";
 import type { CardData, Proposal } from "../../../shared/types";
+import { githubHref, linkedinHref } from "../../../shared/profileLinks";
 import { pick, useT } from "../i18n";
 import { api, tokens } from "../lib/api";
 import { unlockAudio } from "../lib/audio";
@@ -67,12 +68,20 @@ export function Propose({ proposal, card, onNo }: Props) {
 
   const who = proposal.kind === "github" ? `@${proposal.login}` : proposal.name;
   const sub = proposal.kind === "github" ? proposal.name : proposal.headline;
+  const href = proposal.kind === "github" ? githubHref(proposal.login) : linkedinHref(proposal.url);
   return (
     <section className="after-block propose" aria-labelledby={`${uid}-q`}>
       <div className="propose-who">
         <Face proposal={proposal} />
         <p className="propose-text">
-          <span className="propose-name">{who}</span>
+          {/* Le compte proposé s'ouvre dans un nouvel onglet (§18.108) : on vérifie que c'est le sien avant « Oui ». */}
+          {href ? (
+            <a className="propose-name" href={href} target="_blank" rel="noopener noreferrer">
+              {who}
+            </a>
+          ) : (
+            <span className="propose-name">{who}</span>
+          )}
           {sub && <span className="propose-sub">{sub}</span>}
           <strong id={`${uid}-q`} className="propose-q">
             {proposal.kind === "github" ? p.github : p.linkedin}

@@ -16,6 +16,9 @@ import { PAGES_TEXT } from "./pagesText";
 export const CONTACT_EMAIL = "hello@azerit.tech";
 
 /* Le français passe par frTypoDeep (shared/typo.ts) : les espaces devant « : ; ! ? », dans les guillemets et entre un nombre et son unité sortent insécables. */
+/** « de Léa », « d'Inès » : l’élision devant une voyelle (« h » et « y » restent « de »). */
+const deOf = (who: string): string => (/^[aeiouàâäéèêëîïôöûüù]/i.test(who) ? `d’${who}` : `de ${who}`);
+
 const fr = frTypoDeep({
   meta: {
     /** Le titre de l'accueil vient de shared/promise.ts, sa seule source. */
@@ -912,6 +915,12 @@ const fr = frTypoDeep({
   /** Le titre de l'onglet d'une adresse inconnue (la page : components/ErrorPage.tsx, textes sous `pages.error`). */
   notFound: { title: "Page introuvable" },
   crash: { title: "La page n'a pas chargé", text: "Le réseau a peut-être coupé, ou le site vient d'être mis à jour.", reload: "Recharger" },
+  /** Les logos qui mènent à ses profils publics (§18.108) : lus, jamais écrits à l'écran. */
+  profiles: {
+    group: (who: string) => `Profils ${deOf(who)}`,
+    linkedin: (who: string) => `LinkedIn ${deOf(who)}`,
+    github: (who: string) => `GitHub ${deOf(who)}`,
+  },
 });
 
 export type Dict = typeof fr;
@@ -1654,6 +1663,11 @@ const en: Dict = {
   },
   notFound: { title: "Page not found" },
   crash: { title: "The page didn't load", text: "The network may have dropped, or the site was just updated.", reload: "Reload" },
+  profiles: {
+    group: (who: string) => `${who}'s profiles`,
+    linkedin: (who: string) => `${who}'s LinkedIn`,
+    github: (who: string) => `${who}'s GitHub`,
+  },
 };
 
 export const DICTS: Record<Lang, Dict> = { fr, en };

@@ -8,6 +8,7 @@
 // « classement » (« Classement » dans la barre du haut y mène).
 import { useEffect, useId, useState } from "react";
 import { personLabel } from "../../../shared/boardPerson";
+import { personLinks } from "../../../shared/profileLinks";
 import type { BandMember, BandStanding, BandsTop as Top, BandType } from "../../../shared/bands";
 import { BAND_TYPES } from "../../../shared/bands";
 import { RANKING_ANCHOR } from "../../../shared/routes";
@@ -16,6 +17,7 @@ import { api } from "../lib/api";
 import { bandsApi, myBandIds } from "../lib/bands";
 import { onLinkClick } from "../lib/router";
 import { Avatar } from "./Avatar";
+import { ProfileLinks } from "./ProfileLinks";
 import { Stars } from "./Stars";
 import "./bands.css";
 
@@ -73,13 +75,16 @@ function People({ b, id }: { b: BandStanding; id: string }) {
     <ol className="league-people" id={id}>
       {named.map((m) => {
         const href = `/c/${m.cardId}`;
+        const who = personLabel(m) || m.initials || "";
         return (
           <li key={m.cardId}>
             <a className="board-row league-person" href={href} onClick={(e) => onLinkClick(e, href)}>
               <Avatar login={m.login} src={m.avatarUrl ?? ""} initials={m.initials} />
-              <span className="board-login">{personLabel(m) || m.initials}</span>
+              <span className="board-login">{who}</span>
               <Stars n={m.stars} size={14} label={t.bands.score(m.stars)} />
             </a>
+            {/* Ses profils LinkedIn et GitHub (§18.108), au bout de la ligne, hors du lien vers sa fiche. */}
+            <ProfileLinks links={personLinks(m)} who={who} />
           </li>
         );
       })}

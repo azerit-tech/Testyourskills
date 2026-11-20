@@ -4,6 +4,7 @@ import { IMAGE_QUERY } from "../../../shared/images";
 import { parseSeason, seasonDates, type SeasonDates } from "../../../shared/season";
 import seasonJson from "../../../data/season.json";
 import type { CardData, JobState, Lang, Piece, Proposal, WeekRank, WeekTop } from "../../../shared/types";
+import type { ProfileLinks } from "../../../shared/profileLinks";
 /** La maquette (mock.ts), chargée seulement en mode démo : le site réel ne la télécharge jamais. */
 export const demoApi = () => import("./mock").then((m) => m.mockApi);
 import { mockTop, mockWeekRank } from "./mockTop";
@@ -494,6 +495,14 @@ const withGithub = new Set<string>();
 /** L'autre source proposée sous une fiche (§18.100), telle que le serveur l'a rendue à sa personne. */
 const proposals = new Map<string, Proposal>();
 
+/** Ses profils publics (§18.108), tels que le serveur les a rendus avec cette fiche. */
+const links = new Map<string, ProfileLinks>();
+
+/** Les liens vers les profils LinkedIn et GitHub de cette fiche, sinon null. */
+export function linksOf(id: string): ProfileLinks | null {
+  return links.get(id) ?? null;
+}
+
 /** La proposition que le serveur a rendue avec cette fiche, sinon null. */
 export function proposalOf(id: string): Proposal | null {
   return proposals.get(id) ?? null;
@@ -524,6 +533,8 @@ async function getJob(id: string): Promise<JobState> {
     else withGithub.delete(id);
     if (job.kind === "card" && job.propose) proposals.set(id, job.propose);
     else proposals.delete(id);
+    if (job.links) links.set(id, job.links);
+    else links.delete(id);
   }
   return job;
 }
@@ -689,7 +700,7 @@ async function fetchTop(): Promise<WeekTop | null> {
   }
 }
 
-export const api = { createCard, getJob, getCase, proposalOf, declineProposal, vote, sendEmail, requestRemoval, deleteCard, track, getConfig, knownConfig, startLinkedInPhoto, getShowcase, getTop, getMe, getAccount, startClaim, setHidden, logout };
+export const api = { createCard, getJob, getCase, proposalOf, linksOf, declineProposal, vote, sendEmail, requestRemoval, deleteCard, track, getConfig, knownConfig, startLinkedInPhoto, getShowcase, getTop, getMe, getAccount, startClaim, setHidden, logout };
 
 /** URLs des images rendues par le serveur (§7). `?v=` : le dessin en cours, servi avec un cache d'un an (shared/images.ts). */
 export const images = {

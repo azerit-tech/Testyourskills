@@ -12,6 +12,7 @@ import { FIXTURES } from "../../shared/fixtures";
 import { fileOf, piecesOf } from "../../shared/caseFile";
 import { colorwayOf } from "../../shared/card/colorways";
 import { publicView } from "../../shared/publicView";
+import { profileLinks, type ProfileLinks } from "../../shared/profileLinks";
 import { isSitePage, isUpcomingPath } from "../../shared/routes";
 import type { CardData, ComparisonData, ErrorCode, Fact, JobState, Lang } from "../../shared/types";
 import { stripToken, type CardRow, type Store } from "./db";
@@ -33,6 +34,7 @@ import type { TokenPool } from "./github/tokens";
 import { weekTop, withWeekSpecial } from "./top";
 import { normalizeLinkedinUrl, PAID_CALLS_PER_IP, type LinkedinFinder } from "./linkedinProfile/index";
 import { forgetLinkedinOfCard, latestLinkedinCard, recentLinkedinCard } from "./linkedinProfile/cards";
+import { githubShowsLinkedin } from "./linkedinProfile/url";
 import type { LinkedinPeople } from "./linkedinProfile/search";
 import { mountLinkedinSearch } from "./entry/linkedinSearch";
 import { mountGithubSearch, type GithubSearchRoutesOptions } from "./entry/githubSearch";
@@ -492,6 +494,20 @@ export function createApp(opts: AppOptions) {
     return facts?.linkedinUrl && facts.linkedinProven !== true ? { ...cmp, linkUnproven: true } : cmp;
   };
 
+  /**
+   * Ses profils publics, sous la fiche (§18.108, shared/profileLinks.ts) : son GitHub, et son LinkedIn
+   * si sa personne a fait la fiche ou l'a revendiquée, ou si son GitHub affiche déjà ce LinkedIn.
+   */
+  const linksOf = (row: CardRow): ProfileLinks => {
+    const facts = row.facts as { linkedinUrl?: unknown } | null;
+    const fromFacts = typeof facts?.linkedinUrl === "string" ? facts.linkedinUrl : null;
+    const linkedinUrl = fromFacts ?? (row.kind === "card" ? ((row.data as CardData).linkedinUrl ?? null) : null);
+    const anonymous = thirdParty(row);
+    const ghPiece = anonymous && linkedinUrl && row.kind === "comparison" ? store.getCard((row.data as ComparisonData).github.id) : null;
+    const linkedinOnGithub = !!ghPiece && !!linkedinUrl && githubShowsLinkedin(ghPiece.facts, linkedinUrl);
+    return profileLinks({ login: store.loginOf(row) ?? mainCard(row).login, linkedinUrl }, { anonymous, linkedinOnGithub });
+  };
+
   // Public : jamais de montant. ai = ok | budget (plafond du jour atteint) |
   // credits (solde sous AI_MIN_CREDIT_USD, ou 402 vu dans les 10 dernières
   // minutes sans solde suffisant lu depuis) | off (pas de clé).
@@ -930,7 +946,8 @@ export function createApp(opts: AppOptions) {
     // et que la fiche n'a toujours qu'une source.
     const offer = person && row.kind === "card" ? openProposal(store.db, row.id) : null;
     const propose = offer && (offer.kind === "github" ? row.source === "linkedin" && !store.loginOf(row) : row.source === "github" && !store.isHidden(store.loginOf(row))) ? offer : null;
-    const extra = { ...rank, ...(mine ? { mine: true } : {}) };
+    const links = linksOf(row);
+    const extra = { ...rank, ...(mine ? { mine: true } : {}), ...(links.github || links.linkedin ? { links } : {}) };
     // La page partagée (shared/publicView.ts) : rien de privé ne part vers qui n'est pas la personne fichée.
     const shown = person ? data : publicView(data, { thirdParty: thirdParty(row) });
     const state: JobState =

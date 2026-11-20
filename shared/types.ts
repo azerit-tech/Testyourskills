@@ -2,6 +2,7 @@
 // le front (web). Toute carte affichée ou rendue en PNG est un `CardData`.
 // SPEC.md §3 (anatomie), §4 (jugement), §5 (statuts).
 import type { ColorwayKey } from "./card/colorways";
+import type { ProfileLinks } from "./profileLinks";
 
 export type Lang = "fr" | "en";
 
@@ -340,6 +341,11 @@ export interface BoardPerson {
   name?: string;
   /** Pseudo GitHub, si la fiche en a un. */
   login?: string;
+  /**
+   * L'adresse publique de son profil LinkedIn (§18.108), pour le logo qui y mène : seulement si la
+   * personne a fait sa fiche ou l'a revendiquée (shared/profileLinks.ts). Jamais un email.
+   */
+  linkedinUrl?: string;
   /** La photo de la fiche. Absente : les initiales. */
   avatarUrl?: string;
   initials: string;
@@ -382,8 +388,9 @@ export type JobState =
   /** `timeLeft` : ms avant que le serveur coupe la fiche en traitement (rallonge LinkedIn comprise). Absent en file. */
   | { state: "pending"; progress: ProgressEvent[]; queue?: number; findings?: Finding[]; timeLeft?: number }
   /** `mine` : la session GitHub est propriétaire revendiquée du login de la fiche (§18.1). `propose` : à la personne fichée seulement (§18.100). */
-  | { state: "done"; kind: "card"; card: CardData; week?: WeekRank; mine?: boolean; propose?: Proposal }
-  | { state: "done"; kind: "comparison"; comparison: ComparisonData; week?: WeekRank; mine?: boolean }
+  /** `links` : ses profils publics, LinkedIn et GitHub, tels que la règle les permet (§18.108, shared/profileLinks.ts). */
+  | { state: "done"; kind: "card"; card: CardData; week?: WeekRank; mine?: boolean; propose?: Proposal; links?: ProfileLinks }
+  | { state: "done"; kind: "comparison"; comparison: ComparisonData; week?: WeekRank; mine?: boolean; links?: ProfileLinks }
   | { state: "error"; code: ErrorCode; message: Fact };
 
 export type ErrorCode =
