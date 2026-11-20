@@ -40,6 +40,8 @@ export function isSitePage(path: string): boolean {
   if (path === "/" || path === "") return true;
   if (/^\/c\/[A-Za-z0-9_-]+\/?$/.test(path)) return true;
   if (/^\/(confidentialite|privacy|credits)\/?$/.test(path)) return true;
+  // Les anciennes adresses des bandes : 301 vers le classement de l'accueil (server/src/bandPages.ts, §18.100).
+  if (/^\/bandes(?:\/|$)/i.test(path)) return true;
   if (/^\/primes(?:\/|$)/i.test(path) || /^\/reglement\/?$/i.test(path) || isUpcomingPath(path)) return true;
   // /{pseudo} : l'accueil, le champ prérempli.
   const one = /^\/([^/]+)\/?$/.exec(path)?.[1];

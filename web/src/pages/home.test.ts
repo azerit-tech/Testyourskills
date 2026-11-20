@@ -126,7 +126,7 @@ describe("l'accueil de qui a déjà sa fiche (§18.89)", () => {
     expect(html).toContain(">See my sheet<");
   });
 
-  it("la page : sa fiche, le top de la semaine, les primes ouvertes, les bandes, puis « Faire une autre fiche » ; rien d'autre", () => {
+  it("la page : sa fiche, le top de la semaine, les primes ouvertes, les écoles et les boîtes, puis « Faire une autre fiche » ; rien d'autre", () => {
     const home = read("./Home.tsx");
     const page = home.slice(home.indexOf("if (mineHome && mem.mine) {"), home.indexOf('<main className="page page-home" id="main">'));
     const order = ["<MineCard ", "<WeekBoard ", "<PrimesStrip />", "<BandsTop onPlay={play} cardId={mem.mine.id} />", "h.back.another"].map((x) => page.indexOf(x));

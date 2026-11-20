@@ -7,7 +7,7 @@ import { LangProvider } from "../i18n";
 import { ApiError } from "../lib/errors";
 import { failureOf } from "../lib/remote";
 import { PAGES_TEXT } from "../pagesText";
-import { BandNotFound, CardNotFound, NotFound, PrimeNotFound, Unreachable } from "./ErrorPage";
+import { CardNotFound, NotFound, PrimeNotFound, Unreachable } from "./ErrorPage";
 
 function render(el: ReactElement, lang: "fr" | "en" = "fr"): string {
   vi.stubGlobal("localStorage", { getItem: () => lang, setItem: () => undefined });
@@ -19,7 +19,6 @@ afterEach(() => vi.unstubAllGlobals());
 const PRESETS: [string, () => ReactElement][] = [
   ["page inconnue", () => createElement(NotFound)],
   ["fiche", () => createElement(CardNotFound)],
-  ["bande", () => createElement(BandNotFound)],
   ["prime", () => createElement(PrimeNotFound, { listed: true })],
   ["serveur muet", () => createElement(Unreachable)],
 ];
@@ -40,11 +39,8 @@ describe("la mise en page d'erreur", () => {
     }
   });
 
-  it("introuvable : « Faire ma fiche » partout ; une bande offre le tableau, une prime les primes", () => {
+  it("introuvable : « Faire ma fiche » partout ; une prime offre les primes", () => {
     expect(render(createElement(CardNotFound))).toContain('<a class="btn-primary err-action" href="/">Faire ma fiche</a>');
-    const band = render(createElement(BandNotFound));
-    expect(band).toContain("Introuvable");
-    expect(band).toContain('<a class="link-alt" href="/bandes">Toutes les bandes</a>');
     const prime = render(createElement(PrimeNotFound, { listed: true }));
     expect(prime).toContain("Cette prime n&#x27;existe pas");
     expect(prime).toContain('<a class="btn-primary err-action" href="/">Faire ma fiche</a>');

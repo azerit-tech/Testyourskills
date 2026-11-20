@@ -613,7 +613,7 @@ export function mountBands(app: Hono, o: BandsOptions): void {
     return c.json(bandsTop(store.db, Date.now(), { ecole: own("ecole"), boite: own("boite") }));
   });
 
-  // GET /api/bands/:type/:id : la page d'une bande.
+  // GET /api/bands/:type/:id : une bande et ses fiches (ouverte au classement de l'accueil, §18.100).
   app.get("/api/bands/:type/:id", (c) => {
     const type = c.req.param("type");
     const id = c.req.param("id");

@@ -5,15 +5,16 @@
 // et son partage, avec « Changer » et « Sortir ». Le sélecteur (pastille
 // proposée, recherche d'école, nom de boîte) ne sert plus qu'à changer, ou quand
 // rien n'a été lu sur le profil. Rien ne s'affiche si la fiche n'y a pas droit
-// (dénoncée, pas à elle).
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+// (dénoncée, pas à elle). Le nom de la bande et son partage mènent au classement de
+// l'accueil (§18.100) : la page d'une bande n'existe plus.
+import { useEffect, useId, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import type { BandRef, BandStanding, BandType, MyBands } from "../../../shared/bands";
-import { BAND_TYPES, bandPath, COMPANY_INPUT_MAX, searchSchools } from "../../../shared/bands";
+import { BAND_TYPES, COMPANY_INPUT_MAX, searchSchools } from "../../../shared/bands";
 import { pick, useT } from "../i18n";
 import { api } from "../lib/api";
-import { bandHint, bandsApi, bandUrl, starLine, suggestedPills, takeBandJoin } from "../lib/bands";
-import { onLinkClick } from "../lib/router";
+import { bandsApi, rankingShareUrl, starLine, suggestedPills } from "../lib/bands";
+import { goRanking, RANKING_HREF } from "../lib/router";
 import { hasNativeShare } from "../lib/sharing";
 import { copyText, isTouch } from "../lib/util";
 import { IconLinkedIn, IconShare } from "./Icons";
@@ -24,15 +25,15 @@ type Toast = (m: string) => void;
 
 /**
  * Le partage d'une bande : la feuille du téléphone, sinon LinkedIn avec le texte au
- * presse-papier (comme After.tsx). Une boîte au nom libre en formation n'a pas
- * encore de page publique : le lien mène à l'accueil, le texte dit quoi taper.
+ * presse-papier (comme After.tsx). Le lien mène au classement de l'accueil ; une boîte
+ * au nom libre pas encore classée : le texte dit quoi taper.
  */
 export function useBandShare(toast: Toast) {
   const { t, lang } = useT();
   const native = hasNativeShare() && isTouch();
-  const share = async (b: Pick<BandRef, "type" | "id"> & { hasPage?: boolean }, text: string, cardId: string | null) => {
+  const share = async (b: Pick<BandRef, "type" | "id">, text: string, cardId: string | null) => {
     // Partagé depuis le site en anglais, le lien le dit : son aperçu sort en anglais.
-    const url = `${b.hasPage === false ? `${window.location.origin}/` : bandUrl(b)}${lang === "en" ? "?lang=en" : ""}`;
+    const url = rankingShareUrl(lang);
     const meta = { type: b.type, id: b.id };
     if (native) {
       try {
@@ -57,30 +58,10 @@ export function BandPick({ cardId, toast }: { cardId: string; toast: Toast }) {
   const uid = useId().replace(/:/g, "");
   // undefined : on lit encore ; null : pas de bandes pour cette fiche.
   const [mb, setMb] = useState<MyBands | null | undefined>(undefined);
-  const [hint] = useState(() => bandHint());
-  const say = useRef({ toast, landed: t.bands.states.landed });
-  say.current = { toast, landed: t.bands.states.landed };
 
   useEffect(() => {
     let alive = true;
-    void (async () => {
-      const mine = await bandsApi.mine(cardId);
-      if (!alive) return;
-      setMb(mine);
-      if (!mine) return;
-      // La bande choisie sur sa page avant de faire la fiche (SPEC §18.48) : la fiche posée, elle y entre.
-      // Choisie à la main, elle passe devant celle que le serveur a lue sur le profil (§18.82).
-      const pending = takeBandJoin(cardId);
-      if (!pending || mine[pending.type]?.id === pending.id) return;
-      try {
-        const next = await bandsApi.join(cardId, pending.type, { id: pending.id, name: pending.label });
-        if (!alive) return;
-        setMb(next);
-        say.current.toast(say.current.landed(pending.label));
-      } catch {
-        /* refusée (quota, bande fermée) : sa pastille reste en tête, un toucher suffit */
-      }
-    })();
+    void bandsApi.mine(cardId).then((mine) => alive && setMb(mine));
     return () => {
       alive = false;
     };
@@ -96,7 +77,7 @@ export function BandPick({ cardId, toast }: { cardId: string; toast: Toast }) {
       {/* Déjà dedans (l'entrée d'office, §18.82) : la ligne le dit, et qu'on peut changer. */}
       <p>{mb.ecole || mb.boite ? p.introIn : p.intro}</p>
       {BAND_TYPES.map((type) => (
-        <League key={type} type={type} cardId={cardId} mb={mb} hint={hint} onChange={setMb} toast={toast} />
+        <League key={type} type={type} cardId={cardId} mb={mb} onChange={setMb} toast={toast} />
       ))}
     </section>
   );
@@ -106,12 +87,11 @@ interface LeagueProps {
   type: BandType;
   cardId: string;
   mb: MyBands;
-  hint: BandRef | null;
   onChange: (mb: MyBands) => void;
   toast: Toast;
 }
 
-function League({ type, cardId, mb, hint, onChange, toast }: LeagueProps) {
+function League({ type, cardId, mb, onChange, toast }: LeagueProps) {
   const { t, lang } = useT();
   const p = t.bands.pick;
   const uid = useId().replace(/:/g, "");
@@ -144,7 +124,7 @@ function League({ type, cardId, mb, hint, onChange, toast }: LeagueProps) {
 
   const results = useMemo(() => (type === "ecole" && value.trim().length >= 2 ? searchSchools(value, 5) : []), [type, value]);
   // La bande tenue n'est pas proposée à elle-même.
-  const pills = suggestedPills(type, mb, hint).filter((r) => r.id !== joined?.id);
+  const pills = suggestedPills(type, mb).filter((r) => r.id !== joined?.id);
   const head = type === "ecole" ? p.school : p.company;
 
   const submit = (e: FormEvent) => {
@@ -255,8 +235,8 @@ interface JoinedProps {
 function Joined({ b, stars, busy, native, changing, onChange, onLeave, onShare }: JoinedProps) {
   const { t } = useT();
   const p = t.bands.pick;
-  // Sans page publique (boîte au nom libre, moins de trois dossiers) : ni lien, et le partage dit quoi taper.
-  const href = b.hasPage ? bandPath(b) : null;
+  // Pas encore au classement public (boîte au nom libre, moins de trois dossiers) : ni lien, et le partage dit quoi taper.
+  const ranked = b.hasPage;
   const glyphs = starLine(stars);
   const rank = t.bands.rank(b);
   const text = b.hasPage ? p.shareText(glyphs, b.label, rank) : p.shareTextNoPage(glyphs, b.label, rank);
@@ -266,8 +246,8 @@ function Joined({ b, stars, busy, native, changing, onChange, onLeave, onShare }
         {/* Une seule espace dans le texte : l'écart après les étoiles est une marge (un copier-coller ne double plus l'espace). */}
         {p.line[0]} <Stars n={stars} total={stars} size={14} label={t.bands.score(stars)} />
         {p.line[1]}{" "}
-        {href ? (
-          <a href={href} onClick={(e) => onLinkClick(e, href)}>
+        {ranked ? (
+          <a href={RANKING_HREF} onClick={goRanking}>
             {b.label}
           </a>
         ) : (
@@ -281,7 +261,7 @@ function Joined({ b, stars, busy, native, changing, onChange, onLeave, onShare }
         {/* secondaire : le seul bouton principal de l'écran reste le partage de la fiche */}
         <button type="button" className="pill" onClick={() => onShare(text)} aria-label={p.shareLabel(b.label)}>
           {native ? <IconShare /> : <IconLinkedIn />}
-          {t.bands.page.share}
+          {p.share}
         </button>
         {/* discrets, à droite : changer de bande, ou en sortir */}
         <span className="bp-quiet">

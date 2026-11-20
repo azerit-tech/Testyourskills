@@ -1,8 +1,8 @@
-// Les bandes côté navigateur (§18.38) : l'API, sa démo (?mock=1), et deux
-// souvenirs locaux, la bande de la dernière page vue (sa pastille passe en
-// premier sous la fiche) et les bandes choisies ici (« Ta bande » sur /bandes).
+// Les bandes côté navigateur (§18.38) : l'API, sa démo (?mock=1), et un souvenir
+// local, les bandes de la personne (sa ligne au classement de l'accueil, §18.92).
 import { boardPerson } from "../../../shared/boardPerson";
-import type { BandBoard, BandPage, BandRef, BandsTop, BandStanding, BandType, MyBands } from "../../../shared/bands";
+import type { BandPage, BandRef, BandsTop, BandStanding, BandType, MyBands } from "../../../shared/bands";
+import { RANKING_ANCHOR } from "../../../shared/routes";
 import { BAND_MIN_MEMBERS, BAND_TYPES, bandHasPage, companyCheck, schoolById } from "../../../shared/bands";
 import { isMock, tokens } from "./api";
 import { ApiError } from "./errors";
@@ -47,22 +47,13 @@ async function post(url: string, cardId: string, body: unknown): Promise<MyBands
 }
 
 export const bandsApi = {
-  /** Les cinq premières de chaque ligue (l'accueil) ; null si le serveur ne répond pas. */
   /** Le classement de chaque ligue pour l'accueil ; `mine` : ses bandes, rendues en plus si elles sont plus bas. */
   async top(mine: Partial<Record<BandType, string | null>> = {}): Promise<BandsTop | null> {
     if (isMock()) return mock.top(mine);
     const q = BAND_TYPES.filter((k) => mine[k]).map((k) => `${k}=${encodeURIComponent(mine[k]!)}`).join("&");
     return getJson<BandsTop>(`/api/bands/top${q ? `?${q}` : ""}`).catch(() => null);
   },
-  /** Le tableau d'une ligue, sa propre bande si elle est plus bas, et les bandes en formation. Une panne remonte en ApiError. */
-  async board(type: BandType, withId?: string | null): Promise<BandBoard> {
-    if (isMock()) return mock.board(type, withId ?? null);
-    const q = withId ? `&with=${encodeURIComponent(withId)}` : "";
-    const board = await getJson<BandBoard>(`/api/bands?type=${type}${q}`);
-    // Une réponse gardée en cache d'avant les bandes en formation n'a pas la liste.
-    return { ...board, forming: board.forming ?? [] };
-  },
-  /** La page d'une bande ; null si elle n'existe pas. Une panne réseau remonte en ApiError. */
+  /** Les fiches d'une bande (ouverte au classement de l'accueil) ; null si elle n'existe pas. Une panne réseau remonte en ApiError. */
   async page(type: BandType, id: string): Promise<BandPage | null> {
     if (isMock()) return mock.page(type, id);
     try {
@@ -92,7 +83,6 @@ export const bandsApi = {
 
 /* ---------- souvenirs locaux ---------- */
 
-const HINT_KEY = "tys_band_hint";
 const MINE_KEY = "tys_my_bands";
 
 function readJson<T>(key: string): T | null {
@@ -112,58 +102,7 @@ function writeJson(key: string, v: unknown) {
   }
 }
 
-const isRef = (v: unknown): v is BandRef =>
-  !!v && typeof v === "object" && ((v as BandRef).type === "ecole" || (v as BandRef).type === "boite") && typeof (v as BandRef).id === "string" && typeof (v as BandRef).label === "string";
-
-/** La bande d'où l'on vient (sa page vue) : « Fais ta fiche pour… », puis sa pastille en tête. */
-export function rememberBandHint(ref: BandRef, now = Date.now()) {
-  writeJson(HINT_KEY, { type: ref.type, id: ref.id, label: ref.label, at: now });
-}
-
-/** Elle vaut un jour : une fiche faite bien plus tard, ou par quelqu'un d'autre sur ce navigateur, ne la reçoit pas en tête. */
-export const BAND_HINT_MS = 24 * 3600 * 1000;
-
-export function bandHint(now = Date.now()): BandRef | null {
-  const v = readJson<unknown>(HINT_KEY);
-  const at = v && typeof v === "object" ? (v as { at?: unknown }).at : null;
-  if (!isRef(v) || typeof at !== "number" || now - at > BAND_HINT_MS) return null;
-  return { type: v.type, id: v.id, label: v.label };
-}
-
-/* La bande choisie sur sa page, portée à travers la création jusqu'à la fiche posée :
-   sous la fiche, BandPick la rejoint (une fois). sessionStorage, la RAM en repli. */
-const JOIN_KEY = "tys_band_join";
-let memJoin: (BandRef & { cardId: string }) | null = null;
-
-export function rememberBandJoin(cardId: string, ref: BandRef) {
-  memJoin = { cardId, type: ref.type, id: ref.id, label: ref.label };
-  try {
-    sessionStorage.setItem(JOIN_KEY, JSON.stringify(memJoin));
-  } catch {
-    /* stockage bloqué : la RAM suffit pour cet onglet */
-  }
-}
-
-/** La bande qui attend cette fiche, ou null ; elle n'est lue qu'une fois. */
-export function takeBandJoin(cardId: string): BandRef | null {
-  let v: unknown = memJoin;
-  try {
-    const raw = sessionStorage.getItem(JOIN_KEY);
-    if (raw) v = JSON.parse(raw);
-  } catch {
-    /* la RAM fait foi */
-  }
-  if (!isRef(v) || (v as { cardId?: unknown }).cardId !== cardId) return null;
-  memJoin = null;
-  try {
-    sessionStorage.removeItem(JOIN_KEY);
-  } catch {
-    /* rien */
-  }
-  return { type: v.type, id: v.id, label: v.label };
-}
-
-/** Les bandes choisies depuis ce navigateur, pour « Ta bande » sur /bandes. */
+/** Les bandes de la personne, retenues ici : sa ligne au classement de l'accueil, sans fiche à lire. */
 export function rememberMyBands(mb: MyBands) {
   writeJson(MINE_KEY, { ecole: mb.ecole?.id ?? null, boite: mb.boite?.id ?? null });
 }
@@ -174,13 +113,10 @@ export function myBandIds(): Record<BandType, string | null> {
   return { ecole: id(v?.ecole), boite: id(v?.boite) };
 }
 
-/** Les pastilles proposées sous la fiche : la bande d'où l'on vient d'abord, puis celle lue sur la fiche. */
-export function suggestedPills(type: BandType, mb: MyBands, hint: BandRef | null): BandRef[] {
-  const out: BandRef[] = [];
-  if (hint && hint.type === type) out.push(hint);
+/** Les pastilles proposées sous la fiche : celle lue sur la fiche. */
+export function suggestedPills(type: BandType, mb: MyBands): BandRef[] {
   const s = mb.suggest[type];
-  if (s && !out.some((r) => r.id === s.id)) out.push(s);
-  return out;
+  return s ? [s] : [];
 }
 
 /** Les étoiles sur leur échelle de six, pour un texte de partage (« ★★★★☆☆ », §18.48 : toute note a son échelle). */
@@ -189,7 +125,8 @@ export const starLine = (n: number) => {
   return "★".repeat(k) + "☆".repeat(6 - k);
 };
 
-export const bandUrl = (b: Pick<BandRef, "type" | "id">) => `${window.location.origin}/bandes/${b.type}/${b.id}`;
+/** Le lien partagé d'une bande : le classement de l'accueil (§18.100), en anglais si on partage depuis l'anglais. */
+export const rankingShareUrl = (lang: "fr" | "en") => `${window.location.origin}/${lang === "en" ? "?lang=en" : ""}#${RANKING_ANCHOR}`;
 
 /* ---------- la démo (?mock=1) ---------- */
 
@@ -268,17 +205,6 @@ const mock = {
       if (i >= 5) (out.mine ??= {})[type] = { place: i + 1, band: order[i]! };
     }
     return out;
-  },
-  board(type: BandType, withId: string | null): BandBoard {
-    const all = mockStandings(type);
-    const entries = all.filter((b) => b.rank !== null).sort((a, b) => a.rank! - b.rank!);
-    const extra = withId && !entries.some((b) => b.id === withId) ? (all.find((b) => b.id === withId && b.hasPage) ?? null) : null;
-    // Comme le serveur : les bandes en formation qui ont leur page, les plus avancées d'abord, sans la sienne.
-    const forming = all
-      .filter((b) => b.rank === null && b.hasPage && b.id !== extra?.id)
-      .sort((a, b) => b.members - a.members || b.score - a.score)
-      .slice(0, 10);
-    return { type, total: entries.length, entries: entries.slice(0, 20), forming, extra };
   },
   page(type: BandType, id: string): BandPage | null {
     const band = mockStandings(type).find((b) => b.id === id) ?? (type === "ecole" && schoolById(id) ? { ...standing("ecole", id, schoolById(id)!.label, 0, 0), rank: null, gap: null, ahead: null } : null);

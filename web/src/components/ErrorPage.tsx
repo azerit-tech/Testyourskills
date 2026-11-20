@@ -5,7 +5,7 @@
 // utile, jamais une impasse.
 //
 // Les gabarits prêts à poser : <NotFound /> (page inconnue), <CardNotFound />,
-// <BandNotFound />, <PrimeNotFound />, et <Unreachable /> quand le serveur ne
+// <PrimeNotFound />, et <Unreachable /> quand le serveur ne
 // répond pas (jamais « introuvable » : « Réessayer »). Avec `bare`, le panneau
 // seul, à poser dans son propre <main>.
 import { useEffect, useRef } from "react";
@@ -148,14 +148,6 @@ export function CardNotFound({ bare, onMake }: Preset & { onMake?: () => void })
   const c = t.pages.error.card;
   useTabTitle(t.pages.error.tab.card);
   return <ErrorPage bare={bare} stamp="none" title={c.title} text={c.text} action={{ label: c.action, href: "/", onClick: onMake }} />;
-}
-
-/** Une bande qui n'est pas au tableau : la monter, ou voir les autres. */
-export function BandNotFound({ bare }: Preset) {
-  const { t } = useT();
-  const b = t.pages.error.band;
-  useTabTitle(t.pages.error.tab.band);
-  return <ErrorPage bare={bare} stamp="none" title={b.title} text={b.text} action={{ label: b.action, href: "/" }} alt={{ label: b.alt, href: "/bandes" }} />;
 }
 
 /** Une prime inconnue : « Faire ma fiche » comme partout ; les autres primes en appoint si la saison en porte. */

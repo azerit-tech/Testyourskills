@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import type { Lang } from "../../../shared/types";
 import { useT } from "../i18n";
 import { api, isMock } from "../lib/api";
-import { onLinkClick, usePath } from "../lib/router";
+import { goRanking, onLinkClick, RANKING_HREF, usePath } from "../lib/router";
 import { seasonLine, useAppConfig } from "../lib/season";
 import { syncMine } from "../lib/entryApi";
 import { MINE_EVENT, myCard } from "../lib/session";
@@ -80,7 +80,8 @@ export function SeasonBand() {
 }
 
 /**
- * La barre du haut, sur l'encre : la marque, puis « Bandes », « Ma fiche » (seulement si une fiche
+ * La barre du haut, sur l'encre : la marque, puis « Classement » (l'ancre du classement de l'accueil,
+ * §18.100), « Ma fiche » (seulement si une fiche
  * est en mémoire dans ce navigateur) et la langue.
  */
 export function TopBar() {
@@ -101,15 +102,14 @@ export function TopBar() {
   const acct = got && !got.known ? got : null;
   const mine = myCard();
   const mineHref = acct?.cardId ? `/c/${acct.cardId}` : mine ? `/c/${mine.id}` : got?.cardId ? `/c/${got.cardId}` : null;
-  const onBands = /^\/bandes(\/|$)/.test(path);
   return (
     <header className="topbar">
       <a href="/" className="topbar-brand" onClick={(e) => onLinkClick(e, "/")} aria-label={t.chrome.home}>
         <Brand />
       </a>
       <nav className="topbar-nav" aria-label={t.chrome.nav}>
-        <a className="topbar-link" href="/bandes" onClick={(e) => onLinkClick(e, "/bandes")} aria-current={onBands ? "page" : undefined}>
-          {t.chrome.bands}
+        <a className="topbar-link" href={RANKING_HREF} onClick={goRanking}>
+          {t.chrome.ranking}
         </a>
         {mineHref && acct?.cardId ? (
           <a className="topbar-link topbar-mine" href={mineHref} onClick={(e) => onLinkClick(e, mineHref)} aria-current={path === mineHref ? "page" : undefined}>
@@ -143,7 +143,7 @@ export function Footer() {
   const cfg = useAppConfig();
   const path = usePath();
   const privacy = lang === "fr" ? "/confidentialite" : "/privacy";
-  const inner: [string, string][] = [["/bandes", t.chrome.bands]];
+  const inner: [string, string][] = [[RANKING_HREF, t.chrome.ranking]];
   if (cfg?.primesListed) inner.push(["/primes", t.chrome.primes]);
   if (cfg?.rulesPublished) inner.push(["/reglement", t.chrome.rules]);
   inner.push([privacy, t.footer.privacy], ["/credits", t.chrome.credits]);
@@ -162,7 +162,7 @@ export function Footer() {
         <nav className="footer-links" aria-label={t.chrome.nav}>
           {inner.map(([href, label]) => (
             // la page en cours, soulignée comme dans la barre du haut
-            <a key={href} href={href} onClick={(e) => onLinkClick(e, href)} aria-current={path === href ? "page" : undefined}>
+            <a key={href} href={href} onClick={(e) => (href === RANKING_HREF ? goRanking(e) : onLinkClick(e, href))} aria-current={path === href ? "page" : undefined}>
               {label}
             </a>
           ))}

@@ -3,7 +3,8 @@
 // Jacques (le produit) debout sur son crépuscule : à droite au bureau, juste
 // sous le formulaire sur téléphone, où son haut dépasse du premier écran.
 // Ensuite, dans l'ordre de l'envie : la berline (§18.79), le top de la semaine
-// (§18.22), les primes si elles sont ouvertes (§18.4), un classement des écoles et un des boîtes (§18.92), le
+// (§18.22), les primes si elles sont ouvertes (§18.4), un classement des écoles et un des boîtes (§18.92,
+// sous l'ancre « classement » où mène « Classement » de la barre du haut, §18.100), le
 // mur des 13 profils (§18.28), et un dernier formulaire avant le pied de page.
 // Rien d'autre. La couverture en mosaïque du §18.31 a disparu (§18.81).
 // L'accueil se souvient : le dossier encore en cours tient en une ligne au-dessus du
@@ -29,7 +30,8 @@ import { PrimesStrip } from "../components/Primes";
 import { Stars } from "../components/Stars";
 import { useT } from "../i18n";
 import { ApiError, api, type Showcase } from "../lib/api";
-import { onLinkClick } from "../lib/router";
+import { currentAnchor, onLinkClick } from "../lib/router";
+import { RANKING_ANCHOR } from "../../../shared/routes";
 import { homeHook, useAppConfig } from "../lib/season";
 import { returnPending } from "../lib/entryApi";
 import { MINE_EVENT, clearPending, dropPrefill, filmOwed, myCard, peekPrefill, pendingFile, type MyCard } from "../lib/session";
@@ -95,7 +97,7 @@ interface Memory {
   card?: CardData | null;
 }
 
-/** La dernière fiche lue ici : revenir sur l'accueil (depuis sa fiche, depuis /bandes) la montre sans attendre. */
+/** La dernière fiche lue ici : revenir sur l'accueil (depuis sa fiche, par « Classement ») la montre sans attendre. */
 let seen: { id: string; card: CardData } | null = null;
 
 /**
@@ -277,31 +279,37 @@ export function ExampleCard({ card, href, pieces }: Showcase) {
 
 const reducedMotion = () => !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
-/** Venu par l'ancre du top (« /#semaine », depuis le partage d'une fiche). */
-const atWeekAnchor = () => window.location.hash.slice(1).split("?")[0] === WEEK_ANCHOR;
+/** Venu par une ancre de l'accueil : « /#semaine » (le partage d'une fiche) ou « /#classement » (la barre du haut, §18.100). */
+const homeAnchor = (): string | null => {
+  const a = currentAnchor();
+  return a === WEEK_ANCHOR || a === RANKING_ANCHOR ? a : null;
+};
 
 /**
- * L'accueil ouvert sur « /#semaine » : le tableau n'est pas à sa place à la première image (la
- * fiche d'exemple et la berline prennent leur hauteur ensuite). On y descend quand le top a
- * répondu, puis de nouveau quand les polices et la vitrine sont posées, tant que la personne n'a
- * pas défilé elle-même. Le titre du tableau arrive sous la barre du haut (scroll-margin-top).
+ * L'accueil ouvert sur une ancre : le tableau n'est pas à sa place à la première image (la
+ * fiche d'exemple et la berline prennent leur hauteur ensuite). On y descend quand il est là
+ * (le top de la semaine quand il a répondu ; le classement des écoles et des boîtes tient sa
+ * place dès le premier rendu), puis de nouveau quand les polices et la vitrine sont posées,
+ * tant que la personne n'a pas défilé elle-même. Le titre arrive en haut de l'écran (scroll-margin-top).
  */
-function useWeekAnchor(topKnown: boolean) {
+function useHomeAnchor(topKnown: boolean) {
+  const [anchor] = useState(homeAnchor);
+  const wait = anchor === WEEK_ANCHOR && !topKnown;
   useEffect(() => {
-    if (!topKnown || !atWeekAnchor()) return;
+    if (!anchor || wait) return;
     let moved = false;
     const mine = () => {
       moved = true;
     };
     const go = () => {
-      if (moved || !atWeekAnchor()) return;
-      document.getElementById(WEEK_ANCHOR)?.scrollIntoView({ block: "start" });
+      if (moved || homeAnchor() !== anchor) return;
+      document.getElementById(anchor)?.scrollIntoView({ block: "start" });
     };
     const opts = { passive: true, once: true } as const;
     window.addEventListener("wheel", mine, opts);
     window.addEventListener("touchstart", mine, opts);
     window.addEventListener("keydown", mine, opts);
-    const timers = [0, 300, 800, 1600].map((ms) => window.setTimeout(go, ms));
+    const timers = [0, 300, 800, 1600, 2600].map((ms) => window.setTimeout(go, ms));
     void document.fonts?.ready.then(go);
     return () => {
       timers.forEach((t) => window.clearTimeout(t));
@@ -309,7 +317,7 @@ function useWeekAnchor(topKnown: boolean) {
       window.removeEventListener("touchstart", mine);
       window.removeEventListener("keydown", mine);
     };
-  }, [topKnown]);
+  }, [anchor, wait]);
 }
 
 export function Home() {
@@ -324,7 +332,7 @@ export function Home() {
   const hook = homeHook(h, useAppConfig());
   // Revenu en plein film : la fiche existe, sa note attend la poursuite.
   const owed = !!mem.mine && filmOwed(mem.mine.id);
-  useWeekAnchor(topKnown);
+  useHomeAnchor(topKnown);
 
   useEffect(() => {
     document.title = t.meta.title;
@@ -388,7 +396,7 @@ export function Home() {
   if (mineHome && mem.mine) {
     return (
       <main className="page page-home is-mine" id="main">
-        {/* Sa fiche, puis les classements : le top de la semaine (sa ligne en évidence), les primes ouvertes, les bandes. */}
+        {/* Sa fiche, puis les classements : le top de la semaine (sa ligne en évidence), les primes ouvertes, les écoles et les boîtes. */}
         <div className="home-mine">
           <MineCard mine={mem.mine} card={mem.card} />
           <WeekBoard onPlay={play} />

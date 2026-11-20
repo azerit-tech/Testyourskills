@@ -32,11 +32,11 @@ const links = (html: string) => [...html.matchAll(/<a [^>]*href="([^"]*)"[^>]*>(
 afterEach(() => vi.unstubAllGlobals());
 
 describe("la barre du haut", () => {
-  it("sans fiche en mémoire : la marque, « Bandes », la langue en deux mots", () => {
+  it("sans fiche en mémoire : la marque, « Classement » (l'ancre du classement de l'accueil), la langue en deux mots", () => {
     const html = render(createElement(TopBar));
     expect(links(html)).toEqual([
       ["/", "AZERIT"],
-      ["/bandes", "Bandes"],
+      ["/#classement", "Classement"],
     ]);
     expect(html).toContain('aria-label="Azerit, accueil"');
     expect(html).toMatch(/<button[^>]*aria-pressed="true"[^>]*>FR<\/button>/);
@@ -47,14 +47,14 @@ describe("la barre du haut", () => {
     const html = render(createElement(TopBar), { mine: { id: "Ab12345678", login: "leamd", overall: 71 } });
     expect(links(html)).toEqual([
       ["/", "AZERIT"],
-      ["/bandes", "Bandes"],
+      ["/#classement", "Classement"],
       ["/c/Ab12345678", "Ma fiche"],
     ]);
   });
 
   it("en anglais", () => {
     const html = render(createElement(TopBar), { lang: "en", mine: { id: "Ab12345678", login: null, overall: 40 } });
-    expect(links(html).map((l) => l[1])).toEqual(["AZERIT", "Crews", "My sheet"]);
+    expect(links(html).map((l) => l[1])).toEqual(["AZERIT", "Ranking", "My sheet"]);
     expect(html).toContain('aria-label="Azerit, home"');
   });
 });
@@ -75,12 +75,12 @@ describe("le bandeau de saison", () => {
 
 describe("le pied de page", () => {
   // Le mot de la vie privée appartient au dictionnaire : le test lit le sien.
-  it("par défaut : qui fait le site et azerit.tech, puis Bandes, vie privée, Crédits", () => {
+  it("par défaut : qui fait le site et azerit.tech, puis Classement, vie privée, Crédits", () => {
     const html = render(createElement(Footer));
     expect(html).toContain("Azerit recrute des devs sur preuves");
     expect(links(html)).toEqual([
       ["https://azerit.tech", "azerit.tech ↗"],
-      ["/bandes", "Bandes"],
+      ["/#classement", "Classement"],
       ["/confidentialite", DICTS.fr.footer.privacy],
       ["/credits", "Crédits"],
     ]);
@@ -88,7 +88,7 @@ describe("le pied de page", () => {
 
   it("primes listées et règlement publié : leurs liens s'ajoutent, dans l'ordre", () => {
     const html = render(createElement(Footer), { config: { primesOpen: true, primesListed: true, rulesPublished: true, season: SEASON } });
-    expect(links(html).map((l) => l[0])).toEqual(["https://azerit.tech", "/bandes", "/primes", "/reglement", "/confidentialite", "/credits"]);
+    expect(links(html).map((l) => l[0])).toEqual(["https://azerit.tech", "/#classement", "/primes", "/reglement", "/confidentialite", "/credits"]);
   });
 
   it("en anglais", () => {
@@ -96,7 +96,7 @@ describe("le pied de page", () => {
     expect(html).toContain("Azerit hires devs on evidence: experience first, code as proof.");
     expect(links(html)).toEqual([
       ["https://azerit.tech", "azerit.tech ↗"],
-      ["/bandes", "Crews"],
+      ["/#classement", "Ranking"],
       ["/primes", "Bounties"],
       ["/reglement", "Rules"],
       ["/privacy", DICTS.en.footer.privacy],

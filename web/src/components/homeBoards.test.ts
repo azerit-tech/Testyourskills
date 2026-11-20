@@ -1,4 +1,4 @@
-// Les tableaux de l'accueil (§18.48, §18.92) : le top de la semaine et ceux des bandes,
+// Les tableaux de l'accueil (§18.48, §18.92, §18.100) : le top de la semaine et ceux des bandes,
 // et la ligne de mémoire, rendus en chaîne, sans navigateur ni serveur.
 import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -127,10 +127,10 @@ describe("la ligne de mémoire au-dessus du formulaire", () => {
   });
 });
 
-describe("les bandes sur l'accueil : un classement par ligue (§18.92)", () => {
+describe("les bandes sur l'accueil : un classement par ligue (§18.92, §18.100)", () => {
   const band = (type: "ecole" | "boite", id: string, label: string, score: number, members: number, rank: number | null = null) =>
     ({ type, id, label, score, members, rank, missing: Math.max(0, 3 - members), gap: null, ahead: null, hasPage: true }) as BandStanding;
-  const view = (top: BandsTop, mine: Partial<Record<"ecole" | "boite", string | null>> = {}, language?: string) => render(createElement(BandsTopView, { top, mine, onPlay: () => undefined }), language);
+  const view = (top: BandsTop | null, mine: Partial<Record<"ecole" | "boite", string | null>> = {}, language?: string) => render(createElement(BandsTopView, { top, mine, onPlay: () => undefined }), language);
   // La prod du 20 novembre : une école au tableau, une en formation, une boîte au tableau.
   const prod: BandsTop = {
     ecole: [band("ecole", "centralesupelec", "CentraleSupélec", 11, 3, 1), band("ecole", "centrale-mediterranee", "Centrale Méditerranée", 7, 2)],
@@ -138,23 +138,26 @@ describe("les bandes sur l'accueil : un classement par ligue (§18.92)", () => {
   };
   const league = (html: string, type: "ecole" | "boite") => html.slice(html.indexOf(`league-${type}-title`), type === "ecole" ? html.indexOf("league-boite-title") : undefined);
 
-  it("deux tableaux faits comme le top de la semaine : le nom de la ligue, l'onglet « Top 5 », l'unité « Étoiles »", () => {
+  it("deux tableaux faits comme le top de la semaine, sous l'ancre « classement » : le nom de la ligue, l'onglet « Top 5 », l'unité « Étoiles »", () => {
     const html = view(prod);
+    expect(html).toMatch(/^<div class="leagues" id="classement">/);
     expect(html).toMatch(/<h2 id="league-ecole-title">Écoles<\/h2><div class="board-top"><p class="board-tag">Top 5<\/p><span class="board-scale" aria-hidden="true">Étoiles<\/span><ol class="board-list is-top">/);
     expect(html).toMatch(/<h2 id="league-boite-title">Boîtes<\/h2>/);
     expect(count(html, '<section class="board league"')).toBe(2);
     expect(view(prod, {}, "en-US")).toMatch(/<h2 id="league-ecole-title">Schools<\/h2>.*>Stars<\/span>/);
   });
 
-  it("le tableau d'abord, puis la bande en formation à la place suivante : sa place, son nom, ses fiches, ses étoiles, le lien vers sa page", () => {
+  it("le tableau d'abord, puis la bande en formation à la place suivante : sa place, son nom, ses fiches, ses étoiles ; la ligne s'ouvre sur ses fiches, pas sur une page", () => {
     const html = league(view(prod), "ecole");
-    expect(count(html, 'class="board-row band-row league-row"')).toBe(2);
-    expect(html).toContain('href="/bandes/ecole/centralesupelec"');
-    expect(html).toContain('<span class="board-rank">1</span><span class="band-name"><span class="board-login">CentraleSupélec</span><span class="band-count">3\u00a0fiches</span></span><span class="band-score">11</span>');
-    expect(html).toContain('<span class="board-rank">2</span><span class="band-name"><span class="board-login">Centrale Méditerranée</span><span class="band-count">2\u00a0fiches, en formation</span></span><span class="band-score">7</span>');
-    expect(html).toMatch(/aria-label="Place 2\s: Centrale Méditerranée, 7\u00a0étoiles, 2\u00a0fiches, en formation"/);
-    expect(league(view({ ...prod, ecole: [band("ecole", "utc", "UTC", 3, 1)] }), "ecole")).toContain("1\u00a0fiche, en formation");
-    expect(league(view(prod, {}, "en-US"), "ecole")).toContain("2\u00a0sheets, forming");
+    expect(count(html, 'class="board-row band-row league-row has-people"')).toBe(2);
+    expect(html).not.toContain("href=");
+    expect(count(html, 'aria-expanded="false"')).toBe(2);
+    expect(count(html, 'class="league-chev"')).toBe(2);
+    expect(html).toContain('<span class="board-rank">1</span><span class="band-name"><span class="board-login">CentraleSupélec</span><span class="band-count">3 fiches</span></span><span class="band-score">11</span>');
+    expect(html).toContain('<span class="board-rank">2</span><span class="band-name"><span class="board-login">Centrale Méditerranée</span><span class="band-count">2 fiches, en formation</span></span><span class="band-score">7</span>');
+    expect(html).toMatch(/aria-label="Place 2\s: Centrale Méditerranée, 7 étoiles, 2 fiches, en formation"/);
+    expect(league(view({ ...prod, ecole: [band("ecole", "utc", "UTC", 3, 1)] }), "ecole")).toContain("1 fiche, en formation");
+    expect(league(view(prod, {}, "en-US"), "ecole")).toContain("2 sheets, forming");
   });
 
   it("les places libres en une seule ligne, qui ramène au formulaire, comme au top de la semaine", () => {
@@ -171,21 +174,35 @@ describe("les bandes sur l'accueil : un classement par ligue (§18.92)", () => {
     expect(count(league(full, "ecole"), "league-row")).toBe(5);
   });
 
+  it("la production remise à zéro : une ligne de places libres par ligue, ni zéro ni bloc vide", () => {
+    const html = view({ ecole: [], boite: [] });
+    expect(count(html, "Places 1 à 5 libres")).toBe(2);
+    expect(count(html, "board-row")).toBe(2);
+    expect(html).not.toMatch(/>0</);
+  });
+
+  it("en attendant le serveur : les deux titres et la place des lignes, l'ancre déjà là", () => {
+    const html = view(null);
+    expect(html).toMatch(/^<div class="leagues" id="classement">/);
+    expect(count(html, 'aria-busy="true"')).toBe(2);
+    expect(count(html, "board-wait")).toBe(2);
+    expect(html).not.toContain("board-row");
+  });
+
   it("sa bande est mise en évidence, comme sa ligne au top de la semaine ; plus bas que la cinquième place, elle vient après un filet", () => {
     const html = view(prod, { ecole: "centrale-mediterranee", boite: null });
     expect(count(html, "is-me")).toBe(1);
-    expect(html).toMatch(/class="board-row band-row league-row is-me" href="\/bandes\/ecole\/centrale-mediterranee"[^>]*aria-current="true"/);
+    expect(html).toMatch(/class="board-row band-row league-row has-people is-me"[^>]*aria-current="true"[^>]*><span class="board-rank">2<\/span><span class="band-name"><span class="board-login">Centrale Méditerranée/);
     const five = [1, 2, 3, 4, 5].map((r) => band("ecole", `e${r}`, `École ${r}`, 20 - r, 3, r));
     const low = view({ ecole: five, boite: [], mine: { ecole: { place: 8, band: band("ecole", "utc", "UTC", 4, 3, 8) } } }, { ecole: "utc" });
-    expect(league(low, "ecole")).toMatch(/<ol class="board-list is-rest" start="8"><li><a class="board-row band-row league-row is-me" href="\/bandes\/ecole\/utc"[^>]*><span class="board-rank">8<\/span>/);
+    expect(league(low, "ecole")).toMatch(/<ol class="board-list is-rest" start="8"><li><button type="button" class="board-row band-row league-row has-people is-me"[^>]*><span class="board-rank">8<\/span>/);
     expect(league(low, "boite")).not.toContain("is-rest");
     // déjà dans les cinq lignes : pas de doublon
     expect(view({ ecole: five, boite: [], mine: { ecole: { place: 2, band: five[1]! } } }, { ecole: "e2" })).not.toContain("is-rest");
   });
 
-  it("rien que le classement : ni « Ta bande », ni emplacements, ni partage, ni phrase « Encore N fiches », et le lien vers /bandes dessous", () => {
+  it("rien que le classement : ni « Ta bande », ni emplacements, ni partage, ni « Encore N fiches », ni lien vers /bandes", () => {
     const html = view(prod, { ecole: "centrale-mediterranee" });
-    for (const gone of ["Ta bande", "band-slots", "band-slot", "Partager", "Encore", "En formation", "Top des bandes", "board-meta", "band-mine"]) expect(html).not.toContain(gone);
-    expect(html).toMatch(/<a class="link-alt bands-top-all" href="\/bandes">Toutes les bandes<\/a><\/div>$/);
+    for (const gone of ["Ta bande", "band-slots", "band-slot", "Partager", "Encore", "En formation", "Top des bandes", "board-meta", "band-mine", "/bandes", "Toutes les bandes", "bands-top-all"]) expect(html).not.toContain(gone);
   });
 });

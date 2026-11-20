@@ -1,7 +1,6 @@
 // Petit routeur sur l'API history : un chemin, des écouteurs, rien de plus.
 import { useSyncExternalStore } from "react";
-import { isReservedSegment, isUpcomingPath } from "../../../shared/routes";
-import type { BandType } from "../../../shared/bands";
+import { isReservedSegment, isUpcomingPath, RANKING_ANCHOR } from "../../../shared/routes";
 import { parseLogin } from "./util";
 
 const listeners = new Set<() => void>();
@@ -43,11 +42,35 @@ export function navigate(to: string, opts: { replace?: boolean; state?: unknown;
   notify();
 }
 
+/** Un clic que le navigateur garde pour lui (nouvel onglet), ou déjà traité. */
+const ownClick = (e: React.MouseEvent<HTMLAnchorElement>) => e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey;
+
 /** Clic gauche simple sur un lien interne : on navigue sans recharger. */
 export function onLinkClick(e: React.MouseEvent<HTMLAnchorElement>, to: string) {
-  if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  if (ownClick(e)) return;
   e.preventDefault();
   navigate(to);
+}
+
+/** Le classement des écoles et des boîtes, sur l'accueil (§18.100). */
+export const RANKING_HREF = `/#${RANKING_ANCHOR}`;
+
+/** L'ancre de l'adresse en cours, sans la requête qu'un partage a pu coller derrière (« #semaine?x »). */
+export const currentAnchor = () => window.location.hash.slice(1).split("?")[0];
+
+/**
+ * « Classement » : sur l'accueil, on y descend ; ailleurs, l'accueil s'ouvre sur l'ancre et y
+ * descend lui-même une fois posé (Home.tsx).
+ */
+export function goRanking(e?: React.MouseEvent<HTMLAnchorElement>) {
+  if (e) {
+    if (ownClick(e)) return;
+    e.preventDefault();
+  }
+  if (window.location.pathname !== "/") return navigate(RANKING_HREF);
+  window.history.pushState(null, "", withQuery(RANKING_HREF, window.location.search));
+  const reduced = !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  document.getElementById(RANKING_ANCHOR)?.scrollIntoView({ block: "start", behavior: reduced ? "auto" : "smooth" });
 }
 
 export type Route =
@@ -55,9 +78,8 @@ export type Route =
   | { kind: "card"; id: string }
   | { kind: "privacy" }
   | { kind: "credits" }
-  /** Les bandes (§18.38) : les deux tableaux, puis la page d'une bande. */
-  | { kind: "bands" }
-  | { kind: "band"; type: BandType; id: string }
+  /** Les anciennes adresses des bandes (/bandes, /bandes/…) : le classement de l'accueil (§18.100). */
+  | { kind: "ranking" }
   /** Les primes (§18.4) et le règlement : la saison décide de les montrer (App.tsx). */
   | { kind: "primes" }
   | { kind: "prime"; id: string }
@@ -82,9 +104,7 @@ export function routeOf(path: string): Route {
   if (path === "/" || path === "") return { kind: "home" };
   if (/^\/(confidentialite|privacy)\/?$/.test(path)) return { kind: "privacy" };
   if (/^\/credits\/?$/.test(path)) return { kind: "credits" };
-  if (/^\/bandes\/?$/i.test(path)) return { kind: "bands" };
-  const band = /^\/bandes\/(ecole|boite)\/([a-z0-9]+(?:-[a-z0-9]+)*)\/?$/.exec(path);
-  if (band) return { kind: "band", type: band[1] as BandType, id: band[2] };
+  if (/^\/bandes(\/|$)/i.test(path)) return { kind: "ranking" };
   if (/^\/primes\/?$/i.test(path)) return { kind: "primes" };
   const prime = /^\/primes\/([a-z0-9]+(?:-[a-z0-9]+)*)\/?$/.exec(path);
   if (prime) return { kind: "prime", id: prime[1] };

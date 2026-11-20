@@ -168,7 +168,7 @@ const fr = frTypoDeep({
     errNetwork: "Le serveur ne répond pas. Réessaie dans un instant.",
     /** Limite atteinte (§18.48) : sous l'erreur, une autre porte que le bouton qui échouerait. */
     meanwhileTop: "En attendant : le top de la semaine",
-    meanwhileBands: "En attendant : les bandes",
+    meanwhileRanking: "En attendant : le classement",
   },
   stats: {
     TEC: { name: "Technique", what: "La profondeur de ce qui est écrit ou décrit." },
@@ -880,7 +880,8 @@ const fr = frTypoDeep({
   chrome: {
     home: "Azerit, accueil",
     nav: "Le site",
-    bands: "Bandes",
+    /** Le classement des écoles et des boîtes, sur l'accueil (§18.100). */
+    ranking: "Classement",
     mine: "Ma fiche",
     primes: "Primes",
     rules: "Règlement",
@@ -1029,7 +1030,7 @@ const en: Dict = {
     errTooManyPages: (n) => `${n} pages: the limit is 10. A résumé fits on one or two.`,
     errNetwork: "The server isn't answering. Try again in a moment.",
     meanwhileTop: "Meanwhile: this week's top",
-    meanwhileBands: "Meanwhile: the crews",
+    meanwhileRanking: "Meanwhile: the ranking",
   },
   stats: {
     TEC: { name: "Tech skill", what: "How deep the written or described work goes." },
@@ -1624,7 +1625,7 @@ const en: Dict = {
   chrome: {
     home: "Azerit, home",
     nav: "Site",
-    bands: "Crews",
+    ranking: "Ranking",
     mine: "My sheet",
     primes: "Bounties",
     rules: "Rules",
