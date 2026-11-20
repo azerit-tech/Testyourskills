@@ -216,7 +216,18 @@ export interface GridConfig {
   weights: Record<CriterionCode, number>;
   /** Le niveau d'expérience auquel le dossier est lu : seuils en mois comptés, du plus haut au plus bas. */
   seniority: { levels: { code: SeniorityCode; months: number }[]; default: SeniorityCode };
-  final: { neverLower: CriterionCode[]; proofBonus: number; capUnproven: number; emptyBelowShare: number; emptyScore: number; bounds: { min: number; max: number } };
+  final: {
+    neverLower: CriterionCode[];
+    proofBonus: number;
+    capUnproven: number;
+    emptyBelowShare: number;
+    emptyScore: number;
+    bounds: { min: number; max: number };
+    /** 0.7.0 : la moyenne (sur 100) → la note, points [moyenne, note], interpolation linéaire. */
+    curve: [number, number][];
+    /** 0.7.0 : le plancher d'un critère compté, par niveau d'expérience ; niveau absent, aucun plancher. */
+    floors: Partial<Record<SeniorityCode, number>>;
+  };
   thinGithub: { minRepos: number; repoCommits: number; minCommits: number };
   EDU: { tiers: Record<Exclude<SchoolTier, "none">, number>; selection: Record<SelectionKind, number>; githubPattern: string; githubScore: number };
   XP: {

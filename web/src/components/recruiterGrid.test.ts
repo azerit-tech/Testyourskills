@@ -28,6 +28,8 @@ import { profileToText } from "../../../server/src/linkedinProfile/text";
 import type { GithubFacts } from "../../../server/src/github/facts";
 import type { CodeReadingResult } from "../../../shared/readings";
 import { GRID_CAP_UNPROVEN, GRID_EMPTY_SCORE } from "../../../shared/gridText";
+import { GRID } from "../../../server/src/scoring/config";
+import { interpolate } from "../../../server/src/scoring/scale";
 import { asLinkedinCard, asLinkedinComparison } from "../../../shared/linkedinText";
 import { DICTS, LangProvider } from "../i18n";
 import { comparisonGridsMock } from "../lib/mockGrid";
@@ -309,8 +311,8 @@ describe("une vraie grille du serveur, à travers le bloc : les deux profils d'e
     // Ni « ÷ n » ni moyenne chiffrée à l'écran : la note d'une fiche porte un petit aléa, jamais dit (§18.106).
     expect(formula).not.toContain("÷");
     expect(final).not.toMatch(/=\s\d+(?:[,.]\d+)?\s(?:sur|out of)\s10/);
-    // La grille du moteur, avant l'aléa : sa note se refait sur les termes affichés.
-    const raw = Math.floor((20 * num2 + den2) / (2 * den2));
+    // La grille du moteur, avant l'aléa : sa note se refait sur les termes affichés, la moyenne passée par la courbe (0.7.0).
+    const raw = Math.floor(interpolate(GRID.final.curve, (10 * num2) / den2) + 0.5 + 1e-9);
     expect(grid.rule === "capped_unproven" ? Math.min(raw, GRID_CAP_UNPROVEN) : raw).toBe(grid.overall);
   }
 

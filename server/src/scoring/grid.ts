@@ -20,6 +20,7 @@ import { df, nf } from "./common";
 import { GRID, type EmpCondition, type GridRoleKind, type OwnDeclaredRow, type OwnRow, type StkDeclaredRow, type StkRow } from "./config";
 import { isTutorialRepo, type GithubMetrics } from "./derive";
 import { highBarEmployer, type HighBarList } from "./employers";
+import { interpolate } from "./scale";
 import { normSchool, rankedSchools, schoolListNames, schoolTier, type RankedSchoolList } from "./school";
 import { EDU_NEXT, EDU_NEXT_GITHUB, SCHOOL_COUNTED, schoolCounted } from "../../../shared/schoolRank";
 import { frTypo } from "../../../shared/typo";
@@ -1694,15 +1695,22 @@ export function stkCrossCheck(draft: Draft, d: DeclaredInput, gh: GithubSide): D
 // --- La note générale (§4) ------------------------------------------------------------
 
 /**
- * Les quatre règles, et pas une de plus : (1) un critère sans note sort de la
+ * Les règles, et pas une de plus : (1) un critère sans note sort de la
  * moyenne ; (2) l'école et l'open source n'y entrent que s'ils sont au-dessus de
- * la moyenne des autres ; (3) plafond à 85 sans code prouvé ; (4) moins d'un
+ * la moyenne des autres ; (3) plafond à 80 sans code prouvé ; (4) moins d'un
  * quart des coefficients noté : 20. Ce que LinkedIn ou le CV déclare compte comme
- * le reste (0.6.0) : la preuve est déjà dans les notes (`withProof`). Calcul en
- * entiers (coefficients doublés), arrondi au supérieur à ,5, bornes 1 à 99.
+ * le reste (0.6.0) : la preuve est déjà dans les notes (`withProof`). 0.7.0 : au
+ * début de carrière et au junior, un critère noté ne descend pas sous le plancher
+ * du niveau (`final.floors`), et la moyenne passe par la courbe (`final.curve`)
+ * avant le plafond. Arrondi au supérieur à ,5, bornes 1 à 99.
+ *
+ * Idempotent sur ses propres critères : refaire la note d'une grille rangée depuis
+ * ses critères (scripts/recalcule-notes.ts) donne la même note.
  */
-export function finalize(drafts: Draft[], seniority?: GridSeniority): Grid {
+export function finalize(input: Draft[], seniority?: GridSeniority): Grid {
   const F = GRID.final;
+  const floor = seniority ? (F.floors[seniority.code] ?? 0) : 0;
+  const drafts = floor ? input.map((d) => floored(d, floor)) : input;
   const byCode = new Map(drafts.map((d) => [d.code, d]));
   const ordered = CRITERION_CODES.map((c) => byCode.get(c)!).filter(Boolean);
   const w2 = (c: CriterionCode) => Math.round(GRID.weights[c] * 2);
@@ -1726,8 +1734,8 @@ export function finalize(drafts: Draft[], seniority?: GridSeniority): Grid {
   const inMean = scored.filter((d) => counted.has(d.code));
   const n = inMean.reduce((s, d) => s + d.score! * w2(d.code), 0);
   const den = inMean.reduce((s, d) => s + w2(d.code), 0);
-  // 10 × n / den, arrondi au supérieur à ,5, en entiers.
-  let overall = den ? Math.floor((20 * n + den) / (2 * den)) : F.bounds.min;
+  // 10 × n / den, la moyenne sur 100, puis la courbe (0.7.0), arrondie au supérieur à ,5.
+  let overall = den ? roundHalfUp(interpolate(F.curve, (10 * n) / den)) : F.bounds.min;
   const codeProven = byCode.get("CODE")?.score != null;
   let rule: Grid["rule"];
   if (!codeProven) {
@@ -1736,6 +1744,17 @@ export function finalize(drafts: Draft[], seniority?: GridSeniority): Grid {
   }
   overall = Math.min(F.bounds.max, Math.max(F.bounds.min, overall));
   return { criteria: ordered.map((d) => ({ ...d, counted: counted.has(d.code) })), overall, ...(rule ? { rule } : {}), ...meta };
+}
+
+/**
+ * Le plancher du niveau (0.7.0) : au début de carrière et au junior, un critère noté sous
+ * le plancher y remonte, et sa pièce le dit. Les critères hors moyenne par nature (XP,
+ * coefficient 0) et ceux qui ne comptent que pour monter (école, open source) gardent leur note.
+ */
+function floored(d: Draft, floor: number): Draft {
+  if (d.score === null || d.score >= floor || !GRID.weights[d.code] || GRID.final.neverLower.includes(d.code)) return d;
+  const note = f(` Plancher du niveau : ${floor}.`, ` Level floor: ${floor}.`);
+  return { ...d, score: floor, reached: { fr: d.reached.fr + note.fr, en: d.reached.en + note.en } };
 }
 
 // --- Un dossier, un calcul (§4, SPEC §18.84) -----------------------------------------------

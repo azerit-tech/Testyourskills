@@ -3,10 +3,11 @@
 //   - une fiche GitHub seule : les faits (`facts_json`) et la lecture du code (`ai_json`)
 //     sont gardés, la grille se refait à l'identique du pipeline (scoreGithub) ;
 //   - une fiche LinkedIn ou CV, un dossier : la lecture du profil n'est jamais gardée (vie
-//     privée, §18.84), et le barème 0.6.0 lit des choses que la grille rangée ne dit pas
-//     (les postes et leurs employeurs, les technos rattachées, les résultats datés). Elles
-//     sont comptées « à relire » et laissées telles quelles : il faut une nouvelle lecture
-//     (fournisseur LinkedIn et IA), que ce script ne lance pas.
+//     privée, §18.84). Ses critères, si : la note se refait depuis eux (`finalize`, plancher
+//     du niveau et courbe de 0.7.0, SPEC §18.117), critères inchangés. Ce qui demande la
+//     lecture (une table de critère changée, comme les stages du junior en 0.7.0) attend
+//     une nouvelle lecture (fournisseur LinkedIn et IA), que ce script ne lance pas.
+//     Une grille sans niveau rangé, ou dont un critère n'a pas de note entière : à relire.
 // Jamais touchés : les fiches remplacées (`superseded_by`, l'historique) et les pièces d'un
 // dossier (`parent_id`, elles portent la note de leur dossier). La note recalculée prend
 // l'aléa de la fiche (±1 à 3, tiré sur son id), comme une fiche neuve.
@@ -29,6 +30,9 @@ import { starsFor } from "../shared/types";
 import type { GithubFacts } from "../server/src/github/facts";
 import { SCORING } from "../server/src/scoring/config";
 import { scoreGithub } from "../server/src/scoring/github";
+import { finalize } from "../server/src/scoring/grid";
+import type { ComparisonData, Grid } from "../shared/types";
+import { tierFor } from "../shared/types";
 import { JITTER_BOUNDS } from "../server/src/pipeline";
 
 export interface RawRow {
@@ -53,19 +57,42 @@ export function verdictOf(r: RawRow, version: string = SCORING.version): Verdict
   if (r.parent_id) return { id: r.id, kind: "kept", why: "pièce d'un dossier" };
   if (r.superseded_by) return { id: r.id, kind: "kept", why: "fiche remplacée" };
   const data = JSON.parse(r.json) as CardData;
-  if (!data.grid || !Array.isArray(data.grid.criteria) || !Number.isFinite(data.overall)) return { id: r.id, kind: "kept", why: "sans grille" };
-  const before = data.overall;
-  if (data.scoringVersion === version) return { id: r.id, kind: "current", before };
-  if (r.kind !== "card" || r.source !== "github" || !r.facts_json) return { id: r.id, kind: "reread", before, why: "lecture LinkedIn ou CV non gardée" };
+  // Un dossier porte sa note dans sa grille, sa version dans ses pièces (`cv`, `github`).
+  const dossier = "cv" in data && "github" in data ? (data as unknown as ComparisonData) : null;
+  const overall = dossier ? data.grid?.overall : data.overall;
+  if (!data.grid || !Array.isArray(data.grid.criteria) || !Number.isFinite(overall)) return { id: r.id, kind: "kept", why: "sans grille" };
+  const before = overall!;
+  if ((dossier ? dossier.cv.scoringVersion : data.scoringVersion) === version) return { id: r.id, kind: "current", before };
+  if (r.kind !== "card" || r.source !== "github" || !r.facts_json) return fromCriteria(r, data, before, version);
   const codeRead = data.grid.criteria.some((c) => c.code === "CODE" && c.score !== null);
-  // Une fiche d'avant `ai_json` : sa lecture du code n'est pas gardée, la refaire sans elle la changerait.
-  if (r.ai_json === null && codeRead) return { id: r.id, kind: "reread", before, why: "lecture du code non gardée" };
+  // Une fiche d'avant `ai_json` : sa lecture du code n'est pas gardée, la refaire sans elle la changerait ; la note se refait depuis ses critères.
+  if (r.ai_json === null && codeRead) return fromCriteria(r, data, before, version);
   const facts = JSON.parse(r.facts_json) as GithubFacts;
   const ai = r.ai_json ? (JSON.parse(r.ai_json) as CodeReadingResult | null) : null;
   const body = scoreGithub(facts, ai, { lang: data.lang ?? "fr", judgedInSeconds: data.judgedInSeconds ?? 0 });
   // La note finale comme le pipeline : l'aléa de la fiche, tiré sur son id (shared/jitter.ts).
   const next = jitterCard<CardData>({ ...data, grid: body.grid, overall: body.overall, tier: body.tier, scoringVersion: body.scoringVersion }, r.id, JITTER_BOUNDS);
   return { id: r.id, kind: "recomputed", before, after: next.overall, data: next };
+}
+
+/**
+ * Une fiche LinkedIn ou CV, un dossier : la note refaite depuis les critères rangés (0.7.0).
+ * La grille garde ses critères ; seuls la note, le niveau de la fiche et le compté changent.
+ * L'aléa de la fiche, tiré sur son id, comme le pipeline.
+ */
+function fromCriteria(r: RawRow, data: CardData, before: number, version: string): Verdict {
+  const grid = data.grid!;
+  const whole = grid.criteria.every((c) => c.score === null || Number.isInteger(c.score));
+  if (!grid.seniority || !whole) return { id: r.id, kind: "reread", before, why: "lecture LinkedIn ou CV non gardée" };
+  const drafts = grid.criteria.map(({ counted: _c, ...d }) => d);
+  const exact: Grid = finalize(drafts, grid.seniority);
+  const note = { overall: exact.overall, tier: tierFor(exact.overall), scoringVersion: version };
+  const base = "cv" in data && "github" in data ? (data as unknown as ComparisonData) : null;
+  const next = base
+    ? jitterCard<ComparisonData>({ ...base, grid: exact, cv: { ...base.cv, ...note }, github: { ...base.github, ...note } }, r.id, JITTER_BOUNDS)
+    : jitterCard<CardData>({ ...data, ...note, grid: exact }, r.id, JITTER_BOUNDS);
+  const after = next.grid!.overall;
+  return { id: r.id, kind: "recomputed", before, after, data: next as unknown as CardData };
 }
 
 /** Les notes de toutes les fiches vivantes, avant et après : la note recalculée, sinon celle d'aujourd'hui. */

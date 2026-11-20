@@ -23,7 +23,11 @@
     "capUnproven": 80,
     "emptyBelowShare": 0.25,
     "emptyScore": 20,
-    "bounds": { "min": 1, "max": 99 }
+    "bounds": { "min": 1, "max": 99 },
+    "_curveDoc": "0.7.0 (SPEC §18.117) : la moyenne pondérée des critères (sur 100) passe par cette courbe, points [moyenne, note], interpolation linéaire, avant le plafond et les bornes. Le milieu des tables de son niveau (5 sur 10 : de vrais petits projets, un stage, une école) se lit 4 étoiles, pas 3 : de 35 à 55 la note monte plus vite que la moyenne, de 55 à 77 moins vite, et à partir de 77 elle est la moyenne. Un dossier presque vide (moins de 35) et un dossier fort (77 et plus) ne bougent pas.",
+    "curve": [[0, 0], [35, 35], [55, 67], [77, 77], [100, 100]],
+    "_floorsDoc": "0.7.0 : au début de carrière et au junior, un critère compté ne descend pas sous ce plancher : à ce niveau, un signal absent (aucune semaine active, aucune PR) ne vaut pas 0. Les niveaux absents de la liste gardent leurs tables telles quelles.",
+    "floors": { "student": 2, "junior": 2 }
   },
 
   "thinGithub": {
@@ -75,7 +79,7 @@
     "_doc": "Parcours, sur LinkedIn ou le CV seulement, lu dans la table du niveau d'expérience (0.5.0) : un stage dans une équipe exigeante est en haut de la table d'un début de carrière, dix ans sans progression en bas de celle d'un expert. Mois par employeur (postes du même employeur réunis). Un « vrai poste » est un poste hors stage, alternance et association.",
     "founderPattern": "\\b(co-?)?(founder|founding|fondat(eur|rice)|cofondat(eur|rice)|createur|creatrice|cofounder)\\b",
     "productTypes": ["startup", "scaleup"],
-    "_tablesDoc": "Une table par niveau d'expérience. Chaque ligne s'ouvre par l'une de ses conditions (any) ; on obtient la plus haute ligne ouverte. role : un vrai poste (hors stage) chez un même employeur, months tenus ; at product : startup ou scale-up (lu par l'IA) ou employeur de la liste à forte barre ; at highBar : la liste seule. founded : une entreprise fondée, months tenus. internship : un stage ou une alternance chez un même employeur. internships : count stages ou alternances, ou months cumulés. Depuis 0.6.0, months se compte sur tous les postes qui remplissent la ligne (deux entreprises fondées, deux équipes produit), chaque mois une fois. riseOrTeam : deux intitulés datés qui progressent, ou une équipe encadrée avec un fait cité.",
+    "_tablesDoc": "Une table par niveau d'expérience. Chaque ligne s'ouvre par l'une de ses conditions (any) ; on obtient la plus haute ligne ouverte. role : un vrai poste (hors stage) chez un même employeur, months tenus ; at product : startup ou scale-up (lu par l'IA) ou employeur de la liste à forte barre ; at highBar : la liste seule. founded : une entreprise fondée, months tenus. internship : un stage ou une alternance chez un même employeur. internships : count stages ou alternances, ou months cumulés. Depuis 0.6.0, months se compte sur tous les postes qui remplissent la ligne (deux entreprises fondées, deux équipes produit), chaque mois une fois. riseOrTeam : deux intitulés datés qui progressent, ou une équipe encadrée avec un fait cité. 0.7.0 : la table du junior lit aussi les stages (6 pour un an de stages cumulés ou 4 mois dans une équipe produit, 5 pour deux stages ou un stage de 4 mois) : les stages comptés pour moitié font passer un étudiant au junior, ils ne doivent pas y tomber à 3, sous la table qu'il quitte.",
     "tables": {
       "student": [
         { "score": 10, "any": [{ "what": "internship", "at": "highBar", "months": 4 }, { "what": "role", "at": "highBar", "months": 6 }] },
@@ -88,8 +92,8 @@
       "junior": [
         { "score": 10, "any": [{ "what": "role", "at": "highBar", "months": 12 }] },
         { "score": 8, "any": [{ "what": "role", "at": "product", "months": 12 }, { "what": "founded", "months": 12 }] },
-        { "score": 6, "any": [{ "what": "role", "at": "product", "months": 6 }, { "what": "founded", "months": 6 }, { "what": "role", "months": 24 }] },
-        { "score": 5, "any": [{ "what": "role", "months": 12 }] },
+        { "score": 6, "any": [{ "what": "role", "at": "product", "months": 6 }, { "what": "founded", "months": 6 }, { "what": "role", "months": 24 }, { "what": "internships", "months": 12 }, { "what": "internship", "at": "product", "months": 4 }] },
+        { "score": 5, "any": [{ "what": "role", "months": 12 }, { "what": "internships", "count": 2 }, { "what": "internship", "months": 4 }] },
         { "score": 4, "any": [{ "what": "role" }, { "what": "founded" }] },
         { "score": 3, "any": [{ "what": "internship" }] }
       ],
