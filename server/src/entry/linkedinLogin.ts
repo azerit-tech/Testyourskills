@@ -455,9 +455,7 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
   // Rien d'autre que ce que la fiche montre déjà à tous.
   app.get("/api/entry/me", (c) => {
     c.header("Cache-Control", "no-store");
-    const w = whoOf(c);
-    const card = w && (w.url || w.cardId) ? (o.knownCard?.(w) ?? null) : null;
-    return c.json({ card });
+    return c.json({ card: knownOf(c) });
   });
 
   /**
@@ -511,7 +509,15 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
   /** La fiche que `tys_who` désigne (« Voir ma fiche », §18.90), sans droit ; null s'il ne désigne rien. */
   const knownOf = (c: Context): KnownCard | null => {
     const w = whoOf(c);
-    return w && (w.url || w.cardId) ? (o.knownCard?.(w) ?? null) : null;
+    const card = w && (w.url || w.cardId) ? (o.knownCard?.(w) ?? null) : null;
+    // La fiche retenue a été remplacée par un dossier (§18.106) : le navigateur retient le dossier, à la même échéance.
+    if (w?.cardId && card && card.id !== w.cardId) {
+      const p = unsign(secret, "who", getCookie(c, WHO_COOKIE));
+      if (p && typeof p.e === "number" && p.e > now()) {
+        setCookie(c, WHO_COOKIE, sign(secret, "who", { ...p, c: card.id }), { ...cookieBase, maxAge: Math.floor((p.e - now()) / 1000) });
+      }
+    }
+    return card;
   };
 
   /** Se déconnecter, ou sa fiche supprimée par son compte (§18.91) : ce navigateur oublie tout de l'entrée. */
