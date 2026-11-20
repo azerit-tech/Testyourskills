@@ -25,6 +25,8 @@ export interface CreateInput {
   denouncedBy?: string;
   /** La fiche que celle-ci complète (« Ajoute ton GitHub », « Ajoute ton LinkedIn ») : ses bandes suivent (§18.82). */
   from?: string;
+  /** « Je n'en ai pas » à la question d'avant le jugement (§18.110) : sa fiche LinkedIn seule, sans GitHub proposé. */
+  noGithub?: boolean;
 }
 
 export type Verdict = "guilty" | "cleared";
@@ -470,7 +472,7 @@ async function createCard(input: CreateInput): Promise<CreateResult> {
       res = await fetch("/api/card", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...browser, ...(held ? { "X-Card-Token": held } : {}) },
-        body: JSON.stringify({ login: input.login, linkedin: input.linkedin, lang: input.lang, ref, denouncedBy: input.denouncedBy, from: input.from }),
+        body: JSON.stringify({ login: input.login, linkedin: input.linkedin, lang: input.lang, ref, denouncedBy: input.denouncedBy, from: input.from, ...(input.noGithub ? { noGithub: true } : {}) }),
       });
     }
   } catch {

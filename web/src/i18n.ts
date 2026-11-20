@@ -82,6 +82,8 @@ const fr = frTypoDeep({
     /** Au retour de LinkedIn (§18.90) : le temps de retrouver le profil, puis, sans personne, la phrase qui le dit. */
     finding: "On te retrouve sur LinkedIn…",
     findingNote: "30 secondes au plus.",
+    /** Avant de juger (§18.110) : son GitHub, trouvé (« C'est ton GitHub ? ») ou à taper. */
+    ghAsk: { q: "C'est ton GitHub ?", yes: "Oui", no: "Non", title: "Ajoute ton GitHub", label: "Pseudo GitHub", go: "Valider", none: "Je n'en ai pas" },
     lostNone: "On ne t'a pas retrouvé sur LinkedIn. Colle le lien de ton profil.",
     lostError: "La connexion LinkedIn n'a pas abouti. Colle le lien de ton profil.",
     lostGithub: "La connexion GitHub n'a pas abouti. Tape ton pseudo.",
@@ -972,6 +974,7 @@ const en: Dict = {
     backToLogin: "Sign in",
     finding: "Finding you on LinkedIn…",
     findingNote: "30 seconds at most.",
+    ghAsk: { q: "Is this your GitHub?", yes: "Yes", no: "No", title: "Add your GitHub", label: "GitHub username", go: "Continue", none: "I don't have one" },
     lostNone: "We couldn't find you on LinkedIn. Paste your profile link.",
     lostError: "LinkedIn sign-in didn't go through. Paste your profile link.",
     lostGithub: "GitHub sign-in didn't go through. Type your username.",

@@ -27,6 +27,8 @@ interface MockJob {
   timeline: ProgressEvent[];
   doneAt: number;
   denouncedBy?: string;
+  /** « Je n'en ai pas » (§18.110) : rien à lui proposer sous sa fiche. */
+  noGithub?: boolean;
 }
 
 /** Complices suggérés en démo (§18.6) : des pseudos qui ont leur fixture. */
@@ -352,6 +354,7 @@ export const mockApi = {
     const queueMs = lower === "queue" ? 4500 : 0;
     let kind: Kind;
     if (input.linkedin && lower === "x") kind = "liempty";
+    else if (input.linkedin && input.noGithub) kind = "li";
     else if (input.linkedin) kind = login || !/\/in\/sans-github$/.test(input.linkedin) ? "licmp" : "li";
     else if (lower === "camille-ardent") kind = "licmp";
     else if (input.cv && login) kind = "cmp";
@@ -363,7 +366,7 @@ export const mockApi = {
     // Fiche dénoncée : « D » après le type (rand() est en minuscules), pour la reconnaître après un rechargement.
     const id = `m-${kind}-${input.denouncedBy ? "D" : ""}${rand()}`;
     const { timeline, doneAt } = timelineFor(kind);
-    jobs.set(id, { kind, start: Date.now() + queueMs, login, linkedin: input.linkedin, lang: input.lang, timeline, doneAt, denouncedBy: input.denouncedBy });
+    jobs.set(id, { kind, start: Date.now() + queueMs, login, linkedin: input.linkedin, lang: input.lang, timeline, doneAt, denouncedBy: input.denouncedBy, ...(input.noGithub ? { noGithub: true } : {}) });
     return { id, deleteToken: `tok-${rand()}`, cached: false };
   },
 
@@ -387,7 +390,7 @@ export const mockApi = {
     const links = profileLinks({ login: main.login, linkedinUrl }, { anonymous: denounced && !claimed });
     const state: JobState = hasLinks(links) ? { ...engine, links } : engine;
     // Sa propre fiche à une source (§18.100) : l'autre lui est proposée, comme le serveur le fait.
-    if (state.state === "done" && state.kind === "card" && job && !job.denouncedBy && !declined.has(id)) {
+    if (state.state === "done" && state.kind === "card" && job && !job.denouncedBy && !job.noGithub && !declined.has(id)) {
       const propose = mockProposal(state.card);
       if (propose) return { ...state, propose };
     }
