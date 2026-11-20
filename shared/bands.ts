@@ -11,8 +11,8 @@
 //   refusé s'il porte une insulte ou un terme haineux (data/bands.json), une
 //   adresse, un @ ou un numéro, et toujours nettoyé (espaces, casse, ni emoji ni
 //   ponctuation décorative). Une bande fermée à la main (`blocked`) n'existe plus.
-//   Une boîte hors alias n'a de page publique, d'image ni de place au tableau
-//   qu'à partir de trois dossiers (`hasPage`).
+//   Toute bande est au classement dès sa première fiche, une boîte au nom libre
+//   comprise (§18.38, 20 novembre 2026).
 
 import raw from "../data/bands.json";
 import type { BoardPerson, Fact, Position } from "./types";
@@ -21,8 +21,8 @@ import type { BoardPerson, Fact, Position } from "./types";
 export type BandType = "ecole" | "boite";
 export const BAND_TYPES: readonly BandType[] = ["ecole", "boite"];
 
-/** Membres qu'il faut à une bande pour entrer au tableau ; en dessous, « bande en formation ». */
-export const BAND_MIN_MEMBERS = 3;
+/** Membres qu'il faut à une bande pour entrer au classement : sa première fiche (§18.38, 20 novembre 2026 ; trois avant). */
+export const BAND_MIN_MEMBERS = 1;
 /** Les dossiers qui comptent dans le score d'une bande : ses vingt meilleurs. */
 export const BAND_TOP_MEMBERS = 20;
 /** Entrées dans une bande par jour et par adresse IP. */
@@ -46,18 +46,17 @@ export interface BandStanding extends BandRef {
   score: number;
   /** Dossiers comptés (fiches en ligne, non masquées). */
   members: number;
-  /** Rang dans sa ligue, à partir de trois dossiers ; null : bande en formation. */
+  /** Rang dans sa ligue dès sa première fiche ; null : une école de la liste que personne n'a rejointe. */
   rank: number | null;
-  /** Complices qui manquent pour entrer au tableau ; 0 au tableau. */
+  /** Fiches qui manquent pour entrer au classement : 1 pour une école vide, 0 sinon. */
   missing: number;
-  /** Étoiles qui la séparent de la bande de devant ; null en tête ou en formation. */
+  /** Étoiles qui la séparent de la bande de devant ; null en tête ou sans fiche. */
   gap: number | null;
-  /** La bande de devant, au tableau ; null en tête ou en formation. */
+  /** La bande de devant, au classement ; null en tête ou sans fiche. */
   ahead: { id: string; label: string; rank: number } | null;
   /**
    * Sa page publique et son image existent : toute école de la liste, toute boîte
-   * de la table d'alias, une autre boîte à partir de trois dossiers. Sinon, seule
-   * la personne la voit, sous sa fiche.
+   * dès sa première fiche (une bande fermée à la main n'existe plus).
    */
   hasPage: boolean;
 }
@@ -65,24 +64,24 @@ export interface BandStanding extends BandRef {
 /** GET /api/bands?type= : le tableau d'une ligue. */
 export interface BandBoard {
   type: BandType;
-  /** Bandes au tableau (trois dossiers ou plus). */
+  /** Bandes au classement (une fiche ou plus). */
   total: number;
   /** Les vingt premières. */
   entries: BandStanding[];
   /**
-   * Les bandes en formation (un ou deux dossiers) qui ont leur page publique, les
-   * plus avancées d'abord, dix au plus ; sans celle rendue dans `extra`.
+   * Les bandes sous le seuil (BAND_MIN_MEMBERS) qui ont leur page publique, les
+   * plus avancées d'abord, dix au plus ; sans celle rendue dans `extra`. Vide depuis
+   * que le seuil est d'une fiche (20 novembre 2026).
    */
   forming: BandStanding[];
-  /** La bande demandée par `with`, si elle est plus bas ou en formation. */
+  /** La bande demandée par `with`, si elle est plus bas. */
   extra: BandStanding | null;
 }
 
 /**
  * GET /api/bands/top : le classement de chaque ligue pour l'accueil (§18.92), cinq lignes
- * au plus. Les bandes au tableau d'abord, dans leur ordre ; s'il reste des places, les
- * bandes en formation qui ont leur page publique (`rank` null), les plus étoilées
- * d'abord. La place d'une ligne est sa position dans la liste.
+ * au plus, dans l'ordre du classement : toute bande qui a une fiche, une boîte au nom
+ * libre comprise (20 novembre 2026). La place d'une ligne est sa position dans la liste.
  */
 export interface BandsTop {
   ecole: BandStanding[];
@@ -373,8 +372,9 @@ export function companyAliasLabel(id: string): string | null {
 }
 
 /**
- * Une page publique, une image et une place au tableau : toute école de la liste
- * et toute boîte de la table d'alias ; une boîte au nom libre à partir de trois dossiers.
+ * Une page publique, une image et une place au classement : toute école de la liste,
+ * toute boîte de la table d'alias, une boîte au nom libre dès sa première fiche
+ * (20 novembre 2026 ; trois avant). `blocked` (data/bands.json) ferme un nom à la main.
  */
 export function bandHasPage(type: BandType, id: string, members: number): boolean {
   return type === "ecole" || companyAliasLabel(id) !== null || members >= BAND_MIN_MEMBERS;

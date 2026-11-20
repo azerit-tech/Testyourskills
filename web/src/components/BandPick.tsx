@@ -235,7 +235,7 @@ interface JoinedProps {
 function Joined({ b, stars, busy, native, changing, onChange, onLeave, onShare }: JoinedProps) {
   const { t } = useT();
   const p = t.bands.pick;
-  // Pas encore au classement public (boîte au nom libre, moins de trois dossiers) : ni lien, et le partage dit quoi taper.
+  // Pas encore au classement public (aucune fiche n'y compte encore) : ni lien, et le partage dit quoi taper.
   const ranked = b.hasPage;
   const glyphs = starLine(stars);
   const rank = t.bands.rank(b);

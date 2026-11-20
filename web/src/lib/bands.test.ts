@@ -36,17 +36,17 @@ describe("les anciennes adresses des bandes (§18.101)", () => {
 const plain = (s: string) => s.replace(/\s/g, " ");
 
 describe("la ligne du rang", () => {
-  it("en français : rang, écart, égalité, tête, formation", () => {
+  it("en français : rang, écart, égalité, tête, hors classement", () => {
     expect(plain(fr.bands.rank(b({})))).toBe(plain("3e des écoles, à 6 étoiles de la 2e."));
     expect(plain(fr.bands.rank(b({ gap: 1 })))).toBe(plain("3e des écoles, à 1 étoile de la 2e."));
     expect(plain(fr.bands.rank(b({ rank: 2, gap: 0, ahead: { id: "x", label: "X", rank: 1 } })))).toBe(plain("2e des écoles, à égalité avec la tête."));
     expect(plain(fr.bands.rank(b({ type: "boite", rank: 1, gap: null, ahead: null })))).toBe(plain("N° 1 des boîtes."));
-    expect(plain(fr.bands.rank(b({ rank: null, missing: 2, gap: null, ahead: null })))).toBe(plain("Bande en formation : encore 2 fiches."));
+    expect(plain(fr.bands.rank(b({ rank: null, missing: 1, gap: null, ahead: null })))).toBe(plain("Pas encore au classement : il lui faut 1 fiche."));
   });
 
   it("en anglais", () => {
     expect(plain(en.bands.rank(b({})))).toBe(plain("#3 among schools, 6 stars behind #2."));
-    expect(plain(en.bands.rank(b({ rank: null, missing: 1, gap: null, ahead: null })))).toBe(plain("Crew forming: 1 more sheet needed."));
+    expect(plain(en.bands.rank(b({ rank: null, missing: 1, gap: null, ahead: null })))).toBe(plain("Not ranked yet: 1 sheet needed."));
   });
 
   it("les étoiles pleines seulement", () => {
@@ -94,8 +94,7 @@ describe("les textes des bandes", () => {
         dict.bands.rank(b({})),
         dict.bands.pick.shareText("★★★★", "Epitech", dict.bands.rank(b({}))),
         dict.bands.others(3),
-        dict.bands.home.forming(2),
-        dict.bands.home.rowLabel(1, "Epitech", 12, 3, false),
+        dict.bands.home.rowLabel(1, "Epitech", 12, 3),
       ];
       for (const s of texts) {
         expect(s, s).not.toMatch(/[—·]/);

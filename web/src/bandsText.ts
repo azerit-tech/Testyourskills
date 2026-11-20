@@ -9,9 +9,9 @@ const n = (k: number, one: string, many: string) => `${k}\u00a0${k > 1 ? many : 
 /** Anglais : tout sauf un est pluriel (“0 sheets”, “1 sheet”). */
 const nEn = (k: number, one: string, many: string) => `${k}\u00a0${k === 1 ? one : many}`;
 
-/** « 3e des écoles, à 6 étoiles de la 2e. » ; « N° 1 des boîtes. » ; « Bande en formation : encore 2 fiches. » Une phrase : elle commence par une majuscule. */
+/** « 3e des écoles, à 6 étoiles de la 2e. » ; « N° 1 des boîtes. » ; une école que personne n'a rejointe : « Pas encore au classement : il lui faut 1 fiche. » Une phrase : elle commence par une majuscule. */
 function rankFr(b: Rank): string {
-  if (!b.rank) return `Bande en formation : encore ${n(b.missing, "fiche", "fiches")}.`;
+  if (!b.rank) return `Pas encore au classement : il lui faut ${n(b.missing, "fiche", "fiches")}.`;
   const ord = `${b.rank === 1 ? "N° 1" : `${b.rank}e`} des ${b.type === "ecole" ? "écoles" : "boîtes"}`;
   if (!b.ahead || b.gap === null) return `${ord}.`;
   const ahead = b.ahead.rank === 1 ? "la tête" : `la ${b.ahead.rank}e`;
@@ -19,7 +19,7 @@ function rankFr(b: Rank): string {
 }
 
 function rankEn(b: Rank): string {
-  if (!b.rank) return `Crew forming: ${nEn(b.missing, "more sheet", "more sheets")} needed.`;
+  if (!b.rank) return `Not ranked yet: ${nEn(b.missing, "sheet", "sheets")} needed.`;
   const ord = `#${b.rank} among ${b.type === "ecole" ? "schools" : "companies"}`;
   if (!b.ahead || b.gap === null) return `${ord}.`;
   const ahead = b.ahead.rank === 1 ? "the leader" : `#${b.ahead.rank}`;
@@ -58,16 +58,14 @@ const fr = {
     shareText: (stars: string, label: string, rank: string) => `Je rapporte ${stars} à ${label}. ${rank} Viens grossir les rangs :`,
     /** Une boîte au nom libre, pas encore au classement public : le texte dit quoi taper. */
     shareTextNoPage: (stars: string, label: string, rank: string) => `Je rapporte ${stars} à ${label}. ${rank} Fais ta fiche et tape « ${label} » juste sous elle :`,
-    noPage: "Elle entre au classement à la troisième fiche.",
+    noPage: "Elle entre au classement dès qu'une fiche y compte.",
     linkedinHint: "Texte copié : colle-le dans ton post LinkedIn.",
     failed: "Ça n'a pas pris. Réessaie.",
   },
   home: {
-    /** Sous le nom d'une bande en formation, au classement de l'accueil (§18.92) : la règle des trois fiches, sans phrase. */
-    forming: (k: number) => `${n(k, "fiche", "fiches")}, en formation`,
     /** Une ligne du classement pour un lecteur d'écran : sa place, son nom, ses étoiles, ses fiches. */
-    rowLabel: (place: number, label: string, score: number, dossiers: number, forming: boolean) =>
-      `Place ${place} : ${label}, ${n(score, "étoile", "étoiles")}, ${n(dossiers, "fiche", "fiches")}${forming ? ", en formation" : ""}`,
+    rowLabel: (place: number, label: string, score: number, dossiers: number) =>
+      `Place ${place} : ${label}, ${n(score, "étoile", "étoiles")}, ${n(dossiers, "fiche", "fiches")}`,
   },
 };
 
@@ -100,14 +98,13 @@ const en: BandsDict = {
     shareLabel: (label: string) => `Share the ${label} crew`,
     shareText: (stars: string, label: string, rank: string) => `I'm adding ${stars} to ${label}. ${rank} Come add your stars:`,
     shareTextNoPage: (stars: string, label: string, rank: string) => `I'm adding ${stars} to ${label}. ${rank} Get your rap sheet and type “${label}” right under it:`,
-    noPage: "It joins the ranking at the third sheet.",
+    noPage: "It joins the ranking as soon as a sheet counts for it.",
     linkedinHint: "Text copied: paste it into your LinkedIn post.",
     failed: "That didn't take. Try again.",
   },
   home: {
-    forming: (k: number) => `${nEn(k, "sheet", "sheets")}, forming`,
-    rowLabel: (place: number, label: string, score: number, dossiers: number, forming: boolean) =>
-      `Spot ${place}: ${label}, ${nEn(score, "star", "stars")}, ${nEn(dossiers, "sheet", "sheets")}${forming ? ", forming" : ""}`,
+    rowLabel: (place: number, label: string, score: number, dossiers: number) =>
+      `Spot ${place}: ${label}, ${nEn(score, "star", "stars")}, ${nEn(dossiers, "sheet", "sheets")}`,
   },
 };
 
