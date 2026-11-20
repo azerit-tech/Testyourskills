@@ -15,9 +15,9 @@ export function robotsTxt(baseUrl: string): string {
   return `User-agent: *\nAllow: /\n\nSitemap: ${baseUrl}/sitemap.xml\n`;
 }
 
-/** Les pages publiques du site : l'accueil, les bandes, les primes et le règlement quand ils existent, la vie privée, les crédits. */
+/** Les pages publiques du site : l'accueil (son classement compris, §18.100), les primes et le règlement quand ils existent, la vie privée, les crédits. */
 export function sitemapPaths(o: { primesListed: boolean; rulesPublished: boolean }): string[] {
-  return ["/", "/bandes", ...(o.primesListed ? ["/primes"] : []), ...(o.rulesPublished ? ["/reglement"] : []), "/confidentialite", "/privacy", "/credits"];
+  return ["/", ...(o.primesListed ? ["/primes"] : []), ...(o.rulesPublished ? ["/reglement"] : []), "/confidentialite", "/privacy", "/credits"];
 }
 
 export function sitemapXml(baseUrl: string, paths: string[]): string {

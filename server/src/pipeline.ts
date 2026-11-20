@@ -14,7 +14,6 @@
 import { randomBytes, randomInt } from "node:crypto";
 import type { CardData, ComparisonData, ErrorCode, Fact, Finding, Grid, JobState, Lang, ProgressEvent } from "../../shared/types";
 import { tierFor } from "../../shared/types";
-import type { BandStanding } from "../../shared/bands";
 import { frTypo, typoFacts } from "../../shared/typo";
 import { forReveal, githubFindings, strongest } from "./findings";
 import type { CodeReadingResult, CvReading, CvTextCounts, RepoFiles } from "../../shared/readings";
@@ -36,11 +35,9 @@ export type GithubAuth = string | TokenPool;
 
 export interface RenderInput {
   /** `home` : l'aperçu de lien de l'accueil (/og/home.png), avec la fiche de la vitrine. `story` : 9:16, une fiche seule. */
-  format: "card" | "og" | "portrait" | "story" | "home" | "band" | "prime" | "duel";
+  format: "card" | "og" | "portrait" | "story" | "home" | "prime" | "duel";
   card?: CardData;
   comparison?: ComparisonData;
-  /** `band` : l'aperçu de lien d'une bande (§18.38). */
-  band?: BandStanding;
   /** `prime` : l'aperçu de lien d'une prime (§18.4), et son logo en data URI s'il en a un. */
   prime?: PrimeView;
   logo?: PrimeLogo | null;

@@ -145,18 +145,16 @@ export const starRowWidth = (size: number, gap = Math.round(size * 0.12)) => 6 *
  * Les textes propres aux images. L'appel d'une fiche (« Fais la tienne ») et
  * « Avis de recherche » restent ceux de la fiche (shared/card/i18n.ts).
  */
-export const IMAGE_WORDS: Record<Lang, { what: string; home: string; band: string; prime: string; primeClosed: string }> = {
+export const IMAGE_WORDS: Record<Lang, { what: string; home: string; prime: string; primeClosed: string }> = {
   fr: {
     what: "Une fiche de dev, de une à six étoiles, en une minute.",
     home: "Fais ta fiche",
-    band: "Rejoins la bande",
     prime: "Entre dans la course",
     primeClosed: "Voir le classement",
   },
   en: {
     what: "A dev rap sheet, one to six stars, in one minute.",
     home: "Get your rap sheet",
-    band: "Join the crew",
     prime: "Enter the race",
     primeClosed: "See the ranking",
   },
@@ -208,9 +206,6 @@ export function BrandKicker({ x, y, size, text }: { x: number; y: number; size: 
 
 /** Le format des décors (1152 × 768, 576 × 384). */
 const SCENE_RATIO = 3 / 2;
-
-/** Le cadre des aperçus d'une bande et d'une prime sur le décor par défaut : la ligne d'immeubles et son reflet. */
-export const SKYLINE_FOCUS = { zoom: 2, x: 0.6, y: 0.51 };
 
 /**
  * Le lieu du crime dans un cadre : l'image recadrée pour le remplir (`slice`), centrée

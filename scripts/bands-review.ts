@@ -53,14 +53,14 @@ if (!list.length) {
 }
 
 const cell = (s: string) => s.replace(/\|/g, "\\|");
-console.log(`${list.length} bande(s) de boîte au nom libre. Page publique à partir de ${BAND_MIN_MEMBERS} dossiers en ligne.\n`);
-console.log("| dossiers en ligne (total) | page | état | adresse | libellé affiché | noms tapés |");
+console.log(`${list.length} bande(s) de boîte au nom libre. Au classement public à partir de ${BAND_MIN_MEMBERS} dossiers en ligne.\n`);
+console.log("| dossiers en ligne (total) | publique | état | id | libellé affiché | noms tapés |");
 console.log("|---|---|---|---|---|---|");
 for (const b of list) {
   const blocked = isBlockedBand("boite", b.id, b.first);
   const page = !blocked && b.live >= BAND_MIN_MEMBERS ? "oui" : "non";
   const state = blocked ? "fermée" : "ouverte";
   const names = [...b.names].map((n) => `« ${cell(n)} »`).join(", ");
-  console.log(`| ${b.live} (${b.total}) | ${page} | ${state} | /bandes/boite/${b.id} | ${cell(cleanCompanyLabel(b.first) || b.id)} | ${names} |`);
+  console.log(`| ${b.live} (${b.total}) | ${page} | ${state} | boite/${b.id} | ${cell(cleanCompanyLabel(b.first) || b.id)} | ${names} |`);
 }
 console.log(`\nFermer une bande : ajouter "boite/<id>" à "blocked" dans data/bands.json, puis redéployer.`);

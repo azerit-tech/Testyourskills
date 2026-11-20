@@ -32,7 +32,6 @@ export function pageModule(path: string, status: number): string | null {
   const p = path.toLowerCase();
   if (p === "/" || p === "") return "src/pages/Home.tsx";
   if (/^\/c\//.test(p)) return "src/pages/CardPage.tsx";
-  if (/^\/bandes(\/|$)/.test(p)) return "src/pages/Bands.tsx";
   if (/^\/primes(\/|$)/.test(p)) return "src/pages/Primes.tsx";
   if (/^\/reglement\/?$/.test(p)) return "src/pages/Rules.tsx";
   if (/^\/(confidentialite|privacy)\/?$/.test(p)) return "src/pages/Privacy.tsx";
