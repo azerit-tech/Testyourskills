@@ -28,6 +28,15 @@ export const LINKEDIN_PROFILE_SIGNAL: LinkSignal = { strength: DECLARED, step: "
 export const CLAIM_SIGNAL: LinkSignal = { strength: DECLARED, step: "cest_moi" };
 
 /**
+ * « Oui » à la proposition sous sa fiche (§18.100) : déclaré si la proposition était sûre (son GitHub
+ * affiche ce LinkedIn), trouvé sinon. Le « oui » vient de qui tient la fiche, qui peut l'avoir faite
+ * pour un autre en collant son lien : il ne vaut pas seul une déclaration.
+ */
+export function proposalSignal(sure: boolean): LinkSignal {
+  return sure ? { strength: DECLARED, step: "proposition_oui:affiche" } : { strength: SEARCHED, step: "proposition_oui" };
+}
+
+/**
  * « Se connecter avec LinkedIn » (§18.80, §18.90) : le profil de la personne
  * (`profile` : sûr par l'email ou la photo, choisi par elle dans « C'est toi ? »,
  * ou seul au nom et à l'employeur) et son GitHub (`github` : un commit signé de

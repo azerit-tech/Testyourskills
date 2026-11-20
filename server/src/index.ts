@@ -14,6 +14,7 @@ import { startCreditsWatch, stopCreditsWatch } from "./ai/credits";
 import { linkedinFromEnv } from "./linkedin";
 import { linkedinProfilesFromEnv, normalizeLinkedinUrl } from "./linkedinProfile/index";
 import { registryFromEnv } from "./registry/index";
+import { realProposers } from "./match/index";
 import { linkedinSearchFromEnv } from "./linkedinProfile/search";
 import { githubAuthFromEnv } from "./auth";
 import { githubLoginFromEnv } from "./entry/githubLogin";
@@ -120,14 +121,17 @@ else console.warn("Fournisseur LinkedIn sans jeton : LinkedIn contre GitHub et l
 const linkedinPeople = (linkedinProfiles && linkedinSearchFromEnv(process.env, store.db)) || undefined;
 if (linkedinPeople) console.log(`LinkedIn : recherche par nom par ${linkedinPeople.providerName}.`);
 else if (linkedinProfiles) console.warn("Recherche LinkedIn par nom sans clé (BRAVE_SEARCH_API_KEY, SERPER_API_KEY) : pas de « Se connecter avec LinkedIn », le champ ne prend qu'un lien collé.");
+const githubPool = new TokenPool(githubTokens);
 const { app, pipeline, refreshShowcase } = createApp({
   linkedinProfiles,
   linkedinPeople,
   registry,
+  // L'autre source de la personne, cherchée pendant la lecture de sa fiche, proposée d'un toucher (§18.100).
+  propose: realProposers({ github: githubPool, registry, linkedinProfiles, linkedinPeople }),
   store,
   deps: realDeps,
   githubToken,
-  githubPool: new TokenPool(githubTokens),
+  githubPool,
   maxConcurrentCards,
   timeoutMs: cardTimeoutMs,
   baseUrl,

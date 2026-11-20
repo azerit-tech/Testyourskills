@@ -16,7 +16,7 @@ import type { CardData, ComparisonData, ErrorCode, Fact, JobState, Lang } from "
 import { stripToken, type CardRow, type Store } from "./db";
 import { buildLead, clientEventSchema, sendLead } from "./events";
 import { genericMeta, HOME_IMAGE_PATH, HOME_IMAGE_PATH_EN, injectConfig, injectHomeImage, injectMeta, langOfRequest, messagePage, metaFor, requestLang, siteStylesheets, standalonePage, type MessageKey } from "./html";
-import { ID_RE, MAX_PDF_BYTES, MESSAGES, Pipeline, type Deps, type RenderInput } from "./pipeline";
+import { ID_RE, MAX_PDF_BYTES, MESSAGES, Pipeline, type Deps, type PipelineOptions, type RenderInput } from "./pipeline";
 import { CARDS_PER_BROWSER, CARDS_PER_DAY, RateLimiter, browserId, clientIp } from "./ratelimit";
 import { applyPhoto, giveSignInPhoto, inlineAvatar, keepPhoto, mountLinkedin, ownPhoto, removeAvatars, savePhoto, showsLinkedinPhoto, type LinkedinConfig } from "./linkedin";
 import { deleteCookie } from "hono/cookie";
@@ -37,7 +37,9 @@ import { mountLinkedinSearch } from "./entry/linkedinSearch";
 import { mountGithubSearch, type GithubSearchRoutesOptions } from "./entry/githubSearch";
 import { createLinkedinEnter, type LinkedinEnterOptions } from "./entry/linkedinLogin";
 import type { RegistryPort } from "./registry/index";
-import { CLAIM_SIGNAL, signInSignal } from "./registry/signals";
+import { CLAIM_SIGNAL, proposalSignal, signInSignal } from "./registry/signals";
+import { answerProposal, openProposal } from "./match/store";
+import { SEARCHES_PER_IP } from "./linkedinProfile/search";
 import { mountGithubEnter, type GithubLoginConfig } from "./entry/githubLogin";
 import { primePhase, primesOpen, seasonDates, type Season } from "../../shared/season";
 import { loadSeason } from "./season";
@@ -120,6 +122,8 @@ export interface AppOptions {
   entryPollWaitMs?: number;
   /** La trace du film (FILM_TRACE=1, filmTrace.ts) : le fichier où l'écrire. Absent : pas de route. */
   filmTraceFile?: string;
+  /** Les recherches des propositions sous une fiche (§18.100), les vraies branchées par index.ts (match/index.ts). Absent : aucune. */
+  propose?: PipelineOptions["propose"];
 }
 
 /** La carte vitrine est recalculée au plus une fois par semaine. */
@@ -280,6 +284,8 @@ export function createApp(opts: AppOptions) {
     vouched: opts.showcaseLogin && opts.showcaseLinkedin ? { login: opts.showcaseLogin, linkedinUrl: opts.showcaseLinkedin } : undefined,
     // La photo LinkedIn d'une fiche, copiée chez nous à sa naissance (§18.99).
     keepPhoto: (url, cardId) => keepPhoto(url, cardId, { avatarDir, baseUrl, fetchImpl }),
+    // L'autre source de la personne, cherchée pendant la lecture de sa fiche pour lui être proposée (§18.100).
+    propose: opts.propose,
   });
   const limiter = new RateLimiter(store, opts.ipSalt ?? "testyourskills");
   const cardsPerDay = opts.cardsPerDay ?? CARDS_PER_DAY;
@@ -828,6 +834,8 @@ export function createApp(opts: AppOptions) {
         linkedinSpend: () => limiter.take("linkedin", ip, PAID_CALLS_PER_IP),
         ...(who?.github ? { identity: { githubLogin: who.github.login, how: who.github.how, sureProfile: who.sureProfile } } : {}),
         ...(who?.picture ? { photo: who.picture } : {}),
+        // Sa propre fiche, jamais une dénonciation : l'autre source se cherche pour la lui proposer (§18.100).
+        ...(!denounce && !pdf ? { propose: true, searchSpend: () => limiter.take("li-search", ip, SEARCHES_PER_IP) } : {}),
       });
       denounced(id, true);
       lead(id);
@@ -849,6 +857,18 @@ export function createApp(opts: AppOptions) {
         const prev = typeof from === "string" && ID_RE.test(from) ? store.getCard(from) : null;
         const prevRoot = prev ? rootOf(store, prev) : null;
         const completed = prevRoot && personOf(c, prevRoot, ownedBy(c, prevRoot)) ? prevRoot : null;
+        // « Oui » à la proposition de sa fiche (§18.100) : le lien qu'elle confirme va au registre de l'App (§18.95).
+        const offered = completed ? openProposal(store.db, completed.id) : null;
+        const said =
+          offered?.kind === "github" && login && linkedinUrl && offered.login.toLowerCase() === login.toLowerCase()
+            ? { login, url: linkedinUrl }
+            : offered?.kind === "linkedin" && login && linkedinUrl && offered.url === linkedinUrl
+              ? { login, url: linkedinUrl }
+              : null;
+        if (said && answerProposal(store.db, completed!.id, "yes")) {
+          store.recordEvent("proposal_yes", completed!.id, { kind: offered!.kind });
+          opts.registry?.recordLink({ ...said, ...proposalSignal(offered!.sure) });
+        }
         void pipeline.wait(id).then(() => {
           const row = store.getCard(id);
           // La fiche complétée devient ce dossier : une personne, une note (SPEC §18.84).
@@ -884,14 +904,32 @@ export function createApp(opts: AppOptions) {
     const rank = week ? { week } : {};
     // `mine` : la session est propriétaire du login de la fiche ; le front lui ouvre l'email, la photo et la suppression sans jeton.
     const mine = ownedBy(c, row);
+    const person = personOf(c, row, mine);
+    // L'autre source trouvée pendant sa lecture (§18.100) : à la personne fichée seulement, tant qu'elle n'a pas répondu
+    // et que la fiche n'a toujours qu'une source.
+    const offer = person && row.kind === "card" ? openProposal(store.db, row.id) : null;
+    const propose = offer && (offer.kind === "github" ? row.source === "linkedin" && !store.loginOf(row) : row.source === "github" && !store.isHidden(store.loginOf(row))) ? offer : null;
     const extra = { ...rank, ...(mine ? { mine: true } : {}) };
     // La page partagée (shared/publicView.ts) : rien de privé ne part vers qui n'est pas la personne fichée.
-    const shown = personOf(c, row, mine) ? data : publicView(data, { thirdParty: thirdParty(row) });
+    const shown = person ? data : publicView(data, { thirdParty: thirdParty(row) });
     const state: JobState =
       row.kind === "comparison"
         ? { state: "done", kind: "comparison", comparison: withLinkFlag(row, shown as ComparisonData), ...extra }
-        : { state: "done", kind: "card", card: shown as CardData, ...extra };
+        : { state: "done", kind: "card", card: shown as CardData, ...extra, ...(propose ? { propose } : {}) };
     return c.json(state);
+  });
+
+  // POST /api/card/:id/propose { answer: "no" } : « Non » à la proposition sous sa fiche (§18.100), qui ne revient plus.
+  // « Oui » passe par POST /api/card (« Ajoute ton GitHub », « Ajoute ton LinkedIn »), avec `from`.
+  app.post("/api/card/:id/propose", async (c) => {
+    const id = c.req.param("id");
+    const body = (await c.req.json().catch(() => null)) as { answer?: unknown } | null;
+    if (!ID_RE.test(id) || body?.answer !== "no") return c.json({ ok: false }, 400);
+    const row = store.getCard(id);
+    if (!row) return c.json({ ok: false }, 404);
+    if (!sameOrigin(c, baseUrl) || !personOf(c, row, ownedBy(c, row))) return c.json({ ok: false }, 403);
+    if (answerProposal(store.db, row.id, "no")) store.recordEvent("proposal_no", row.id);
+    return c.json({ ok: true });
   });
 
   // Suppression (§11) : DELETE pour le front, GET pour le lien d'un email.

@@ -12,7 +12,7 @@
 // déjà connu par l'identité se collecte pendant la lecture du profil.
 
 import { randomBytes, randomInt } from "node:crypto";
-import type { CardData, ComparisonData, ErrorCode, Fact, Finding, Grid, JobState, Lang, ProgressEvent } from "../../shared/types";
+import type { CardData, ComparisonData, ErrorCode, Fact, Finding, Grid, JobState, Lang, ProgressEvent, Proposal } from "../../shared/types";
 import { tierFor } from "../../shared/types";
 import type { BandStanding } from "../../shared/bands";
 import { frTypo, typoFacts } from "../../shared/typo";
@@ -21,7 +21,10 @@ import type { CodeReadingResult, CvReading, CvTextCounts, RepoFiles } from "../.
 import type { NewCardRow, Store } from "./db";
 import { TokenPool } from "./github/tokens";
 import type { GithubLookup, LinkedinFinder, LinkedinProfile } from "./linkedinProfile/index";
-import { githubShowsLinkedin } from "./linkedinProfile/url";
+import { githubDeclaredOf, githubShowsLinkedin } from "./linkedinProfile/url";
+import type { PersonHints } from "./match/github";
+import type { GithubHints } from "./match/linkedin";
+import { saveProposal } from "./match/store";
 import { asLinkedinCard, asLinkedinComparison, profileToText } from "./linkedinProfile/text";
 import { linkedinFindings } from "./linkedinProfile/findings";
 import { highBarEmployers, type HighBarList } from "./scoring/employers";
@@ -342,6 +345,15 @@ export interface PipelineOptions {
    * vitest) ; `false` la coupe.
    */
   timingLog?: ((line: string, trace: Trace) => void) | false;
+  /**
+   * Les propositions sous une fiche (§18.100) : le GitHub d'une fiche LinkedIn seule, le LinkedIn
+   * d'une fiche GitHub seule, cherchés pendant sa lecture (deux secondes au plus), jamais attachés.
+   * Absent : aucune.
+   */
+  propose?: {
+    github?: (person: PersonHints, signal: AbortSignal) => Promise<Proposal | null>;
+    linkedin?: (gh: GithubHints, opts: { spend?: () => boolean; signal: AbortSignal }) => Promise<Proposal | null>;
+  };
 }
 
 export const MAX_CONCURRENT_CARDS = 4;
@@ -410,7 +422,14 @@ export interface JobInput {
   identity?: { githubLogin: string; how: "email" | "name"; sureProfile: boolean };
   /** Entrée « Se connecter avec LinkedIn » : la photo que LinkedIn vient de rendre de la personne (§18.99). */
   photo?: string;
+  /** La fiche est celle que la personne fait pour elle (jamais une dénonciation) : l'autre source se cherche pour la lui proposer (§18.100). */
+  propose?: boolean;
+  /** Prend une unité de la limite par IP des recherches de profils par nom (§18.90) ; false : refusé. */
+  searchSpend?: () => boolean;
 }
+
+/** Une proposition pas encore prête quand la fiche l'est : attendue ce temps-là au plus, puis la fiche sort sans elle. */
+export const PROPOSE_WAIT_MS = 1000;
 
 /** Une photo LinkedIn qui traîne au téléchargement n'est plus attendue à la sortie de la fiche. */
 const PHOTO_WAIT_MS = 2500;
@@ -428,6 +447,26 @@ interface Ctx {
   readonly budgetEnd: number;
   /** Repousse la fin du délai (lecture LinkedIn lente, §18.24). Jamais en arrière. */
   extendTo(at: number): void;
+  /** L'autre source à proposer sous la fiche (§18.100), rangée avec elle. */
+  proposal?: Proposal | null;
+}
+
+/** La valeur de `p` si elle vient dans `ms`, sinon null ; une erreur vaut null. */
+function within<T>(p: Promise<T | null>, ms: number): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<null>((res) => {
+    timer = setTimeout(() => res(null), ms);
+    timer.unref?.();
+  });
+  return Promise.race([p.catch(() => null), late]).finally(() => clearTimeout(timer));
+}
+
+/** Ce que la fiche GitHub sait de la personne, pour lui chercher son LinkedIn. */
+function githubHints(facts: unknown): GithubHints | null {
+  const gh = githubDeclaredOf(facts);
+  if (!gh) return null;
+  const company = (facts as { profile?: { company?: unknown } } | null)?.profile?.company;
+  return { login: gh.login, name: gh.name ?? null, company: typeof company === "string" ? company : null };
 }
 
 /** Ce que la grille lit du profil LinkedIn : postes datés, formation, compétences, adresse. */
@@ -716,6 +755,7 @@ export class Pipeline {
       if (timedOut) throw new JobError("timeout", MESSAGES.timeout);
       this.opts.store.insertCards(rows);
       const root = rows[0]!;
+      if (ctx.proposal) saveProposal(this.opts.store.db, root.id, ctx.proposal);
       outcome = root.kind === "comparison" ? `dossier ${root.source}` : root.source;
       this.opts.store.recordEvent("card_generated", root.id, { source: root.source, kind: root.kind });
       this.jobs.delete(job.id); // la base fait foi désormais
@@ -781,6 +821,14 @@ export class Pipeline {
     // puis le nom. Masqué par son propriétaire : la fiche LinkedIn sort seule.
     const identity = entry && input.identity && !this.opts.store.isHidden(input.identity.githubLogin) ? input.identity : undefined;
     if (identity && (identity.how === "email" || !login)) login = identity.githubLogin;
+    // Fiche LinkedIn sans GitHub (§18.100) : son GitHub se cherche pendant la lecture du profil, pour le lui proposer.
+    const offer: { p?: Promise<Proposal | null> } = {};
+    const propose = input.propose && !pdf ? this.opts.propose : undefined;
+    if (entry && !login && propose?.github) {
+      const person = { name: entry.profile.name, url: input.linkedinUrl!, companies: entry.profile.roles.map((r) => r.company) };
+      offer.p = phase("proposition", () => propose.github!(person, ctx.signal));
+      offer.p.catch(() => {});
+    }
     /** Prouvé par l'identité : son email mène à ce GitHub, et ce profil est sûrement le sien. */
     const identityProven = !!identity && identity.how === "email" && identity.sureProfile && login === identity.githubLogin;
 
@@ -801,6 +849,15 @@ export class Pipeline {
         ? (facts: unknown) => {
             const found = finder.forGithub(facts, { url: linkedinAsked, spend: input.linkedinSpend, onSlow: slow, signal: ctx.signal });
             lk.p = this.linkedinBranch(found, ctx, true);
+            // Fiche GitHub dont rien n'a donné le LinkedIn (§18.100) : il se cherche par le nom, pour le lui proposer.
+            const hints = githubHints(facts);
+            if (!linkedinAsked && hints && propose?.linkedin) {
+              offer.p = found.then(
+                (r) => (r ? null : phase("proposition", () => propose.linkedin!(hints, { spend: input.searchSpend, signal: ctx.signal }))),
+                () => null,
+              );
+              offer.p.catch(() => {});
+            }
             lk.p.then((r) => keep(r?.profile.photoUrl), () => {});
           }
         : undefined;
@@ -858,6 +915,8 @@ export class Pipeline {
     // GitHub seule si on l'a, sinon une erreur honnête. Un LinkedIn trouvé mais
     // pas lu : la fiche sort, hors cache 24 h.
     if (!declared?.reading) {
+      // Rien de LinkedIn sur la fiche : le LinkedIn trouvé par le nom lui est proposé (§18.100).
+      if (gh && !li && offer.p) ctx.proposal = await within(offer.p, PROPOSE_WAIT_MS);
       if (gh) return [githubRow(withLiPhoto(githubCard(id)), null, gh.degraded || (!!li && !li.cv.reading))];
       throw new JobError("internal", entry ? MESSAGES.linkedin_unreadable : MESSAGES.cv_unreadable);
     }
@@ -885,6 +944,11 @@ export class Pipeline {
     // d'un dev : pas de carte GitHub (§4.7). Un LinkedIn, lui, se compare toujours au
     // GitHub, quel que soit le métier qu'il déclare (§18.35).
     if (!gh || (!reading.is_dev_profile && !linkedinUrl)) {
+      // La fiche LinkedIn sort sans GitHub : celui trouvé pendant sa lecture lui est proposé (§18.100), jamais un compte masqué.
+      if (!gh && linkedinUrl && offer.p) {
+        const p = await within(offer.p, PROPOSE_WAIT_MS);
+        ctx.proposal = p && !(p.kind === "github" && this.opts.store.isHidden(p.login)) ? p : null;
+      }
       const found = linkedinUrl ? strongest(ctx.findings()) : [];
       const card = withLiPhoto(asDeclared({
         ...phaseSync("barème", () => deps.scoreCv(reading, declared.counts, { lang, judgedInSeconds, ...declaredOpts })),
