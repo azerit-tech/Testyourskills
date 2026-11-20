@@ -1,7 +1,7 @@
 // Avant de juger (§18.111) : au retour de LinkedIn, son GitHub, pour que la première
-// fiche soit le dossier LinkedIn + GitHub. Le compte trouvé à son nom : « C'est ton
-// GitHub ? », « Oui » en rose, « Non » en lien. Rien trouvé, ou « Non » : « Ajoute ton
-// GitHub », un champ (les comptes à ce nom dessous) et « Je n'en ai pas ».
+// fiche soit le dossier LinkedIn + GitHub. Le compte trouvé à son nom : « J'ai trouvé
+// ton GitHub », validé seul au bout de 3 s (§18.113). Rien trouvé, ou « Ce n'est pas
+// moi » : « Ajoute ton GitHub », un champ (les comptes à ce nom dessous) et « Je n'en ai pas ».
 import { useEffect, useId, useRef, useState } from "react";
 import type { GithubSuggestion } from "../../../shared/entry";
 import { resolveDoor } from "../../../shared/entry";
@@ -10,6 +10,7 @@ import { useT } from "../i18n";
 import { useAvatar } from "../card/avatar";
 import { isTouch, parseLogin } from "../lib/util";
 import { BusyDots } from "./Busy";
+import { FoundConfirm } from "./FoundConfirm";
 import { IconGithub } from "./Icons";
 import { useSuggestBox, useSuggestions } from "./Suggest";
 
@@ -76,34 +77,25 @@ export function GithubAsk({ name, candidate, onAnswer, busy }: Props) {
   if (candidate && !typing) {
     const href = githubHref(candidate.login);
     return (
-      <section ref={ref} className="gh-ask" aria-labelledby={`${uid}-q`}>
-        <div className="propose-who">
-          <Face url={candidate.avatarUrl} />
-          <p className="propose-text">
-            {/* Le compte s'ouvre dans un nouvel onglet (§18.108) : on vérifie que c'est le sien avant « Oui ». */}
-            {href ? (
-              <a className="propose-name" href={href} target="_blank" rel="noopener noreferrer">
-                @{candidate.login}
-              </a>
-            ) : (
-              <span className="propose-name">@{candidate.login}</span>
-            )}
-            {candidate.name && <span className="propose-sub">{candidate.name}</span>}
-          </p>
-        </div>
-        <h2 id={`${uid}-q`} className="gh-ask-q">
-          {a.q}
-        </h2>
-        <div className="propose-acts">
-          <button type="button" className="pill pill-big propose-yes" onClick={() => onAnswer(candidate.login)} disabled={busy} aria-busy={busy}>
-            {a.yes}
-            {busy && <BusyDots />}
-          </button>
-          <button type="button" className="link-quiet propose-no" onClick={() => setTyping(true)} disabled={busy}>
-            {a.no}
-          </button>
-        </div>
-      </section>
+      <FoundConfirm
+        face={<Face url={candidate.avatarUrl} />}
+        who={
+          // Le compte s'ouvre dans un nouvel onglet (§18.108), l'onglet caché met l'attente en pause.
+          href ? (
+            <a className="propose-name" href={href} target="_blank" rel="noopener noreferrer">
+              @{candidate.login}
+            </a>
+          ) : (
+            <span className="propose-name">@{candidate.login}</span>
+          )
+        }
+        sub={candidate.name}
+        spoken={[`@${candidate.login}`, candidate.name].filter(Boolean).join(", ")}
+        statement={t.home.found.github}
+        busy={busy}
+        onConfirm={() => onAnswer(candidate.login)}
+        onNotMe={() => setTyping(true)}
+      />
     );
   }
 

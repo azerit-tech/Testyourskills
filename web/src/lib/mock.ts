@@ -27,7 +27,7 @@ interface MockJob {
   timeline: ProgressEvent[];
   doneAt: number;
   denouncedBy?: string;
-  /** « Je n'en ai pas » (§18.111) : rien à lui proposer sous sa fiche. */
+  /** « Je n'en ai pas » (§18.111) ou « Ce n'est pas moi » (§18.113) : rien à lui proposer sous sa fiche. */
   noGithub?: boolean;
 }
 
@@ -366,7 +366,7 @@ export const mockApi = {
     // Fiche dénoncée : « D » après le type (rand() est en minuscules), pour la reconnaître après un rechargement.
     const id = `m-${kind}-${input.denouncedBy ? "D" : ""}${rand()}`;
     const { timeline, doneAt } = timelineFor(kind);
-    jobs.set(id, { kind, start: Date.now() + queueMs, login, linkedin: input.linkedin, lang: input.lang, timeline, doneAt, denouncedBy: input.denouncedBy, ...(input.noGithub ? { noGithub: true } : {}) });
+    jobs.set(id, { kind, start: Date.now() + queueMs, login, linkedin: input.linkedin, lang: input.lang, timeline, doneAt, denouncedBy: input.denouncedBy, ...(input.noGithub || input.noLinkedin ? { noGithub: true } : {}) });
     return { id, deleteToken: `tok-${rand()}`, cached: false };
   },
 

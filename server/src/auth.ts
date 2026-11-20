@@ -58,6 +58,16 @@ export interface Owner {
 export const GH_AUTHORIZE_URL = "https://github.com/login/oauth/authorize";
 export const GH_TOKEN_URL = "https://github.com/login/oauth/access_token";
 export const GH_USER_URL = "https://api.github.com/user";
+/** Les comptes sociaux de la personne connectée (§18.113) : son LinkedIn affiché, s'il y en a un. */
+export const GH_SOCIAL_URL = "https://api.github.com/user/social_accounts";
+
+/** Ce que GitHub dit d'elle à la connexion, pour chercher son LinkedIn avant le jugement (§18.113). */
+export interface GithubSelf {
+  name: string | null;
+  company: string | null;
+  /** Un LinkedIn sur son GitHub (site, bio, comptes sociaux) : la fiche le trouvera d'elle-même. */
+  linkedinShown: boolean;
+}
 
 export const SESSION_COOKIE = "tys_owner";
 export const STATE_COOKIE = "tys_oauth";
@@ -183,7 +193,8 @@ export async function fetchGithubUser(
   cfg: GithubAuthConfig,
   redirectUri: string,
   fetchImpl: typeof fetch,
-): Promise<Owner> {
+  opts: { self?: boolean } = {},
+): Promise<Owner & { self?: GithubSelf }> {
   const tokenRes = await fetchImpl(GH_TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
@@ -214,10 +225,25 @@ export async function fetchGithubUser(
     signal: AbortSignal.timeout(API_TIMEOUT_MS),
   });
   if (!userRes.ok) throw new ClaimError(`GET /user : HTTP ${userRes.status}`);
-  const user = (await userRes.json()) as { login?: unknown; id?: unknown };
+  const user = (await userRes.json()) as { login?: unknown; id?: unknown; name?: unknown; company?: unknown; blog?: unknown; bio?: unknown };
   if (typeof user.login !== "string" || !LOGIN_RE.test(user.login)) throw new ClaimError("GET /user : login invalide");
   if (typeof user.id !== "number" || !Number.isSafeInteger(user.id) || user.id <= 0) throw new ClaimError("GET /user : id invalide");
-  return { login: user.login.toLowerCase(), githubId: user.id };
+  const owner = { login: user.login.toLowerCase(), githubId: user.id };
+  if (!opts.self) return owner;
+  // Son LinkedIn affiché sur GitHub : le site, la bio, puis ses comptes sociaux (un appel, avec son jeton, jamais une erreur).
+  const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 200) : null);
+  const shows = (v: unknown) => typeof v === "string" && /linkedin\.com\/(in|pub)\//i.test(v);
+  let linkedinShown = shows(user.blog) || shows(user.bio);
+  if (!linkedinShown) {
+    const social: unknown = await fetchImpl(GH_SOCIAL_URL, {
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "testyourskills" },
+      signal: AbortSignal.timeout(API_TIMEOUT_MS),
+    })
+      .then((r) => (r.ok ? r.json() : []))
+      .catch(() => []);
+    linkedinShown = Array.isArray(social) && social.some((a) => shows((a as { url?: unknown } | null)?.url));
+  }
+  return { ...owner, self: { name: str(user.name), company: str(user.company), linkedinShown } };
 }
 
 // --- Routes -----------------------------------------------------------------

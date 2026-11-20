@@ -108,8 +108,8 @@ export type ReturnPhase =
   | { s: "ask"; name: string; url: string; candidate: GithubSuggestion | null }
   /** Rien de sûr : « C'est toi ? ». `ask` : son GitHub sera demandé après son choix. */
   | { s: "pick"; name: string; candidates: LinkedinSuggestion[]; ask?: GithubAsk }
-  /** GitHub a rendu le pseudo : la fiche part. */
-  | { s: "github"; login: string }
+  /** GitHub a rendu le pseudo : la fiche part. `found` : son LinkedIn trouvé, dit avant de juger (§18.113). */
+  | { s: "github"; login: string; found?: LinkedinSuggestion }
   /** « none » : personne à ce nom, ou la recherche est en panne. « error » : la connexion n'a pas abouti. */
   | { s: "lost"; via: "linkedin" | "github"; why: "none" | "error" };
 
@@ -185,13 +185,23 @@ async function findLinkedin(since: number, mock: string | null): Promise<ReturnP
   return { s: "lost", via: "linkedin", why: "none" };
 }
 
-async function findGithub(): Promise<ReturnPhase> {
+/** Le LinkedIn trouvé tel quel : une adresse et un nom, ou rien. */
+function foundOf(f: unknown): LinkedinSuggestion | undefined {
+  const x = f as Partial<LinkedinSuggestion> | null | undefined;
+  if (!x || typeof x.url !== "string" || typeof x.name !== "string" || !x.name) return undefined;
+  return { url: x.url, name: x.name, headline: typeof x.headline === "string" ? x.headline : "", ...(typeof x.photo === "string" ? { photo: x.photo } : {}) };
+}
+
+async function findGithub(mock: string | null): Promise<ReturnPhase> {
   if (isMock()) {
     await mockDelay();
-    return { s: "github", login: "leamd" };
+    // `auto` : son LinkedIn trouvé (§18.113).
+    return { s: "github", login: "leamd", ...(mock === "auto" ? { found: MOCK_PEOPLE[0]! } : {}) };
   }
-  const b = await getJson<{ signedIn?: boolean; login?: string }>("/api/entry/github");
-  return b?.signedIn && typeof b.login === "string" ? { s: "github", login: b.login } : { s: "lost", via: "github", why: "error" };
+  const b = await getJson<{ signedIn?: boolean; login?: string; found?: unknown }>("/api/entry/github");
+  if (!b?.signedIn || typeof b.login !== "string") return { s: "lost", via: "github", why: "error" };
+  const found = foundOf(b.found);
+  return { s: "github", login: b.login, ...(found ? { found } : {}) };
 }
 
 /**
@@ -223,7 +233,7 @@ function begin(): void {
   }
   const since = Date.now();
   phase = { s: "finding", via, since };
-  void (via === "linkedin" ? findLinkedin(since, value) : findGithub()).then(setPhase, () => setPhase({ s: "lost", via, why: "error" }));
+  void (via === "linkedin" ? findLinkedin(since, value) : findGithub(value)).then(setPhase, () => setPhase({ s: "lost", via, why: "error" }));
 }
 
 /** Une connexion vient-elle de revenir sur cette page ? L'accueil ouvre alors son formulaire. */
