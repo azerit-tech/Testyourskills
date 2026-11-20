@@ -14,7 +14,9 @@ import {
   type SelectionKind,
   type SelectionSignal,
 } from "../../../shared/readings";
+import { checkLineFact } from "../../../shared/punchline";
 import { callStructured, DEFAULT_MODEL, fence, strictJsonSchema, type ChatClient, type Validation } from "./client";
+import { CARD_LINE_EXAMPLES } from "./prompts/cardLine";
 import { CV_POSITIONS, CV_SYSTEM_PROMPT, SENIORITIES } from "./prompts/cv";
 import { clip, locate, scrubContact } from "./text";
 
@@ -59,6 +61,8 @@ const ApiSchema = z.object({
   school_tier: z.enum(SCHOOL_TIERS),
   selection_signals: z.array(z.object({ kind: z.enum(SELECTION_KINDS), quote: z.string() })),
   management_quote: z.string(),
+  // La phrase de la fiche (§18.107), en dernier : écrite après l'extraction, contrôlée par shared/punchline.ts.
+  card_line: z.object({ fr: z.string(), en: z.string() }),
 });
 export const CV_OUTPUT_SCHEMA = strictJsonSchema(ApiSchema);
 
@@ -69,6 +73,7 @@ const RawSchema = ApiSchema.extend({
   roles: z.array(ApiRole.extend({ employer_type: z.string().optional(), kind: z.string().optional() })),
   selection_signals: z.array(z.object({ kind: z.string(), quote: z.string() })).optional(),
   management_quote: z.string().optional(),
+  card_line: z.object({ fr: z.string(), en: z.string() }).optional(),
   years_declared: z.number().min(0).max(60),
   projects_with_dated_outcome: z.number().int().min(0),
   writing_quality: z.number().int().min(1).max(5),
@@ -210,6 +215,11 @@ export function validateCvOutput(raw: unknown, cvText: string): Validation<CvRea
     return { ...r, ...(employer_type ? { employer_type } : {}), ...(k ? { kind: k } : {}) };
   });
 
+  // La phrase de la fiche : contrôlée, jamais l'école ni un ancien employeur (la fiche ne montre que celui du jour).
+  const current = new Set(roles.filter((r) => r.end === null).map((r) => norm(r.company)));
+  const names = [d.school_name, ...roles.filter((r) => r.end !== null && !current.has(norm(r.company))).map((r) => r.company)];
+  const cardLine = checkLineFact(d.card_line, { names, forbid: CARD_LINE_EXAMPLES.cv.flatMap((e) => [e.fr, e.en]) });
+
   return {
     ok: true,
     value: {
@@ -231,6 +241,7 @@ export function validateCvOutput(raw: unknown, cvText: string): Validation<CvRea
       school_tier: hasSchool ? d.school_tier : "none",
       ...(d.selection_signals !== undefined ? { selection_signals: signals } : {}),
       ...(d.management_quote !== undefined ? { management_fact: managed ? { quote: clip(scrubContact(clip(managed))) } : null } : {}),
+      ...(cardLine ? { card_line: cardLine } : {}),
     },
   };
 }

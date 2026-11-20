@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FIXTURES, FIXTURE_COMPARISON } from "../../shared/fixtures";
+import { aliasFor } from "../../shared/punchline";
 import type { CardData, ComparisonData, Fact, JobState } from "../../shared/types";
 import type { CvReading, CvTextCounts } from "../../shared/readings";
 import { SCHOOL_RANK_RE } from "../../shared/schoolRank";
@@ -1134,7 +1135,8 @@ describe("page /c/:id et images", () => {
     const overall = FIXTURES.gold.overall;
     // §18.7 : « @X est dans le viseur ★★★★★☆, {profil} », les six étoiles (§18.27).
     expect(overall).toBeGreaterThanOrEqual(75);
-    expect(html).toContain(`<meta property="og:title" content="@leamd est dans le viseur ★★★★★☆, ${FIXTURES.gold.profile!.label.fr}">`);
+    // Le nom du profil propre à la fiche (§18.107), tiré par son id.
+    expect(html).toContain(`<meta property="og:title" content="@leamd est dans le viseur ★★★★★☆, ${aliasFor(FIXTURES.gold.profile!.id, id)!.fr}">`);
     expect(html).toContain(`content="Fiche ★★★★★☆, ${overall}/100, fiche de dev de`);
     expect(html).toContain(`<meta property="og:image" content="https://skills.test/og/${id}.png?v=11">`);
     expect(html).toContain(`<meta property="og:url" content="https://skills.test/c/${id}">`);

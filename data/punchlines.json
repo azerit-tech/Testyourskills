@@ -1,0 +1,270 @@
+{
+  "version": "0.1.0",
+  "_doc": "La phrase de la fiche (SPEC §18.107). `aliases` : les noms d'un même profil, le premier est celui du catalogue (data/profiles.json) ; un par fiche, tiré par le hachage de son id, sans toucher à l'id ni à la règle. Épicènes ou métaphores, comme les noms du catalogue. `leads` : l'en-tête de procès-verbal (le dernier, vide, laisse la suite seule). `tails` : la suite, en « tu » et en « you », par clé : `generic`, `profile:<id>`, `position:<code>`, `status:<id>` (chef d'accusation de la fiche), `finding:<kind>` (trouvaille, `{key}` = son chiffre), `club` (`{club}` = l'employeur affiché), `lang` (`{lang}` = l'arme), `seniority:student`, `seniority:junior` (`{years}` an{s}), `years` (`{years}` ans, 3 et plus), `founder`, `no_github`. Écrites sans espace insécable : shared/punchline.ts passe le français par frTypo. Jamais un mot qui s'accorde avec la personne, jamais d'école, jamais l'âge, le genre, l'origine, la santé ni l'apparence.",
+  "aliases": {
+    "forger": [
+      { "fr": "Sous couverture", "en": "Undercover" },
+      { "fr": "Couverture parfaite", "en": "Perfect cover" },
+      { "fr": "Nom de code", "en": "Code name" },
+      { "fr": "Double vie", "en": "Double life" }
+    ],
+    "kingpin": [
+      { "fr": "Légende du milieu", "en": "Underworld legend" },
+      { "fr": "Figure du milieu", "en": "Underworld icon" },
+      { "fr": "Légende des quais", "en": "Dockside legend" },
+      { "fr": "Grosse pointure", "en": "Big shot" }
+    ],
+    "mastermind": [
+      { "fr": "Cerveau", "en": "Mastermind" },
+      { "fr": "Tête pensante", "en": "Master planner" },
+      { "fr": "Stratège de l'ombre", "en": "Shadow strategist" },
+      { "fr": "Architecte du casse", "en": "Heist architect" }
+    ],
+    "delivery_machine": [
+      { "fr": "Machine à livrer", "en": "Delivery machine" },
+      { "fr": "Livraison express", "en": "Express delivery" },
+      { "fr": "Pied au plancher", "en": "Pedal to the metal" },
+      { "fr": "Rouleau compresseur", "en": "Steamroller" }
+    ],
+    "night_owl": [
+      { "fr": "Oiseau de nuit", "en": "Night owl" },
+      { "fr": "Ombre de minuit", "en": "Midnight shadow" },
+      { "fr": "Équipe de nuit", "en": "Night shift" },
+      { "fr": "Noctambule", "en": "Night crawler" }
+    ],
+    "arsonist": [
+      { "fr": "Pyromane", "en": "Arsonist" },
+      { "fr": "Mise à feu", "en": "Ignition" },
+      { "fr": "Feu du vendredi", "en": "Friday fire" },
+      { "fr": "Bidon d'essence", "en": "Gas can" }
+    ],
+    "repeat_offender": [
+      { "fr": "Récidiviste", "en": "Repeat offender" },
+      { "fr": "Casier chargé", "en": "Thick rap sheet" },
+      { "fr": "Multirécidive", "en": "Serial offense" },
+      { "fr": "Signature connue", "en": "Known signature" }
+    ],
+    "hoarder": [
+      { "fr": "Écureuil", "en": "Hoarder" },
+      { "fr": "Planque garnie", "en": "Stocked stash" },
+      { "fr": "Entrepôt clandestin", "en": "Hidden warehouse" },
+      { "fr": "Réserve secrète", "en": "Secret reserve" }
+    ],
+    "chameleon": [
+      { "fr": "Caméléon", "en": "Chameleon" },
+      { "fr": "Mille visages", "en": "Thousand faces" },
+      { "fr": "Couteau suisse", "en": "Swiss army knife" },
+      { "fr": "Polyglotte", "en": "Polyglot" }
+    ],
+    "fresh_blood": [
+      { "fr": "Jeune pousse", "en": "Fresh blood" },
+      { "fr": "Sang neuf", "en": "New blood" },
+      { "fr": "Étoile montante", "en": "Rising star" },
+      { "fr": "Graine de légende", "en": "Legend in the making" }
+    ],
+    "old_school": [
+      { "fr": "Vieille école", "en": "Old school" },
+      { "fr": "Code d'époque", "en": "Vintage code" },
+      { "fr": "Pièce de collection", "en": "Collector's item" },
+      { "fr": "Grand cru", "en": "Vintage reserve" }
+    ],
+    "ghost": [
+      { "fr": "Fantôme", "en": "Ghost" },
+      { "fr": "Sans empreintes", "en": "No prints" },
+      { "fr": "Courant d'air", "en": "Thin air" },
+      { "fr": "Zéro trace", "en": "Zero trace" }
+    ],
+    "sleeper_agent": [
+      { "fr": "Cellule dormante", "en": "Sleeper agent" },
+      { "fr": "Taupe en sommeil", "en": "Sleeping mole" },
+      { "fr": "Profil discret", "en": "Low profile" },
+      { "fr": "Coup en préparation", "en": "Job in the works" },
+      { "fr": "Mission en attente", "en": "Mission on hold" }
+    ]
+  },
+  "leads": [
+    { "fr": "Signalement :", "en": "Wanted notice:" },
+    { "fr": "Note du commissaire :", "en": "Inspector's note:" },
+    { "fr": "Rapport de filature :", "en": "Stakeout log:" },
+    { "fr": "Selon nos indics :", "en": "Word on the street:" },
+    { "fr": "Mention au dossier :", "en": "Case note:" },
+    { "fr": "Témoin oculaire :", "en": "Eyewitness:" },
+    { "fr": "Rapport de terrain :", "en": "Field report:" },
+    { "fr": "Tuyau anonyme :", "en": "Anonymous tip:" },
+    { "fr": "Au casier :", "en": "On the rap sheet:" },
+    { "fr": "Hors procès-verbal :", "en": "Off the record:" },
+    { "fr": "Classé secret :", "en": "Classified:" },
+    { "fr": "Rumeur du quartier :", "en": "Street rumor:" },
+    { "fr": "Écoute téléphonique :", "en": "Wiretap:" },
+    { "fr": "Dernier rapport :", "en": "Latest report:" },
+    { "fr": "Avis aux patrouilles :", "en": "All units:" },
+    { "fr": "Pièce à conviction :", "en": "Exhibit A:" },
+    { "fr": "", "en": "" }
+  ],
+  "tails": {
+    "generic": [
+      { "fr": "tu ne pousses jamais un commit sans alibi", "en": "you never push a commit without an alibi" },
+      { "fr": "tu codes avec des gants, zéro empreinte", "en": "you code with gloves on, zero prints" },
+      { "fr": "Ctrl+Z reste ton seul complice", "en": "Ctrl+Z is still your only accomplice" },
+      { "fr": "tu effaces tes traces avec git rebase", "en": "you cover your tracks with git rebase" },
+      { "fr": "tu as un alibi pour chaque bug en prod", "en": "you have an alibi for every bug in prod" },
+      { "fr": "tu relis ta propre PR avant l'interrogatoire", "en": "you review your own PR before questioning" },
+      { "fr": "on te soupçonne de lire la doc en entier", "en": "you're suspected of reading the whole manual" },
+      { "fr": "tu planques tes meilleures idées dans des branches", "en": "you stash your best ideas in branches" },
+      { "fr": "ton café et ton terminal ne dorment jamais", "en": "your coffee and your terminal never sleep" },
+      { "fr": "tu parles aux machines, qui t'obéissent", "en": "you talk to machines, and they obey" },
+      { "fr": "tu ne parles qu'en présence de ton linter", "en": "you only talk with your linter present" },
+      { "fr": "personne n'a jamais vu ton historique Git en entier", "en": "nobody has ever seen your full Git history" }
+    ],
+    "profile:forger": [
+      { "fr": "ton vrai talent travaille sous un nom de code", "en": "your real talent works under a code name" },
+      { "fr": "tu entres partout, badge visiteur en poche", "en": "you get in anywhere with a visitor badge" },
+      { "fr": "ta couverture a même son propre LinkedIn", "en": "your cover even has its own LinkedIn" }
+    ],
+    "profile:kingpin": [
+      { "fr": "tes PR font la loi bien au-delà de ton quartier", "en": "your PRs rule far beyond your block" },
+      { "fr": "des inconnus suivent tes repos comme un feuilleton", "en": "strangers follow your repos like a TV series" },
+      { "fr": "ton nom circule dans tous les changelogs", "en": "your name gets around every changelog" }
+    ],
+    "profile:mastermind": [
+      { "fr": "chaque casse commence sur ton tableau blanc", "en": "every heist starts on your whiteboard" },
+      { "fr": "tu dessines le plan, les autres suivent les flèches", "en": "you draw the plan, the others follow the arrows" },
+      { "fr": "ton archi a plus de couches qu'un alibi", "en": "your architecture has more layers than an alibi" }
+    ],
+    "profile:delivery_machine": [
+      { "fr": "tu livres avant même la fin de la réunion", "en": "you ship before the meeting is even over" },
+      { "fr": "la police n'a jamais vu un tel débit de commits", "en": "the cops have never seen this many commits" },
+      { "fr": "tes mises en prod arrivent avant les sirènes", "en": "your releases outrun the sirens" }
+    ],
+    "profile:night_owl": [
+      { "fr": "tu commites quand la ville dort", "en": "you commit while the city sleeps" },
+      { "fr": "tes meilleurs coups partent après minuit", "en": "your best jobs go out after midnight" },
+      { "fr": "le jour tu dors, la nuit tu déploies", "en": "by day you sleep, by night you deploy" }
+    ],
+    "profile:arsonist": [
+      { "fr": "tu déploies le vendredi, le sourire aux lèvres", "en": "you deploy on Friday, with a smile" },
+      { "fr": "tes week-ends commencent par un push --force", "en": "your weekends start with a push --force" },
+      { "fr": "tu allumes la prod et tu pars en week-end", "en": "you light up prod and leave for the weekend" }
+    ],
+    "profile:repeat_offender": [
+      { "fr": "fix, fix2, final fix, toujours la même signature", "en": "fix, fix2, final fix, same old signature" },
+      { "fr": "tes messages de commit tiennent en un mot", "en": "your commit messages fit in one word" },
+      { "fr": "« wip » reste ton mot préféré", "en": "“wip” is still your favorite word" }
+    ],
+    "profile:hoarder": [
+      { "fr": "tu ouvres un repo comme on ouvre un tiroir", "en": "you open repos the way others open drawers" },
+      { "fr": "ta planque déborde de projets à moitié finis", "en": "your hideout is full of half-done projects" },
+      { "fr": "chaque idée a son repo, aucune n'a de suite", "en": "every idea gets a repo, none gets a sequel" }
+    ],
+    "profile:chameleon": [
+      { "fr": "tu changes de langage plus vite que de planque", "en": "you switch languages faster than safehouses" },
+      { "fr": "chaque repo, une nouvelle identité", "en": "every repo, a new identity" },
+      { "fr": "même la police ne sait plus quel langage tu parles", "en": "even the cops can't tell which language you speak" }
+    ],
+    "profile:fresh_blood": [
+      { "fr": "première affaire en cours, et déjà du bruit", "en": "first case open, and already making noise" },
+      { "fr": "le quartier parle déjà de tes premiers coups", "en": "the block is already talking about your first jobs" },
+      { "fr": "une carrière toute neuve, un dossier déjà épais", "en": "a brand-new career, an already thick file" }
+    ],
+    "profile:old_school": [
+      { "fr": "ton code tournait avant les frameworks", "en": "your code ran before frameworks did" },
+      { "fr": "tu codes encore comme au temps des disquettes", "en": "you still code like it's the floppy-disk era" },
+      { "fr": "tes repos se souviennent de l'époque des forums", "en": "your repos remember the forum days" }
+    ],
+    "profile:ghost": [
+      { "fr": "tu passes, et GitHub ne voit rien", "en": "you pass through, and GitHub sees nothing" },
+      { "fr": "ton code vit dans des repos privés, à l'abri", "en": "your code lives in private repos, safe and sound" },
+      { "fr": "même ton historique Git a un alibi", "en": "even your Git history has an alibi" }
+    ],
+    "profile:sleeper_agent": [
+      { "fr": "tu attends ton heure, le clavier chargé", "en": "you're biding your time, keyboard loaded" },
+      { "fr": "silence radio, jusqu'au jour du grand commit", "en": "radio silence until the day of the big commit" },
+      { "fr": "tu prépares un coup que personne ne voit venir", "en": "you're planning a job nobody sees coming" },
+      { "fr": "en veille, mais le plan est déjà prêt", "en": "on standby, but the plan is ready" }
+    ],
+    "position:FS": [{ "fr": "front, back, tu tiens toutes les portes", "en": "front, back, you cover every door" }],
+    "position:BE": [{ "fr": "tu caches tes secrets derrière une API", "en": "you hide your secrets behind an API" }],
+    "position:FE": [{ "fr": "tu centres des div sous haute surveillance", "en": "you center divs under heavy surveillance" }],
+    "position:MOB": [{ "fr": "tu opères depuis une poche, en toute discrétion", "en": "you operate from a pocket, quietly" }],
+    "position:DATA": [{ "fr": "tu fais parler les données en garde à vue", "en": "you make the data talk in custody" }],
+    "position:ML": [{ "fr": "ton modèle a appris à ne rien avouer", "en": "your model learned to confess nothing" }],
+    "position:OPS": [{ "fr": "tu as les clés de toutes les machines", "en": "you hold the keys to every server" }],
+    "position:SEC": [{ "fr": "tu connais toutes les serrures de la ville", "en": "you know every lock in town" }],
+    "position:EMB": [{ "fr": "tu parles directement au métal", "en": "you talk straight to the metal" }],
+    "position:PM": [{ "fr": "tu tiens le plan du casse, post-it compris", "en": "you hold the heist plan, sticky notes included" }],
+    "position:DESIGN": [{ "fr": "tu maquilles chaque écran à la perfection", "en": "you disguise every screen to perfection" }],
+    "position:CTO": [{ "fr": "tu diriges les opérations depuis l'arrière-boutique", "en": "you run operations from the back room" }],
+    "club": [
+      { "fr": "tu infiltres {club} de l'intérieur", "en": "you've infiltrated {club} from the inside" },
+      { "fr": "{club} ne se doute encore de rien", "en": "{club} still suspects nothing" },
+      { "fr": "ta couverture chez {club} tient toujours", "en": "your cover at {club} still holds" }
+    ],
+    "lang": [
+      { "fr": "tu ne sors jamais sans ton {lang}", "en": "you never leave home without your {lang}" },
+      { "fr": "tu signes chaque casse en {lang}", "en": "you sign every job in {lang}" },
+      { "fr": "{lang}, ton arme de service", "en": "{lang}, your service weapon" },
+      { "fr": "tu parles {lang} couramment, même en garde à vue", "en": "you speak fluent {lang}, even in custody" }
+    ],
+    "seniority:student": [
+      { "fr": "encore sur les bancs de l'école, déjà sur nos radars", "en": "still in school, already on our radar" },
+      { "fr": "stage après stage, le dossier se remplit", "en": "internship after internship, the file fills up" },
+      { "fr": "les premiers coups d'une longue carrière", "en": "the first jobs of a long career" }
+    ],
+    "seniority:junior": [
+      { "fr": "à peine {years} an{s} de métier, et déjà un dossier", "en": "barely {years} year{s} in, and already a file" },
+      { "fr": "{years} an{s} dans le milieu, et ça se sait", "en": "{years} year{s} in the business, and word is out" }
+    ],
+    "years": [
+      { "fr": "{years} ans de métier, toujours aucune preuve contre toi", "en": "{years} years in the trade, still no evidence against you" },
+      { "fr": "{years} ans de terrain, le casier toujours vierge", "en": "{years} years on the job, record still clean" },
+      { "fr": "{years} ans d'expérience, zéro aveu", "en": "{years} years of experience, zero confessions" }
+    ],
+    "founder": [
+      { "fr": "tu as monté ta propre affaire, comme les grands", "en": "you started your own operation, like the greats" },
+      { "fr": "fonder ta boîte, ton premier grand coup", "en": "founding a company, your first big job" },
+      { "fr": "à la tête de ta propre bande", "en": "running your own crew" }
+    ],
+    "no_github": [
+      { "fr": "aucun GitHub au dossier, la planque parfaite", "en": "no GitHub on file, the perfect hideout" },
+      { "fr": "ton code reste en lieu sûr, loin de GitHub", "en": "your code stays somewhere safe, far from GitHub" }
+    ],
+    "status:gh_3am_commit": [{ "fr": "tu commites quand la ville dort", "en": "you commit while the city sleeps" }],
+    "status:gh_friday_push": [{ "fr": "tu pousses en prod le vendredi soir, sans trembler", "en": "you push to prod on Friday night, no shaking" }],
+    "status:gh_lazy_commits": [{ "fr": "« fix » reste ta signature préférée", "en": "“fix” is still your favorite signature" }],
+    "status:gh_no_tests": [
+      { "fr": "tu testes en prod, comme les vrais", "en": "you test in prod, like the pros" },
+      { "fr": "zéro test, mais un sang-froid de pro", "en": "zero tests, nerves of steel" }
+    ],
+    "status:gh_read_by_others": [{ "fr": "tes repos ont plus de fans que de bugs", "en": "your repos have more fans than bugs" }],
+    "status:gh_accepted_elsewhere": [{ "fr": "tes PR entrent chez les autres sans effraction", "en": "your PRs get into other repos without a break-in" }],
+    "status:gh_maintainer": [{ "fr": "des inconnus contribuent à ta planque", "en": "strangers contribute to your hideout" }],
+    "status:gh_polyglot": [{ "fr": "six langages, autant de fausses identités", "en": "six languages, as many cover identities" }],
+    "status:gh_private_talent": [{ "fr": "zéro repo public, zéro empreinte", "en": "zero public repos, zero prints" }],
+    "status:gh_stars_mom": [{ "fr": "zéro star, mais une conscience tranquille", "en": "zero stars, but a clear conscience" }],
+    "status:gh_finished_tutorial": [{ "fr": "tutoriel fini, la suite est classée secret", "en": "tutorial finished, the sequel is classified" }],
+    "status:gh_archaeologist": [{ "fr": "ton dernier commit est aux archives", "en": "your last commit is in the archives" }],
+    "status:gh_documents": [{ "fr": "tes README parlent mieux que des aveux", "en": "your READMEs talk better than a confession" }],
+    "status:gh_ship_or_nothing": [{ "fr": "ta cadence de livraison affole les radars", "en": "your shipping pace sets off every radar" }],
+    "status:cv_buzzwords": [{ "fr": "ton profil parle le jargon sans accent", "en": "your profile speaks fluent buzzword" }],
+    "status:cv_passion": [{ "fr": "ta « passion » a été citée comme témoin", "en": "your “passion” was called as a witness" }],
+    "status:ai_typed": [{ "fr": "même tes types ont un alibi en béton", "en": "even your types have an airtight alibi" }],
+    "status:ai_handles_errors": [{ "fr": "chaque erreur finit au poste, bien rangée", "en": "every error ends up at the station, booked" }],
+    "status:ai_clean_arch": [{ "fr": "ton archi est plus propre qu'un casier vierge", "en": "your architecture is cleaner than a blank record" }],
+    "status:ai_console_log": [{ "fr": "tes console.log témoignent contre toi", "en": "your console.logs testify against you" }],
+    "status:ai_copy_paste": [{ "fr": "Ctrl+C, Ctrl+V, le crime parfait", "en": "Ctrl+C, Ctrl+V, the perfect crime" }],
+    "status:ai_400_lines": [{ "fr": "une fonction de 400 lignes, la brigade enquête", "en": "a 400-line function, the squad is on it" }],
+    "status:ai_short_vars": [{ "fr": "tes variables s'appellent x, tmp et data2", "en": "your variables go by x, tmp and data2" }],
+    "status:ai_franglais": [{ "fr": "tes commentaires parlent franglais couramment", "en": "your comments speak fluent Franglais" }],
+    "finding:night_share": [{ "fr": "{key} de tes commits partent après 22 h", "en": "{key} of your commits go out after 10 p.m." }],
+    "finding:early_bird": [{ "fr": "{key} de tes commits partent avant 8 h", "en": "{key} of your commits go out before 8 a.m." }],
+    "finding:latest_commit": [{ "fr": "un commit repéré à {key} du matin", "en": "a commit spotted at {key}" }],
+    "finding:friday_evening": [{ "fr": "{key} poussés un vendredi soir, sans trembler", "en": "{key} pushed on Friday nights, no shaking" }],
+    "finding:top_starred": [{ "fr": "{key} sur un seul repo, toute la ville te suit", "en": "{key} on one repo, the whole town follows you" }],
+    "finding:external_prs": [{ "fr": "{key} glissées chez les autres, sans effraction", "en": "{key} slipped into other repos, no break-in" }],
+    "finding:dead_language": [{ "fr": "du {key} dans ton passé, l'enquête le prouve", "en": "some {key} in your past, the file proves it" }],
+    "finding:abandoned_repo": [{ "fr": "un repo laissé en {key}, l'enquête reste ouverte", "en": "a repo left behind in {key}, the case stays open" }],
+    "finding:sunday_over_monday": [{ "fr": "plus de commits le dimanche que le lundi", "en": "more commits on Sundays than on Mondays" }],
+    "finding:weekend": [{ "fr": "tes week-ends servent de planque à commits", "en": "your weekends double as a commit hideout" }],
+    "finding:contributions_year": [{ "fr": "{key} contributions en un an, la brigade ne suit plus", "en": "{key} contributions in a year, the squad can't keep up" }]
+  }
+}

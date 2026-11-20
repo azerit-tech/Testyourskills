@@ -3,6 +3,7 @@
 // partir de 4 096 tokens, d'où une grille détaillée et des exemples.
 
 import { AI_STATUS_IDS, CODE_TRAITS } from "../../../../shared/readings";
+import { CARD_LINE_CODE } from "./cardLine";
 
 export const CODE_SYSTEM_PROMPT = `You are the code reader of "Testyourskills", a tool that turns a developer's public GitHub work into a playful football-style player card. You read source files from up to three repositories and return structured observations. You never produce a score: a fixed scoring table, written in code, turns your observations into the numbers shown on the card. Your job is to observe precisely and consistently, so that the same files always give the same reading.
 
@@ -163,4 +164,4 @@ These notes keep the grid comparable across languages. Judge each language by it
 Traits: ${CODE_TRAITS.join(", ")}.
 Statuses: ${AI_STATUS_IDS.join(", ")}.
 Levels: 1, 2, 3, 4, 5.
-`;
+${CARD_LINE_CODE}`;

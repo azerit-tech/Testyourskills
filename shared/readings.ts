@@ -2,7 +2,7 @@
 // et le barème (server/src/scoring). L'IA ne rend jamais de nombre qui finit
 // sur la carte : elle rend ces constats, le barème les transforme (SPEC §4.1).
 
-import type { Lang, Position } from "./types";
+import type { Fact, Lang, Position } from "./types";
 
 /** Fichiers choisis par le code pour la lecture IA (§4.3) : ≤ 3 repos, ≤ 10 fichiers, ≤ 40 Ko au total. */
 export interface RepoFiles {
@@ -50,6 +50,8 @@ export interface CodeReadingResult {
   readings: CodeReading[];
   /** Le statut choisi par l'IA dans la liste fermée, ou null. */
   ai_status: AIStatusId | null;
+  /** La phrase de la fiche écrite pendant la lecture (§18.107), contrôlée ; absente si l'IA n'en rend pas de bonne. */
+  card_line?: Fact;
 }
 
 export type Seniority = "junior" | "mid" | "senior" | "lead" | "staff";
@@ -120,6 +122,8 @@ export interface CvReading {
    * des lectures d'avant le §18.37.
    */
   management_fact?: { quote: string } | null;
+  /** La phrase de la fiche écrite pendant la lecture (§18.107), contrôlée ; absente si l'IA n'en rend pas de bonne. */
+  card_line?: Fact;
 }
 
 /**

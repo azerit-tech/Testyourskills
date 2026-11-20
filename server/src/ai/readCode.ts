@@ -12,7 +12,9 @@ import {
   type CodeTrait,
   type RepoFiles,
 } from "../../../shared/readings";
+import { checkLineFact } from "../../../shared/punchline";
 import { callStructured, DEFAULT_MODEL, fence, strictJsonSchema, type ChatClient, type Validation } from "./client";
+import { CARD_LINE_EXAMPLES } from "./prompts/cardLine";
 import { CODE_SYSTEM_PROMPT } from "./prompts/code";
 import { clip, locate, overlapsSuspicious, suspiciousLines, truncateBytes, waterFill } from "./text";
 
@@ -48,6 +50,8 @@ const ApiSchema = z.object({
     }),
   ),
   ai_status: z.enum(AI_STATUS_IDS).nullable(),
+  // La phrase de la fiche (§18.107), en dernier : contrôlée par shared/punchline.ts.
+  card_line: z.object({ fr: z.string(), en: z.string() }),
 });
 export const CODE_OUTPUT_SCHEMA = strictJsonSchema(ApiSchema);
 
@@ -65,6 +69,7 @@ const RawSchema = z.object({
     }),
   ),
   ai_status: z.string().nullable(),
+  card_line: z.object({ fr: z.string(), en: z.string() }).optional(),
 });
 
 interface PreparedRepo {
@@ -196,7 +201,8 @@ export function validateCodeOutput(raw: unknown, prepared: PreparedRepo[]): Vali
   }
 
   const readings = prepared.map((p) => byRepo.get(p.repo)).filter((r): r is CodeReading => Boolean(r));
-  const result: CodeReadingResult = { readings, ai_status: coherentStatus(parsed.data.ai_status, readings) };
+  const line = checkLineFact(parsed.data.card_line, { forbid: CARD_LINE_EXAMPLES.code.flatMap((e) => [e.fr, e.en]) });
+  const result: CodeReadingResult = { readings, ai_status: coherentStatus(parsed.data.ai_status, readings), ...(line ? { card_line: line } : {}) };
 
   if (issues.length === 0) return { ok: true, value: result };
   return { ok: false, issues, fallback: readings.length > 0 ? result : null };
