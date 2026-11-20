@@ -23,13 +23,14 @@ import type { CardRow, Jury, Store } from "./db";
 import type { Accomplice } from "./github/accomplices";
 import { ID_RE } from "./pipeline";
 
-export const DENOUNCE_PER_DAY = 5;
+/** Dénonciations par jour et par IP (§18.114) : de quoi en enchaîner une dizaine ; une fiche déjà en cache compte aussi. */
+export const DENOUNCE_PER_DAY = 10;
 /** Suggestions affichées sous « Dénonce un complice ». */
 export const ACCOMPLICES_SHOWN = 3;
 
 export const DENOUNCE_LIMITED: Fact = {
-  fr: "Cinq dénonciations par jour, c'est le maximum. Reviens demain.",
-  en: "Five tip-offs a day is the limit. Come back tomorrow.",
+  fr: "Dix dénonciations par jour, c'est le maximum. Reviens demain.",
+  en: "Ten tip-offs a day is the limit. Come back tomorrow.",
 };
 
 const LOGIN_RE = /^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$/;
