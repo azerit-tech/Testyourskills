@@ -1,6 +1,7 @@
 // Les liens vers les profils publics d'une personne fichée (SPEC §18.108) : le logo
 // LinkedIn vers son linkedin.com/in/…, le logo GitHub vers github.com/<pseudo>.
-// Pur, même règle au serveur (GET /api/card/:id, les classements) et en démo.
+// Pur, même règle au serveur (GET /api/card/:id) et en démo. Depuis le §18.127, à la personne fichée
+// seule : ni le visiteur ni les classements ne reçoivent ses profils.
 //
 // - GitHub : le pseudo que la fiche montre déjà (« @pseudo » en tête de page).
 // - LinkedIn : l'adresse lue pour la fiche (la fiche LinkedIn seule, le dossier), faite,
@@ -33,12 +34,6 @@ export function profileLinks(p: { login?: string | null; linkedinUrl?: string | 
   const github = githubHref(p.login);
   const linkedin = linkedinHref(p.linkedinUrl);
   return { ...(linkedin ? { linkedin } : {}), ...(github ? { github } : {}) };
-}
-
-/** Les liens d'une ligne de classement. */
-export function personLinks(p: { cardId?: string; login?: string; linkedinUrl?: string }): ProfileLinks {
-  if (!p.cardId) return {};
-  return profileLinks(p);
 }
 
 /** Aucun lien. */

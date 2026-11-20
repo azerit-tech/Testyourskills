@@ -863,12 +863,35 @@ export function EmailForm({ cardId }: { cardId: string }) {
 
 /* ---------- le bloc recruteur ---------- */
 
+/** L'ancre du bloc recruteur : la tête de la fiche y mène le visiteur (§18.127). */
+export const HIRE_ANCHOR = "recrute";
+
+/**
+ * Là où le visiteur trouvait les profils de la personne (§18.108) : « Tu recrutes ? », qui descend au
+ * bloc recruteur. Les recruteurs passent par Azerit, pas par le LinkedIn de la personne (§18.127).
+ */
+export function HireLink({ className = "" }: { className?: string }) {
+  const { t } = useT();
+  return (
+    <a
+      className={`link-quiet hire-link${className ? ` ${className}` : ""}`}
+      href={`#${HIRE_ANCHOR}`}
+      onClick={(e) => {
+        e.preventDefault();
+        document.getElementById(HIRE_ANCHOR)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }}
+    >
+      {t.result.cta.title}
+    </a>
+  );
+}
+
 /** En fin de page, pour le visiteur comme pour qui a fait la fiche : « Tu recrutes ? », une phrase, une pilule. */
 export function Hiring({ cardId }: { cardId: string | null }) {
   const { t } = useT();
   const c = t.result.cta;
   return (
-    <section className="after-block hire" aria-labelledby="hire-title">
+    <section className="after-block hire" id={HIRE_ANCHOR} aria-labelledby="hire-title">
       <h2 id="hire-title">{c.title}</h2>
       <p>{c.text}</p>
       <a className="pill pill-ghost" href="https://azerit.tech" target="_blank" rel="noopener" onClick={() => api.track("cta_azerit_clicked", cardId, { from: "result" })}>

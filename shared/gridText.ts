@@ -36,6 +36,15 @@ export const SENIORITY_TEXT: Record<SeniorityCode, { name: Fact; range: Fact }> 
   expert: { name: { fr: "Expert", en: "Expert" }, range: { fr: "10 ans et plus", en: "10 years and more" } },
 };
 
+/** Le niveau en un mot, sur une ligne de classement (§18.127) : « Étudiant », « Junior », « Confirmé », « Senior », « Expert ». */
+export const SENIORITY_TAG: Record<SeniorityCode, Fact> = {
+  student: { fr: "Étudiant", en: "Student" },
+  junior: { fr: "Junior", en: "Junior" },
+  mid: { fr: "Confirmé", en: "Mid" },
+  senior: { fr: "Senior", en: "Senior" },
+  expert: { fr: "Expert", en: "Expert" },
+};
+
 /**
  * Le niveau en une ligne courte, à côté de la note : « Junior · 1,1 an », « Début de
  * carrière · moins d'un an », « Junior · 2 ans (estimé) » quand GitHub seul l'estime.

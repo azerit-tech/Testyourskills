@@ -41,33 +41,44 @@ describe("le rendu des logos", () => {
     expect(render(createElement(ProfileLinks, { links: { linkedin: LI }, who: "Léa" }), "en-US")).toContain('aria-label="Léa&#x27;s LinkedIn"');
   });
 
-  it("la tête de la fiche : au bout du nom, hors du titre ; rien sans lien", () => {
+  it("la tête de la fiche, pour la personne fichée : au bout du nom, hors du titre ; rien sans lien", () => {
     const card = { ...FIXTURES.gold, id: "Card000001" };
     const html = render(createElement(WantedHead, { card, links: { linkedin: LI, github: "https://github.com/leamd" } }));
     expect(html).toMatch(/<\/h1><span class="plinks wanted-links"/);
     expect(html).toContain('aria-label="GitHub de @leamd"');
     expect(render(createElement(WantedHead, { card }))).not.toContain("plinks");
   });
+
+  it("la tête de la fiche, pour le visiteur (§18.127) : son nom court, aucun logo, « Tu recrutes ? » qui descend au bloc recruteur", () => {
+    const card = { ...FIXTURES.cv, id: "Card000002", login: undefined, name: "Enzo Le Van" };
+    const html = render(createElement(WantedHead, { card, links: null, short: true, hire: true }));
+    expect(html).toContain('<span class="wanted-name">Enzo L.</span>');
+    expect(html).not.toContain("Le Van");
+    expect(html).not.toContain("plinks");
+    expect(html).toMatch(/<a class="link-quiet hire-link wanted-hire" href="#recrute">Tu recrutes\s?\?<\/a>/);
+    // La personne fichée garde son nom entier.
+    expect(render(createElement(WantedHead, { card }))).toContain('<span class="wanted-name">Enzo Le Van</span>');
+  });
 });
 
-describe("les lignes du top de la semaine", () => {
-  const row = (rank: number, p: Parameters<typeof boardPerson>[0], li?: string): TopEntry => ({ rank, ...boardPerson(p, `Card00000${rank}`, null, li), overall: 90 - rank, stars: 5 });
+describe("les lignes du top de la semaine (§18.127)", () => {
+  const row = (rank: number, p: Parameters<typeof boardPerson>[0], level?: "student" | "mid"): TopEntry => ({ rank, ...boardPerson(p, `Card00000${rank}`, null, level), overall: 90 - rank, stars: 5 });
   const top = (entries: TopEntry[]): WeekTop => ({ weekStart: 0, endsAt: 3_600_000, week: 47, total: entries.length, entries });
 
-  it("dossier, GitHub seule, LinkedIn seule : leurs logos au bout de la ligne, à côté du lien vers la fiche, jamais dedans", () => {
-    const html = render(
-      createElement(WeekBoardView, {
-        top: top([row(1, { name: "Léa Martin-Dubois", login: "leamd" }, LI), row(2, { login: "nour-rs" }), row(3, { name: "Inès Carpentier" }, "https://www.linkedin.com/in/ines-carpentier")]),
-        now: 0,
-        onPlay: () => undefined,
-      }),
-    );
-    expect(count(html, 'class="plinks"')).toBe(3);
-    expect(count(html, "is-linkedin")).toBe(2);
-    expect(count(html, "is-github")).toBe(2);
-    // Le logo suit le lien de la ligne, il n'est pas dedans (pas de lien dans un lien).
-    expect(html).toMatch(/<span class="board-score">89<span class="board-pct">%<\/span><\/span><\/a><span class="plinks"/);
-    expect(html).toContain('href="https://github.com/nour-rs"');
+  it("dossier, GitHub seule, LinkedIn seule : le nom court ou le @pseudo, le niveau, aucun logo ni lien de profil ; la ligne mène à la fiche", () => {
+    const entries = [row(1, { name: "Léa Martin-Dubois", login: "leamd" }, "mid"), row(2, { login: "nour-rs" }), row(3, { name: "Inès Carpentier" }, "student")];
+    const html = render(createElement(WeekBoardView, { top: top(entries), now: 0, onPlay: () => undefined }));
+    expect(html).not.toMatch(/plinks|linkedin\.com|github\.com/);
+    expect(html).toContain('<span class="board-login">Léa M.</span>');
+    expect(html).toContain('<span class="board-login">@nour-rs</span>');
+    expect(html).toContain('<span class="board-login">Inès C.</span>');
+    expect(html).toMatch(/<span class="board-sub"><span class="stars stars-14"[^>]*>.*?<\/span><span class="board-level">Confirmé<\/span><\/span>/);
+    expect(html).toContain('<span class="board-level">Étudiant</span>');
+    expect(count(html, "board-level")).toBe(2);
+    for (const r of [1, 2, 3]) expect(html).toContain(`href="/c/Card00000${r}"`);
+    const en = render(createElement(WeekBoardView, { top: top(entries), now: 0, onPlay: () => undefined }), "en-US");
+    expect(en).toContain('<span class="board-level">Mid</span>');
+    expect(en).toContain('<span class="board-level">Student</span>');
   });
 });
 

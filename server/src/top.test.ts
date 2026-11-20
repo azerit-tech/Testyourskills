@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FIXTURES } from "../../shared/fixtures";
-import { personLinks } from "../../shared/profileLinks";
+import { shortName } from "../../shared/shortName";
 import type { CardData, ComparisonData, JobState, WeekTop } from "../../shared/types";
 import { createApp } from "./app";
 import { RETENTION_MS, Store, type NewCardRow } from "./db";
@@ -161,16 +161,17 @@ describe("weekTop", () => {
     expect(weekRank(store.db, alone.id, NOW)).toMatchObject({ rank: 1, total: 1 });
   });
 
-  it("une fiche LinkedIn seule entre sur sa note, sous le nom de sa fiche, avec ses initiales et le lien vers elle (§18.88)", () => {
+  it("une fiche LinkedIn seule entre sur sa note, sous le nom court de sa fiche, avec ses initiales et le lien vers elle (§18.88, §18.127)", () => {
     const store = newStore();
     const solo = li("camille", 70, W46 + H);
     // Une fiche GitHub sans nom (le bandeau répète le pseudo) : la ligne n'a que son pseudo.
     store.insertCards([solo, gh("dev", 60, W46 + H, {}, { name: "dev", initials: "DE" })]);
     const top = weekTop(store.db, { now: NOW });
     expect(top.total).toBe(2);
-    // Son adresse LinkedIn, pour le logo qui y mène (§18.108) : sa fiche, faite par elle, est au top.
-    const linkedinUrl = "https://www.linkedin.com/in/camille";
-    expect(top.entries[0]).toEqual({ rank: 1, cardId: solo.id, name: FIXTURES.cv.name, linkedinUrl, initials: FIXTURES.cv.initials, overall: 70, stars: 4, ...(top.entries[0]!.profile ? { profile: top.entries[0]!.profile } : {}) });
+    // Son nom court, ni son nom complet ni son adresse LinkedIn (§18.127) : les recruteurs passent par Azerit.
+    expect(top.entries[0]).toEqual({ rank: 1, cardId: solo.id, name: shortName(FIXTURES.cv.name), initials: FIXTURES.cv.initials, overall: 70, stars: 4, ...(top.entries[0]!.profile ? { profile: top.entries[0]!.profile } : {}) });
+    expect(JSON.stringify(top.entries)).not.toMatch(/linkedin\.com|github\.com\/|linkedinUrl/);
+    expect(JSON.stringify(top.entries)).not.toContain(FIXTURES.cv.name);
     expect(top.entries[1]).toMatchObject({ rank: 2, login: "dev", initials: "DE" });
     expect(top.entries[1]!.name).toBeUndefined();
     // Rien d'autre de la fiche ne part : ni l'employeur, ni l'école, ni l'email.
@@ -393,6 +394,26 @@ describe("withWeekSpecial", () => {
   });
 });
 
+describe("la ligne d'une personne (§18.127)", () => {
+  it("son nom court et son niveau, lus sur la grille de sa fiche ou de son dossier ; ni nom complet ni lien", () => {
+    const store = newStore();
+    const grid = (code: "student" | "junior" | "senior") => ({ criteria: [], overall: 70, seniority: { code, months: 20, source: "linkedin" as const } });
+    const solo = gh("enzo", 80, W46 + H, {}, { name: "Enzo Le Van", grid: grid("junior") });
+    const plain = gh("old", 60, W46 + H, {}, { name: "Pierre-Antoine Bannier" });
+    const rows = dossier("cmpLevel01", "duolvl", 90, W46 + H);
+    (rows[0]!.data as ComparisonData).grid = { ...grid("senior"), overall: 90 };
+    store.insertCards([solo, plain, ...rows]);
+    const top = weekTop(store.db, { now: NOW });
+    expect(top.entries.map((e) => [e.cardId, e.name, e.seniority])).toEqual([
+      ["cmpLevel01", "Léa M.", "senior"],
+      [solo.id, "Enzo L.", "junior"],
+      [plain.id, "Pierre-Antoine B.", undefined],
+    ]);
+    const json = JSON.stringify(top);
+    for (const gone of ["Le Van", "Bannier", "Martin-Dubois", "linkedin", "github.com"]) expect(json).not.toContain(gone);
+  });
+});
+
 describe("fiche née d'une dénonciation (§18.119)", () => {
   it("une fiche GitHub dénoncée, pas revendiquée, entre au top avec sa personne et la spéciale", () => {
     const store = newStore();
@@ -402,14 +423,14 @@ describe("fiche née d'une dénonciation (§18.119)", () => {
     store.markDenounced(target.id, snitch.id, null);
     expect(store.getCard(target.id)!.denounceBorn).toBe(true);
     const top = weekTop(store.db, { now: NOW });
-    expect(top.entries[0]).toMatchObject({ rank: 1, cardId: target.id, login: "cible", name: "Léa Cible", overall: 95 });
+    expect(top.entries[0]).toMatchObject({ rank: 1, cardId: target.id, login: "cible", name: "Léa C.", overall: 95 });
     expect(top.entries[0]!.initials).toBeTruthy();
     expect(top.total).toBe(TOTW_MIN_ENTRIES + 2);
     expect(weekRank(store.db, target.id, NOW)).toMatchObject({ rank: 1, inTop5: true });
     expect(withWeekSpecial(store.db, store.getCard(target.id)!.data as CardData, NOW).data.special).toBe("totw");
   });
 
-  it("une fiche LinkedIn seule dénoncée, pas revendiquée, entre nommée, avec son LinkedIn", () => {
+  it("une fiche LinkedIn seule dénoncée, pas revendiquée, entre nommée, sans son LinkedIn (§18.127)", () => {
     const store = newStore();
     const snitch = gh("delateur4", 50, W46 + H);
     const tip = li("ines-tip", 80, W46 + H);
@@ -417,8 +438,8 @@ describe("fiche née d'une dénonciation (§18.119)", () => {
     store.markDenounced(tip.id, snitch.id, null);
     const top = weekTop(store.db, { now: NOW });
     expect(top.entries.map((e) => e.cardId)).toEqual([tip.id, snitch.id]);
-    expect(top.entries[0]).toMatchObject({ name: FIXTURES.cv.name, initials: FIXTURES.cv.initials, overall: 80 });
-    expect(top.entries[0]!.linkedinUrl).toBe("https://www.linkedin.com/in/ines-tip");
+    expect(top.entries[0]).toMatchObject({ name: shortName(FIXTURES.cv.name), initials: FIXTURES.cv.initials, overall: 80 });
+    expect(JSON.stringify(top.entries[0])).not.toContain("linkedin");
     expect(weekRank(store.db, tip.id, NOW)).toMatchObject({ rank: 1 });
   });
 
@@ -477,10 +498,9 @@ describe("fiche née d'une dénonciation (§18.119)", () => {
     expect(store.getCard(tip.id)!.supersededBy).toBe("cmpOwn0001");
     const top = weekTop(store.db, { now: NOW });
     expect(top.entries.map((e) => [e.cardId, e.overall])).toEqual([["cmpOwn0001", 75]]);
-    expect(top.entries[0]!.linkedinUrl).toBe("https://www.linkedin.com/in/duo2");
   });
 
-  it("dossier dénoncé : il entre, une ligne avec la fiche que la personne a faite, qui garde son adresse ; son LinkedIn et son GitHub, revendiqué ou non", () => {
+  it("dossier dénoncé : il entre, une ligne avec la fiche que la personne a faite, qui garde son adresse ; ni son LinkedIn ni son GitHub (§18.127)", () => {
     const store = newStore();
     const own = gh("duo", 60, W46);
     store.insertCards([own]);
@@ -491,14 +511,14 @@ describe("fiche née d'une dénonciation (§18.119)", () => {
     let top = weekTop(store.db, { now: NOW });
     expect(top.entries.map((e) => [e.cardId, e.overall])).toEqual([["cmpDenon1", 88]]);
     expect(top.total).toBe(1);
-    expect(top.entries[0]).toMatchObject({ login: "duo", linkedinUrl: "https://www.linkedin.com/in/duo" });
-    expect(personLinks(top.entries[0]!)).toEqual({ linkedin: "https://www.linkedin.com/in/duo", github: "https://github.com/duo" });
+    expect(top.entries[0]).toMatchObject({ login: "duo" });
+    expect(JSON.stringify(top.entries[0])).not.toContain("linkedin");
     expect(weekRank(store.db, "cmpDenon1", NOW)).toMatchObject({ rank: 1 });
     expect(weekRank(store.db, own.id, NOW)).toMatchObject({ rank: 1, total: 1 });
     expect(store.fileRow(own.id)!.id).toBe(own.id);
     store.claimOwner("duo", 77);
     top = weekTop(store.db, { now: NOW });
-    expect(top.entries[0]).toMatchObject({ cardId: "cmpDenon1", linkedinUrl: "https://www.linkedin.com/in/duo" });
+    expect(top.entries[0]).toMatchObject({ cardId: "cmpDenon1", login: "duo" });
   });
 });
 

@@ -1751,7 +1751,7 @@ describe("ses profils publics, sous la fiche", () => {
     ];
   };
 
-  it("sa fiche et le visiteur : GitHub seule, LinkedIn seule, les deux", async () => {
+  it("sa fiche : GitHub seule, LinkedIn seule, les deux ; le visiteur, rien (§18.127)", async () => {
     const ctx = setup();
     ctx.store.insertCards([
       { id: "GhSeule001", createdAt: now, source: "github", login: "camroux", kind: "card", data: { ...FIXTURES.silver, id: "GhSeule001" }, deleteToken: "tokgh" },
@@ -1759,15 +1759,15 @@ describe("ses profils publics, sous la fiche", () => {
       ...cmpRows("Dossier001"),
     ]);
     expect((await linksOf(ctx, "GhSeule001", { "x-card-token": "tokgh" })).links).toEqual({ github: "https://github.com/camroux" });
-    expect((await linksOf(ctx, "GhSeule001")).links).toEqual({ github: "https://github.com/camroux" });
     expect((await linksOf(ctx, "LiSeule001", { "x-card-token": "tokli" })).links).toEqual({ linkedin: LI2 });
-    expect((await linksOf(ctx, "LiSeule001")).links).toEqual({ linkedin: LI2 });
-    expect((await linksOf(ctx, "Dossier001")).links).toEqual({ linkedin: LI, github: GH });
+    expect((await linksOf(ctx, "Dossier001", { "x-card-token": "tokcmp" })).links).toEqual({ linkedin: LI, github: GH });
     // L'adresse d'une pièce sert le dossier : ses deux liens.
-    expect((await linksOf(ctx, "Dossier001Gh")).links).toEqual({ linkedin: LI, github: GH });
+    expect((await linksOf(ctx, "Dossier001Gh", { "x-card-token": "tokcmp" })).links).toEqual({ linkedin: LI, github: GH });
+    // Le visiteur ne reçoit plus ses profils (§18.127) : les recruteurs passent par Azerit.
+    for (const id of ["GhSeule001", "LiSeule001", "Dossier001", "Dossier001Gh"]) expect((await linksOf(ctx, id)).links).toBeNull();
   });
 
-  it("dénoncée, revendiquée ou non : son LinkedIn et son GitHub, ceux de ses pièces", async () => {
+  it("dénoncée, revendiquée ou non : ni son LinkedIn ni son GitHub au visiteur ni au dénonciateur (§18.127)", async () => {
     const ctx = setup();
     ctx.store.insertCards([
       { id: "LiDenon001", createdAt: now, source: "linkedin", login: null, kind: "card", data: { ...FIXTURES.cv, id: "LiDenon001", linkedinUrl: LI }, facts: { linkedinUrl: LI }, deleteToken: "tokd1" },
@@ -1775,13 +1775,13 @@ describe("ses profils publics, sous la fiche", () => {
     ]);
     ctx.store.markDenounced("LiDenon001", "Delateur01", null);
     ctx.store.markDenounced("CmpDenon01", "Delateur01", null);
-    // Ce ne sont que des données publiques : le visiteur et le dénonciateur voient les mêmes logos.
-    expect((await linksOf(ctx, "LiDenon001")).links).toEqual({ linkedin: LI });
-    expect((await linksOf(ctx, "LiDenon001", { "x-card-token": "tokd1" })).links).toEqual({ linkedin: LI });
-    expect((await linksOf(ctx, "CmpDenon01")).links).toEqual({ linkedin: LI, github: GH });
+    // Une fiche née d'une dénonciation : son jeton n'en fait pas la personne fichée ; personne ne voit ses profils.
+    expect((await linksOf(ctx, "LiDenon001")).links).toBeNull();
+    expect((await linksOf(ctx, "LiDenon001", { "x-card-token": "tokd1" })).links).toBeNull();
+    expect((await linksOf(ctx, "CmpDenon01")).links).toBeNull();
 
     ctx.store.claimOwner("leamd", 42);
-    expect((await linksOf(ctx, "CmpDenon01")).links).toEqual({ linkedin: LI, github: GH });
+    expect((await linksOf(ctx, "CmpDenon01")).links).toBeNull();
   });
 
   it("masquée : rien ne part", async () => {

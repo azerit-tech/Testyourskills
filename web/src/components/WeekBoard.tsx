@@ -6,16 +6,14 @@
 // Plus de dix classés : « Voir tout le classement (27) » ouvre la suite sur place (§18.126).
 import { useEffect, useRef, useState } from "react";
 import { personLabel } from "../../../shared/boardPerson";
-import { personLinks } from "../../../shared/profileLinks";
 import type { TopEntry, WeekTop } from "../../../shared/types";
 import { useT } from "../i18n";
 import { api } from "../lib/api";
 import { onLinkClick } from "../lib/router";
 import { myCard, type MyCard } from "../lib/session";
 import { Avatar } from "./Avatar";
-import { ProfileLinks } from "./ProfileLinks";
 import { SeeAllView, useSeeAll } from "./SeeAll";
-import { Stars } from "./Stars";
+import { RowSub } from "./RowSub";
 
 const SIZE = 10;
 /** L'en-tête de la colonne des notes (§18.48 : toute note a son échelle) ; chaque note porte son « % » (§18.122). */
@@ -48,7 +46,7 @@ const isMine = (e: TopEntry, mine: MyCard | null | undefined) => !!mine && (e.ca
 
 function Row({ e, me }: { e: TopEntry; me: boolean }) {
   const { t } = useT();
-  // La vraie personne (§18.88) : le nom de sa fiche, une fiche LinkedIn seule comprise ; sans nom, son @pseudo.
+  // La vraie personne (§18.88) : son nom court (« Enzo L. », §18.127), une fiche LinkedIn seule comprise ; sans nom, son @pseudo.
   const who = personLabel(e) || e.initials;
   const href = `/c/${e.cardId}`;
   return (
@@ -58,11 +56,10 @@ function Row({ e, me }: { e: TopEntry; me: boolean }) {
         {/* sans photo sûre, les initiales de la fiche (Avatar.tsx) */}
         <Avatar login={e.login} src={e.avatarUrl ?? ""} initials={e.initials} />
         <span className="board-login">{who}</span>
-        <Stars n={e.stars} size={14} />
+        {/* Ses étoiles et son niveau ; ni lien ni logo de profil (§18.127) : on passe par sa fiche. */}
+        <RowSub stars={e.stars} seniority={e.seniority} />
         <BoardScore n={e.overall} />
       </a>
-      {/* Ses profils LinkedIn et GitHub (§18.108), au bout de la ligne, hors du lien vers sa fiche. */}
-      <ProfileLinks links={personLinks(e)} who={who} />
     </li>
   );
 }

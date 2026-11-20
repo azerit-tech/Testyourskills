@@ -1004,8 +1004,9 @@ export function createApp(opts: AppOptions) {
     // et que la fiche n'a toujours qu'une source.
     const offer = person && row.kind === "card" ? openProposal(store.db, row.id) : null;
     const propose = offer && (offer.kind === "github" ? row.source === "linkedin" && !store.loginOf(row) : row.source === "github" && !store.isHidden(store.loginOf(row))) ? offer : null;
-    const links = linksOf(row);
-    const extra = { ...rank, ...(mine ? { mine: true } : {}), ...(links.github || links.linkedin ? { links } : {}) };
+    // Ses profils (§18.108) : à la personne fichée seule depuis le §18.127 ; le visiteur passe par « Tu recrutes ? ».
+    const links = person ? linksOf(row) : null;
+    const extra = { ...rank, ...(mine ? { mine: true } : {}), ...(links && (links.github || links.linkedin) ? { links } : {}) };
     // La page partagée (shared/publicView.ts) : rien de privé ne part vers qui n'est pas la personne fichée.
     const shown = person ? data : publicView(data, { thirdParty: thirdParty(row) });
     const state: JobState =

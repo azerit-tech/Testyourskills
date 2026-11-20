@@ -1,5 +1,6 @@
 /* Ses profils LinkedIn et GitHub (§18.108, ProfileLinks.tsx) : deux logos mats, lilas
-   discret, crème au survol ; 20 px de dessin, 40 px de toucher ; aucun texte à côté. */
+   discret, crème au survol ; 20 px de dessin, 40 px de toucher ; aucun texte à côté.
+   Depuis le §18.127, à la personne fichée seule, dans la tête de sa fiche : plus dans les classements. */
 .plinks {
   display: inline-flex;
   align-items: center;
@@ -76,52 +77,6 @@
   }
 }
 
-/* --- une ligne de classement : au bout de la ligne, hors du lien vers sa fiche --- */
-:is(.board-list, .league-people) > li:has(> .plinks) {
-  position: relative;
-}
-:is(.board-list, .league-people) > li > .plinks {
-  position: absolute;
-  top: 50%;
-  right: 4px;
-  transform: translateY(-50%);
-}
-/* la place de deux logos sur toutes les lignes du tableau, un seul logo compris : les notes restent en colonne */
-.board-list:has(> li > .plinks) > li > .board-row {
-  padding-right: 88px;
-}
-.league-people > li > .plinks {
-  right: -10px;
-}
-.league-people:has(> li > .plinks) > li > .board-row {
-  padding-right: 74px;
-}
-/* téléphone : un nom entier se lit (§18.88), sur deux lignes au plus, puisque les logos prennent le bout */
-@media (max-width: 479px) {
-  .board-list > li:has(> .plinks) > .board-row > .board-login {
-    display: -webkit-box;
-    white-space: normal;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    -webkit-box-orient: vertical;
-  }
-  /* sous une bande ouverte : les étoiles passent sous le nom, comme au top de la semaine */
-  .league-people > li:has(> .plinks) > .board-row.league-person {
-    grid-template-columns: 32px minmax(0, 1fr);
-    row-gap: 2px;
-    padding-block: 6px;
-  }
-  .league-people > li:has(> .plinks) > .league-person > .board-avatar {
-    grid-area: 1 / 1 / 3;
-  }
-  .league-people > li:has(> .plinks) > .league-person > .board-login {
-    grid-area: 1 / 2;
-  }
-  .league-people > li:has(> .plinks) > .league-person > .stars {
-    grid-area: 2 / 2;
-    justify-self: start;
-  }
-}
 @media (prefers-reduced-motion: reduce) {
   .plink {
     transition: none;

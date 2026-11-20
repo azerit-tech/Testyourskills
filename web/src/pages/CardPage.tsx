@@ -5,8 +5,9 @@ import type { ReactNode, RefObject } from "react";
 import { fileOf, shownPhoto } from "../../../shared/caseFile";
 import type { CardData, Fact, Finding, JobState, ProgressEvent } from "../../../shared/types";
 import { declaredOf, LEVEL_LABELS, starsFor } from "../../../shared/types";
-import { AddSource, Claim, Contest, EmailForm, Hiring, LinkedInPhoto, ShareBar, useMe, useToast } from "../components/After";
+import { AddSource, Claim, Contest, EmailForm, HireLink, Hiring, LinkedInPhoto, ShareBar, useMe, useToast } from "../components/After";
 import type { Shareable } from "../components/After";
+import { shortName } from "../../../shared/shortName";
 import { BandPick } from "../components/BandPick";
 import { Denounce } from "../components/Denounce";
 import { Denounced, useRemake, type SignIn } from "../components/Denounced";
@@ -638,7 +639,10 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
   // Connecté (§18.91) : « Se déconnecter » à côté de « Faire une autre fiche ».
   const acct = useAccount();
   const proveFirst = item.kind === "card" && declaredOf(item.card) === "linkedin";
-  const who = main.login ? `@${main.login}` : main.name;
+  // Le visiteur lit son nom court (« Enzo L. », §18.127) ; la personne fichée, le sien en entier.
+  const who = main.login ? `@${main.login}` : visitor ? shortName(main.name) : main.name;
+  // Ses profils (§18.108) : à la personne fichée seule depuis le §18.127 ; le visiteur passe par « Tu recrutes ? ».
+  const links = visitor ? null : api.linksOf(id);
   // Au-dessus de la fiche, sur téléphone : « @pseudo », ou le prénom seul.
   const whoShort = main.login ? `@${main.login}` : (main.name.split(/\s+/)[0] ?? main.name);
   // Sous trois étoiles (§18.48) : la source qui manque est le remède, elle remonte sous le verdict.
@@ -754,22 +758,23 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
 
       <div className="result-top">
         {/* L'en-tête posé sur le ciel, puis la fiche entière au-dessus de la ligne de flottaison (§18.7, §18.29). */}
-        <WantedHead card={main} links={api.linksOf(id)}>{chase}</WantedHead>
+        <WantedHead card={main} links={links} short={visitor} hire={visitor && !vs && !wantedYou}>
+          {chase}
+        </WantedHead>
         {/* Le visiteur, sur téléphone (§18.48) : ce qu'il regarde, au-dessus de la fiche, deux lignes au plus.
             Au bureau, la phrase entière ouvre « À ton tour », en tête de la colonne de droite. */}
         {/* Le face-à-face a sa propre ligne au-dessus des deux fiches : pas de phrase de plus. */}
         {visitor && !vs && (
           <p className="visitor-lead">
-            {/* Ses profils (§18.108) : sur téléphone, la tête est masquée au visiteur, ils sont au bout de la phrase qui le nomme. */}
+            {/* Sur téléphone, la tête est masquée au visiteur : « Tu recrutes ? » est au bout de la phrase qui le nomme,
+                là où étaient ses profils (§18.108, retirés au visiteur en §18.127). */}
             {wantedYou ? (
               <>
                 {t.result.leadDenounced(who, kase?.by ?? null)}
-                <ProfileLinks links={api.linksOf(id)} who={who} className="lead-links" />
               </>
             ) : (
               <>
-                {t.result.leadShort(whoShort)}
-                <ProfileLinks links={api.linksOf(id)} who={who} className="lead-links" />
+                {t.result.leadShort(whoShort)} <HireLink className="lead-hire" />
                 {!other && !self && (
                   <>
                     <br />
@@ -919,9 +924,10 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
  * En tête d'une fiche, posé sur le ciel : « AVIS DE RECHERCHE » dans la voix qui annonce, puis « @LOGIN ».
  * La fiche dit le reste (étoiles, profil, note) ; le texte sous la fiche, la peine. Lu « Avis de recherche : @x ».
  */
-export function WantedHead({ card, links, children }: { card: CardData; links?: Links | null; children?: ReactNode }) {
+export function WantedHead({ card, links, short = false, hire = false, children }: { card: CardData; links?: Links | null; short?: boolean; hire?: boolean; children?: ReactNode }) {
   const { t } = useT();
-  const who = card.login ? `@${card.login}` : card.name;
+  // Le visiteur : le nom court (« Enzo L. », §18.127) ; la fiche (son dessin) garde le sien.
+  const who = card.login ? `@${card.login}` : short ? shortName(card.name) : card.name;
   return (
     <header className="wanted">
       <h1 className="wanted-head" tabIndex={-1}>
@@ -929,8 +935,10 @@ export function WantedHead({ card, links, children }: { card: CardData; links?: 
         <span className="sr-only">{t.result.wantedSep}</span>
         <span className="wanted-name">{who}</span>
       </h1>
-      {/* Ses profils LinkedIn et GitHub (§18.108), au bout du nom : hors de la fiche, l'image de partage ne change pas. */}
+      {/* Ses profils LinkedIn et GitHub (§18.108), au bout du nom, à la personne fichée seule (§18.127) ; au visiteur,
+          « Tu recrutes ? », qui descend au bloc recruteur. Hors de la fiche : l'image de partage ne change pas. */}
       <ProfileLinks links={links} who={who} className="wanted-links" />
+      {hire && <HireLink className="wanted-hire" />}
       {/* « Revoir ma poursuite » (§18.48), sur la ligne de « Avis de recherche » */}
       {children}
     </header>

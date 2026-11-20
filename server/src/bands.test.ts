@@ -434,20 +434,21 @@ describe("pages publiques", () => {
     expect(r.json.band).toMatchObject({ label: "CentraleSupélec", score: 18, members: 4, rank: 1 });
     const person = ({ stars, cardId, name, login, avatarUrl, initials }: BandPage["members"][number]) => ({ stars, cardId, name, login, avatarUrl, initials });
     expect(r.json.members.map(person)).toEqual([
-      { stars: 6, cardId: claimed, name: "Léa Martin-Dubois", login: "LeaMD", avatarUrl: photo, initials: "LM" },
+      // Le nom court (§18.127) : le prénom et l'initiale du nom ; le nom complet ne part pas.
+      { stars: 6, cardId: claimed, name: "Léa M.", login: "LeaMD", avatarUrl: photo, initials: "LM" },
       { stars: 5, cardId: plain, name: undefined, login: "nour-rs", avatarUrl: undefined, initials: "NO" },
-      { stars: 4, cardId: li, name: "Florence Delmas", login: undefined, avatarUrl: undefined, initials: "FD" },
-      { stars: 3, cardId: cv, name: "Yann Perrot", login: undefined, avatarUrl: undefined, initials: "YP" },
+      { stars: 4, cardId: li, name: "Florence D.", login: undefined, avatarUrl: undefined, initials: "FD" },
+      { stars: 3, cardId: cv, name: "Yann P.", login: undefined, avatarUrl: undefined, initials: "YP" },
     ]);
     // Le nom du profil propre à la fiche (§18.107).
     expect(r.json.members[0]!.profile).toEqual(aliasFor(FIXTURES.gold.profile!.id, claimed));
     // Le poste de la fiche, déjà public, distingue deux dossiers du même profil.
     expect(r.json.members.map((m) => m.position)).toEqual(Array(4).fill(FIXTURES.gold.position));
     // Rien d'autre de la fiche ne part : ni l'adresse LinkedIn, ni l'école, ni un rang.
-    expect(JSON.stringify(r.json)).not.toMatch(/linkedin\.com|rang [SABC]|tier|"school"|"club"/);
+    expect(JSON.stringify(r.json)).not.toMatch(/linkedin\.com|linkedinUrl|Martin-Dubois|Delmas|Perrot|rang [SABC]|tier|"school"|"club"/);
   });
 
-  it("une fiche née d'une dénonciation se montre comme les autres, ses logos compris, revendiquée ou non ; un pseudo masqué n'y est pas", async () => {
+  it("une fiche née d'une dénonciation se montre comme les autres, revendiquée ou non, sans lien de profil ; un pseudo masqué n'y est pas", async () => {
     const ctx = setup();
     const by = insert(ctx.store, { login: "balance", stars: 6, name: "Bal Ance" });
     const tip = insert(ctx.store, { login: "victime", stars: 5, name: "Nom Caché", avatarUrl: "https://avatars.githubusercontent.com/u/2?v=4" });
@@ -462,14 +463,14 @@ describe("pages publiques", () => {
     const before = await page();
     // Toutes nommées (§18.119) ; la fiche masquée n'est pas rendue.
     expect(before.members.map((m) => [m.stars, m.cardId ?? null, m.name ?? null, m.login ?? null])).toEqual([
-      [6, by, "Bal Ance", "balance"],
-      [5, tip, "Nom Caché", "victime"],
-      [4, tipLi, "Personne Dénoncée", null],
+      [6, by, "Bal A.", "balance"],
+      [5, tip, "Nom C.", "victime"],
+      [4, tipLi, "Personne D.", null],
     ]);
     expect(before.members[1]!.profile).toEqual(aliasFor(FIXTURES.gold.profile!.id, tip));
     expect(before.members[1]!.avatarUrl).toBe("https://avatars.githubusercontent.com/u/2?v=4");
-    // Ses logos (§18.108) : dénoncée, pas revendiquée, son LinkedIn et son GitHub quand même.
-    expect(before.members[2]!.linkedinUrl).toBe("https://www.linkedin.com/in/personne-denoncee");
+    // Ni son LinkedIn ni son nom complet (§18.127) : les recruteurs passent par Azerit.
+    expect(JSON.stringify(before)).not.toMatch(/linkedin|Dénoncée/);
     expect(before.members[1]!.login).toBe("victime");
     expect(JSON.stringify(before)).not.toMatch(/Partie Loin|"parti"/);
   });

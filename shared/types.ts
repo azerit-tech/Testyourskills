@@ -342,15 +342,12 @@ export interface WeekRank {
 export interface BoardPerson {
   /** L'adresse de la fiche : /c/{cardId}. */
   cardId: string;
-  /** Le nom de la fiche. Absent quand elle n'a que son pseudo. */
+  /** Le nom de la fiche, court : le prénom et l'initiale du nom (« Enzo L. », §18.127). Absent quand elle n'a que son pseudo. */
   name?: string;
   /** Pseudo GitHub, si la fiche en a un. */
   login?: string;
-  /**
-   * L'adresse publique de son profil LinkedIn (§18.108), pour le logo qui y mène : seulement si la
-   * personne a fait sa fiche ou l'a revendiquée (shared/profileLinks.ts). Jamais un email.
-   */
-  linkedinUrl?: string;
+  /** Son niveau d'expérience (§18.127), lu sur la grille ; absent sur une grille d'avant. Ni lien ni adresse de profil. */
+  seniority?: SeniorityCode;
   /** La photo de la fiche. Absente : les initiales. */
   avatarUrl?: string;
   initials: string;

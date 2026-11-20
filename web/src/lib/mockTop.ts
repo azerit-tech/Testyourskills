@@ -2,7 +2,7 @@
 // classés par défaut ; `?top=1` montre le lancement, `?top=8` le bloc du 6e au 8e,
 // `?top=27` « Voir tout le classement (27) » (§18.126), soixante au plus.
 import { boardPerson } from "../../../shared/boardPerson";
-import type { CardData, TopEntry, WeekRank, WeekTop } from "../../../shared/types";
+import type { CardData, SeniorityCode, TopEntry, WeekRank, WeekTop } from "../../../shared/types";
 import { starsFor } from "../../../shared/types";
 
 const DAY = 24 * 3600 * 1000;
@@ -30,20 +30,21 @@ interface Player {
   login?: string;
   name?: string;
   overall: number;
-  /** L'adresse de son profil LinkedIn (§18.108) : toute fiche LinkedIn seule, et les dossiers. */
-  linkedin?: string;
 }
 
+/** Les niveaux de démo (§18.127), un par ligne, en boucle. */
+const LEVELS: SeniorityCode[] = ["senior", "mid", "junior", "student", "expert", "junior", "mid", "student"];
+
 const ALL: Player[] = [
-  { login: "svaaland", name: "Sigrun Vaaland", overall: 91, linkedin: "https://www.linkedin.com/in/sigrun-vaaland" },
-  { login: "leamd", name: "Léa Martin-Dubois", overall: 84, linkedin: "https://www.linkedin.com/in/lea-martin-dubois" },
+  { login: "svaaland", name: "Sigrun Vaaland", overall: 91 },
+  { login: "leamd", name: "Léa Martin-Dubois", overall: 84 },
   { login: "nour-rs", overall: 79 },
-  { name: "Inès Carpentier", overall: 74, linkedin: "https://www.linkedin.com/in/ines-carpentier" },
+  { name: "Inès Carpentier", overall: 74 },
   { login: "jplefevre", name: "Jean-Pierre Lefèvre", overall: 68 },
-  { name: "Yanis Belkacem", overall: 52, linkedin: "https://www.linkedin.com/in/yanis-belkacem" },
+  { name: "Yanis Belkacem", overall: 52 },
   { login: "ghost-coder", overall: 31 },
   { login: "mira-k", name: "Mira Kowalczyk", overall: 27 },
-  { name: "Théo Dubois", overall: 22, linkedin: "https://www.linkedin.com/in/theo-dubois" },
+  { name: "Théo Dubois", overall: 22 },
   { login: "pixel-ops", overall: 18 },
 ];
 
@@ -55,7 +56,7 @@ function extra(i: number): Player {
   const overall = Math.max(4, 17 - Math.floor(i / 4));
   const handle = `${FIRST[i % FIRST.length]!.toLowerCase()}-${LAST[(i + 3) % LAST.length]!.toLowerCase()}`.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   if (i % 3 === 0) return { login: handle, overall };
-  if (i % 3 === 1) return { name, overall, linkedin: `https://www.linkedin.com/in/demo-${i + 11}` };
+  if (i % 3 === 1) return { name, overall };
   return { login: handle.replace("-", ""), name, overall };
 }
 const MAX = 60;
@@ -92,11 +93,11 @@ export function mockTop(now = Date.now()): WeekTop {
 export function mockTopPage(offset: number, limit: number, now = Date.now()): WeekTop {
   const monday = mondayOf(now);
   const all = players();
-  const entries: TopEntry[] = all.map(({ login, name, overall, linkedin }, i) => ({
+  const entries: TopEntry[] = all.map(({ login, name, overall }, i) => ({
     rank: i + 1,
     // Une fiche de démo qui s'ouvre vraiment (mock.ts lit le type dans l'id) : GitHub, ou LinkedIn seule.
     // Les pseudos inventés au-delà des dix nommés n'ont pas de photo : leurs initiales.
-    ...boardPerson({ name, login, ...(login && i < ALL.length ? { avatarUrl: `https://github.com/${login}.png?size=64` } : {}) }, login ? `m-gold-${login.replace(/[^a-z0-9]/g, "")}` : `m-li-top${i + 1}`, null, linkedin),
+    ...boardPerson({ name, login, ...(login && i < ALL.length ? { avatarUrl: `https://github.com/${login}.png?size=64` } : {}) }, login ? `m-gold-${login.replace(/[^a-z0-9]/g, "")}` : `m-li-top${i + 1}`, null, LEVELS[i % LEVELS.length]),
     overall,
     stars: starsFor(overall),
   }));

@@ -229,6 +229,24 @@
 .league-person .board-login {
   color: var(--c-text);
 }
+/* téléphone : sous une bande ouverte, les étoiles et le niveau passent sous le nom (§18.127) */
+@media (max-width: 479px) {
+  .league-people .board-row.league-person {
+    grid-template-columns: 32px minmax(0, 1fr);
+    row-gap: 2px;
+    padding-block: 6px;
+  }
+  .league-person > .board-avatar {
+    grid-area: 1 / 1 / 3;
+  }
+  .league-person > .board-login {
+    grid-area: 1 / 2;
+  }
+  .league-person > .board-sub {
+    grid-area: 2 / 2;
+    justify-self: start;
+  }
+}
 .league-rest {
   padding: 8px 0 4px;
   font: var(--font-small);

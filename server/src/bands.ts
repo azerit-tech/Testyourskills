@@ -47,7 +47,7 @@
 import type Database from "better-sqlite3";
 import type { Context, Hono } from "hono";
 import { z } from "zod";
-import { boardPerson } from "../../shared/boardPerson";
+import { boardPerson, seniorityOf } from "../../shared/boardPerson";
 import {
   BAND_ID_MAX,
   BAND_ID_RE,
@@ -382,9 +382,8 @@ function bandMembers(store: Store, type: BandType, id: string, now: number): Ban
     const position = card?.position;
     const root = row ? rootOf(store, row) : null;
     const login = r.memberLogin ?? (root ? store.loginOf(root) : null);
-    // Son LinkedIn (§18.108), revendiquée ou non : ce ne sont que des données publiques.
-    const linkedinUrl = root ? linkedinOf(root) : null;
-    return { stars: r.stars, profile, ...(position ? { position } : {}), ...(card && root ? boardPerson(card, r.cardId, login, linkedinUrl) : {}) };
+    // Son nom court et son niveau ; ni son LinkedIn ni son nom complet (§18.127) : les recruteurs passent par Azerit.
+    return { stars: r.stars, profile, ...(position ? { position } : {}), ...(card && root ? boardPerson(card, r.cardId, login, seniorityOf(row?.data as Partial<CardData>)) : {}) };
   });
 }
 

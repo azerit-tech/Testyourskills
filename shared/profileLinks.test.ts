@@ -1,7 +1,7 @@
 // La règle des liens vers ses profils publics (§18.108) : quelles sources font un lien, selon la fiche.
 import { describe, expect, it } from "vitest";
 import { boardPerson } from "./boardPerson";
-import { githubHref, linkedinHref, personLinks, profileLinks } from "./profileLinks";
+import { githubHref, linkedinHref, profileLinks } from "./profileLinks";
 
 const LI = "https://www.linkedin.com/in/lea-martin-dubois";
 const GH = "https://github.com/leamd";
@@ -26,15 +26,9 @@ describe("les liens d'une fiche", () => {
   });
 });
 
-describe("les liens d'une ligne de classement", () => {
-  it("la personne montrée : son GitHub, et son LinkedIn quand le serveur l'a mis", () => {
-    expect(personLinks(boardPerson({ name: "Léa", login: "leamd" }, "Card000001", null, LI))).toEqual({ linkedin: LI, github: GH });
-    expect(personLinks(boardPerson({ name: "Inès Carpentier" }, "Card000002", null, LI))).toEqual({ linkedin: LI });
-    expect(personLinks(boardPerson({ login: "leamd" }, "Card000003"))).toEqual({ github: GH });
-  });
-
-  it("une ligne anonyme (sans fiche) : aucun lien ; une adresse qui n'est pas un profil ne part pas", () => {
-    expect(personLinks({ login: "leamd", linkedinUrl: LI })).toEqual({});
-    expect(boardPerson({ name: "Léa" }, "Card000004", null, "https://evil.test/in/lea").linkedinUrl).toBeUndefined();
+describe("une ligne de classement (§18.127)", () => {
+  it("ne porte aucune adresse de profil : les recruteurs passent par Azerit", () => {
+    const p = boardPerson({ name: "Léa Martin-Dubois", login: "leamd" }, "Card000001");
+    expect(JSON.stringify(p)).not.toMatch(/linkedin|https:/);
   });
 });

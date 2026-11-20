@@ -163,14 +163,13 @@ const mockJoined = new Map<string, Partial<Record<BandType, { id: string; label:
  * avec son nom et sa photo, des fiches LinkedIn seules (un nom, pas de pseudo, avec ou
  * sans photo), une fiche GitHub sans nom (son @pseudo), un nom très long.
  */
-// `linkedin` : l'adresse de son profil, que le serveur rend pour le logo qui y mène (§18.108).
-const MOCK_PEOPLE: { name?: string; login?: string; avatarUrl?: string; linkedin?: string }[] = [
-  { name: "Léa Martin-Dubois", login: "leamd", avatarUrl: "https://avatars.githubusercontent.com/u/583231?v=4", linkedin: "https://www.linkedin.com/in/lea-martin-dubois" },
-  { name: "Inès Carpentier", linkedin: "https://www.linkedin.com/in/ines-carpentier" },
-  { name: "Yanis Belkacem", avatarUrl: "/mock-linkedin.svg", linkedin: "https://www.linkedin.com/in/yanis-belkacem" },
+const MOCK_PEOPLE: { name?: string; login?: string; avatarUrl?: string }[] = [
+  { name: "Léa Martin-Dubois", login: "leamd", avatarUrl: "https://avatars.githubusercontent.com/u/583231?v=4" },
+  { name: "Inès Carpentier" },
+  { name: "Yanis Belkacem", avatarUrl: "/mock-linkedin.svg" },
   { login: "nour-rs" },
-  { name: "Théo Dubois", linkedin: "https://www.linkedin.com/in/theo-dubois" },
-  { name: "Marie-Charlotte Vandenberghe-Lefebvre de Montmorency", linkedin: "https://www.linkedin.com/in/marie-charlotte-vandenberghe" },
+  { name: "Théo Dubois" },
+  { name: "Marie-Charlotte Vandenberghe-Lefebvre de Montmorency" },
   { name: "Camille Roux", login: "camroux" },
 ];
 
@@ -234,8 +233,8 @@ const mock = {
       null,
     ];
     const positions = ["BE", "FE", "DATA", "FS", "OPS"] as const;
-    // Comme le serveur (§18.88, §18.108, §18.119) : toutes les fiches jusqu'à 50 (BAND_PAGE_MEMBERS), chacune avec
-    // sa personne et ses logos, dénoncée ou non.
+    // Comme le serveur (§18.88, §18.119, §18.127) : toutes les fiches jusqu'à 50 (BAND_PAGE_MEMBERS), chacune avec
+    // sa personne (nom court, niveau, sans lien), dénoncée ou non.
     const count = Math.min(band.members, 50);
     const members = Array.from({ length: count }, (_, i) => {
       const p = MOCK_PEOPLE[i % MOCK_PEOPLE.length]!;
@@ -245,7 +244,7 @@ const mock = {
         stars: Math.max(1, 6 - Math.floor(i / 3)),
         profile: profiles[i % profiles.length]!,
         position: positions[i % positions.length],
-        ...boardPerson(p, cardId, null, p.linkedin),
+        ...boardPerson(p, cardId, null, (["junior", "mid", "student", "senior"] as const)[i % 4]),
       };
     });
     return { band, members };

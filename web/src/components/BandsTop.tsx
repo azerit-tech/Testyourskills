@@ -9,7 +9,6 @@
 // Plus de cinq bandes : « Voir tout le classement (12) » ouvre la suite sur place (§18.126).
 import { useCallback, useEffect, useId, useState } from "react";
 import { personLabel } from "../../../shared/boardPerson";
-import { personLinks } from "../../../shared/profileLinks";
 import type { BandMember, BandPlace, BandStanding, BandsTop as Top, BandType } from "../../../shared/bands";
 import { BAND_TYPES } from "../../../shared/bands";
 import { RANKING_ANCHOR } from "../../../shared/routes";
@@ -18,9 +17,8 @@ import { api } from "../lib/api";
 import { bandsApi, myBandIds } from "../lib/bands";
 import { onLinkClick } from "../lib/router";
 import { Avatar } from "./Avatar";
-import { ProfileLinks } from "./ProfileLinks";
+import { RowSub } from "./RowSub";
 import { SeeAllView, useSeeAll } from "./SeeAll";
-import { Stars } from "./Stars";
 import "./bands.css";
 
 const TOP = 5;
@@ -83,10 +81,9 @@ function People({ b, id }: { b: BandStanding; id: string }) {
             <a className="board-row league-person" href={href} onClick={(e) => onLinkClick(e, href)}>
               <Avatar login={m.login} src={m.avatarUrl ?? ""} initials={m.initials} />
               <span className="board-login">{who}</span>
-              <Stars n={m.stars} size={14} label={t.bands.score(m.stars)} />
+              {/* Ses étoiles et son niveau ; ni lien ni logo de profil (§18.127). */}
+              <RowSub stars={m.stars} seniority={m.seniority} label={t.bands.score(m.stars)} />
             </a>
-            {/* Ses profils LinkedIn et GitHub (§18.108), au bout de la ligne, hors du lien vers sa fiche. */}
-            <ProfileLinks links={personLinks(m)} who={who} />
           </li>
         );
       })}

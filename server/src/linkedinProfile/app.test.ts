@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { fileOf } from "../../../shared/caseFile";
 import { FIXTURES } from "../../../shared/fixtures";
 import { publicView } from "../../../shared/publicView";
+import { shortName } from "../../../shared/shortName";
 import type { CvReading } from "../../../shared/readings";
 import type { CardData, ComparisonData, JobState } from "../../../shared/types";
 import { createApp, type AppOptions } from "../app";
@@ -456,12 +457,13 @@ describe("entrée LinkedIn (le champ unique)", () => {
     const s = await state(ctx, json.id);
     expect(s).toMatchObject({ state: "done", kind: "card", card: { source: "cv", declaredSource: "linkedin", linkedinUrl: URL_ } });
     expect(ctx.store.getCard(json.id)).toMatchObject({ source: "linkedin", login: null, facts: { linkedinUrl: URL_ } });
-    // Le top classe des personnes (SPEC §18.84) : la fiche LinkedIn seule y entre sous le nom de sa fiche,
-    // avec le lien vers elle (§18.88) et l'adresse de son profil, pour le logo qui y mène (§18.108).
+    // Le top classe des personnes (SPEC §18.84) : la fiche LinkedIn seule y entre sous le nom court de sa fiche,
+    // avec le lien vers elle (§18.88), sans l'adresse de son profil (§18.127).
     expect(weekRank(ctx.store.db, json.id)).toMatchObject({ rank: 1, total: 1 });
     const entries = weekTop(ctx.store.db).entries;
     const { name, initials } = ctx.store.getCard(json.id)!.data as { name: string; initials: string };
-    expect(entries).toMatchObject([{ cardId: json.id, name, initials, linkedinUrl: URL_ }]);
+    expect(entries).toMatchObject([{ cardId: json.id, name: shortName(name), initials }]);
+    expect(JSON.stringify(entries)).not.toContain("linkedin.com");
     expect(ctx.calls.collect).toHaveLength(0);
     expect(s.state === "done" && s.kind === "card" && s.card.findings?.[0]?.text.fr).toBe("LinkedIn retrouvé : « Senior Full-Stack Engineer ».");
     const again = await post(ctx, { linkedin: "https://fr.linkedin.com/in/camille-ardent?trk=abc" });

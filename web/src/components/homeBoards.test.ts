@@ -61,19 +61,19 @@ describe("le top de la semaine sur l'accueil", () => {
     expect(render(createElement(WeekBoardView, { top, now: 0, onPlay: () => undefined }), "en-US")).toContain("See the full ranking (27)");
   });
 
-  it("ouvert : toutes les lignes de la semaine, sur place, chacune avec son lien et ses logos ; la mienne en évidence ; « Réduire » (§18.126)", () => {
+  it("ouvert : toutes les lignes de la semaine, sur place, chacune avec son lien et son niveau ; la mienne en évidence ; « Réduire » (§18.126)", () => {
     const top = week(10);
     top.total = 27;
-    const rest = Array.from({ length: 17 }, (_, i) => ({ ...entry(i + 11), linkedinUrl: `https://www.linkedin.com/in/dev${i + 11}` }));
+    const rest = Array.from({ length: 17 }, (_, i) => ({ ...entry(i + 11), seniority: "junior" as const }));
     const html = render(createElement(WeekBoardView, { top, now: 0, onPlay: () => undefined, rest, mine: { id: "Card0000020", login: null, overall: 70 } }));
     // les dix du bloc, puis les dix-sept suivantes après un filet : 27 lignes, 27 liens vers leur fiche
     expect(count(html, "board-row")).toBe(27);
     expect(html).toContain('<ol class="board-list is-rest" start="11">');
     for (let r = 1; r <= 27; r++) expect(html).toContain(`href="/c/Card00000${r}"`);
     expect(html).toMatch(/<span class="board-rank">27<\/span>/);
-    // les logos au bout des lignes de la suite (§18.108)
-    expect(html).toContain('href="https://www.linkedin.com/in/dev27"');
-    expect(html).toContain('href="https://github.com/dev27"');
+    // le niveau sur les lignes de la suite ; ni logo ni lien de profil (§18.127)
+    expect(count(html, '<span class="board-level">Junior</span>')).toBe(17);
+    expect(html).not.toMatch(/plinks|linkedin\.com|github\.com/);
     // ma ligne, la 20e, mise en évidence, une seule fois
     expect(count(html, "is-me")).toBe(1);
     expect(html).toMatch(/class="board-row is-me" href="\/c\/Card0000020"/);

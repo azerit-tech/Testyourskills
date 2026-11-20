@@ -1798,6 +1798,20 @@ svg {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+/* sous le nom : les étoiles, puis le niveau en un mot mat (§18.127), sur une seule ligne */
+.board-sub {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  white-space: nowrap;
+}
+.board-level {
+  font: var(--font-label);
+  letter-spacing: var(--ls-label);
+  text-transform: uppercase;
+  color: var(--c-text-2);
+}
 /* le « % » de la note, plus petit, sur la ligne de base (§18.122) */
 .board-pct {
   font-size: 0.6em;
@@ -1913,7 +1927,7 @@ svg {
   .board-row:has(> .board-score) > .board-login {
     grid-area: 1 / 3;
   }
-  .board-row:has(> .board-score) > .stars {
+  .board-row:has(> .board-score) > .board-sub {
     grid-area: 2 / 3;
     justify-self: start;
   }
@@ -3142,6 +3156,26 @@ svg {
   font: var(--font-page);
   text-transform: uppercase;
   color: var(--cream);
+}
+
+/* « Tu recrutes ? » (§18.127) : au visiteur, là où étaient les profils de la personne ; descend au bloc
+   recruteur. Sous le nom dans la tête (bureau), au bout de la phrase au-dessus de la fiche (téléphone). */
+.wanted-hire {
+  justify-self: start;
+}
+.lead-hire {
+  display: inline;
+  min-height: 0;
+  font-size: var(--t-14);
+  white-space: nowrap;
+}
+.page-result:has(> .card-sky.sky-light.is-in) .hire-link {
+  color: var(--ink-0);
+}
+@media (max-width: 899px) {
+  .page-result.is-visitor .wanted .wanted-hire {
+    display: none;
+  }
 }
 
 /* sous la fiche du visiteur : ce qu'il regarde, le jury, les critères, le reste replié ; puis « À ton tour » */
