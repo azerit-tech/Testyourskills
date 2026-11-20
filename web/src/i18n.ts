@@ -16,8 +16,8 @@ import { PAGES_TEXT } from "./pagesText";
 export const CONTACT_EMAIL = "hello@azerit.tech";
 
 /* Le français passe par frTypoDeep (shared/typo.ts) : les espaces devant « : ; ! ? », dans les guillemets et entre un nombre et son unité sortent insécables. */
-/** « de Léa », « d'Inès » : l'élision devant une voyelle (le « h » reste « de »). */
-const deOf = (who: string): string => (/^[aeiouyàâäéèêëîïôöûüù]/i.test(who) ? `d’${who}` : `de ${who}`);
+/** « de Léa », « d'Inès » : l’élision devant une voyelle (« h » et « y » restent « de »). */
+const deOf = (who: string): string => (/^[aeiouàâäéèêëîïôöûüù]/i.test(who) ? `d’${who}` : `de ${who}`);
 
 const fr = frTypoDeep({
   meta: {
