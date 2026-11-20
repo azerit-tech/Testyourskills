@@ -6,10 +6,10 @@
 // ses fiches (le nom, le visage, les étoiles, le lien vers chacune) : c'est ce que
 // montrait la page d'une bande, qui n'existe plus. Le bloc porte l'ancre
 // « classement » (« Classement » dans la barre du haut y mène).
-import { useEffect, useId, useState } from "react";
+// Plus de cinq bandes : « Voir tout le classement (12) » ouvre la suite sur place (§18.126).
+import { useCallback, useEffect, useId, useState } from "react";
 import { personLabel } from "../../../shared/boardPerson";
-import { personLinks } from "../../../shared/profileLinks";
-import type { BandMember, BandStanding, BandsTop as Top, BandType } from "../../../shared/bands";
+import type { BandMember, BandPlace, BandStanding, BandsTop as Top, BandType } from "../../../shared/bands";
 import { BAND_TYPES } from "../../../shared/bands";
 import { RANKING_ANCHOR } from "../../../shared/routes";
 import { useT } from "../i18n";
@@ -17,8 +17,8 @@ import { api } from "../lib/api";
 import { bandsApi, myBandIds } from "../lib/bands";
 import { onLinkClick } from "../lib/router";
 import { Avatar } from "./Avatar";
-import { ProfileLinks } from "./ProfileLinks";
-import { Stars } from "./Stars";
+import { RowSub } from "./RowSub";
+import { SeeAllView, useSeeAll } from "./SeeAll";
 import "./bands.css";
 
 const TOP = 5;
@@ -81,10 +81,9 @@ function People({ b, id }: { b: BandStanding; id: string }) {
             <a className="board-row league-person" href={href} onClick={(e) => onLinkClick(e, href)}>
               <Avatar login={m.login} src={m.avatarUrl ?? ""} initials={m.initials} />
               <span className="board-login">{who}</span>
-              <Stars n={m.stars} size={14} label={t.bands.score(m.stars)} />
+              {/* Ses étoiles et son niveau ; ni lien ni logo de profil (§18.127). */}
+              <RowSub stars={m.stars} seniority={m.seniority} label={t.bands.score(m.stars)} />
             </a>
-            {/* Ses profils LinkedIn et GitHub (§18.108), au bout de la ligne, hors du lien vers sa fiche. */}
-            <ProfileLinks links={personLinks(m)} who={who} />
           </li>
         );
       })}
@@ -129,8 +128,38 @@ function Row({ place, b, me }: { place: number; b: BandStanding; me: boolean }) 
   );
 }
 
+/**
+ * Sous les cinq lignes : sa bande plus bas, après un filet ; et plus de cinq bandes classées,
+ * « Voir tout le classement (12) », qui ouvre la suite sur place (§18.126). Ouverte, la liste
+ * montre sa bande à sa place, mise en évidence : la ligne du bas s'efface. `initial` : déjà ouverte (tests).
+ */
+function LeagueMore({ type, total, mine, below, initial }: { type: BandType; total: number; mine: Mine; below: BandPlace | null; initial?: BandPlace[] }) {
+  const load = useCallback((offset: number, limit: number) => bandsApi.league(type, offset, limit).then((p) => p && { total: p.total, rows: p.entries }), [type]);
+  const all = useSeeAll<BandPlace>(TOP, total, load, initial && { open: true, rows: initial });
+  return (
+    <>
+      {below && !all.open && (
+        <ol className="board-list is-rest" start={below.place}>
+          <Row place={below.place} b={below.band} me />
+        </ol>
+      )}
+      {total > TOP && (
+        <SeeAllView state={all}>
+          {all.rows.length > 0 && (
+            <ol className="board-list is-rest" start={all.rows[0]!.place}>
+              {all.rows.map((r) => (
+                <Row key={r.band.id} place={r.place} b={r.band} me={r.band.id === mine[type]} />
+              ))}
+            </ol>
+          )}
+        </SeeAllView>
+      )}
+    </>
+  );
+}
+
 /** Une ligue ; `top` nul : le titre et la place des cinq lignes, pour que rien ne saute dessous. */
-function League({ type, top, mine }: { type: BandType; top: Top | null; mine: Mine; onPlay: () => void }) {
+function League({ type, top, mine, rest }: { type: BandType; top: Top | null; mine: Mine; onPlay: () => void; rest?: BandPlace[] }) {
   const { t } = useT();
   const rows = top ? top[type].slice(0, TOP) : [];
   const own = top?.mine?.[type];
@@ -157,21 +186,20 @@ function League({ type, top, mine }: { type: BandType; top: Top | null; mine: Mi
           <div className="board-list is-top board-wait" />
         )}
       </div>
-      {below && (
-        <ol className="board-list is-rest" start={below.place}>
-          <Row place={below.place} b={below.band} me />
-        </ol>
-      )}
+      {top && <LeagueMore type={type} total={top.totals?.[type] ?? rows.length} mine={mine} below={below} initial={rest} />}
     </section>
   );
 }
 
-/** Les deux classements, sans appel au serveur ; `top` nul : leur place, en attendant. */
-export function BandsTopView({ top, mine = {}, onPlay }: { top: Top | null; mine?: Mine; onPlay: () => void }) {
+/**
+ * Les deux classements, sans appel au serveur tant qu'une suite n'est pas demandée ; `top` nul :
+ * leur place, en attendant. `rest` : une ligue déjà ouverte sur ces lignes (tests).
+ */
+export function BandsTopView({ top, mine = {}, onPlay, rest }: { top: Top | null; mine?: Mine; onPlay: () => void; rest?: Partial<Record<BandType, BandPlace[]>> }) {
   return (
     <div className="leagues" id={RANKING_ANCHOR}>
       {BAND_TYPES.map((type) => (
-        <League key={type} type={type} top={top} mine={mine} onPlay={onPlay} />
+        <League key={type} type={type} top={top} mine={mine} onPlay={onPlay} rest={rest?.[type]} />
       ))}
     </div>
   );

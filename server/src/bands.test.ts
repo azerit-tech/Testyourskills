@@ -5,13 +5,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import Database from "better-sqlite3";
 import { afterEach, describe, expect, it } from "vitest";
-import type { BandBoard, BandPage, BandRef, BandsTop, MyBands } from "../../shared/bands";
+import type { BandBoard, BandLeaguePage, BandPage, BandRef, BandsTop, MyBands } from "../../shared/bands";
 import { FIXTURES } from "../../shared/fixtures";
 import { aliasFor } from "../../shared/punchline";
 import type { CardData } from "../../shared/types";
 import { createApp, purge } from "./app";
 import { SESSION_COOKIE, signSession } from "./auth";
-import { bandBoard, bandsTop, bandStanding, forgetBands, joinBand } from "./bands";
+import { bandBoard, bandsLeague, bandsTop, bandStanding, forgetBands, joinBand } from "./bands";
+import { TOP_PAGE_MAX } from "./top";
 import { migrate, RETENTION_MS, Store } from "./db";
 import type { Deps } from "./pipeline";
 
@@ -433,20 +434,21 @@ describe("pages publiques", () => {
     expect(r.json.band).toMatchObject({ label: "CentraleSupélec", score: 18, members: 4, rank: 1 });
     const person = ({ stars, cardId, name, login, avatarUrl, initials }: BandPage["members"][number]) => ({ stars, cardId, name, login, avatarUrl, initials });
     expect(r.json.members.map(person)).toEqual([
-      { stars: 6, cardId: claimed, name: "Léa Martin-Dubois", login: "LeaMD", avatarUrl: photo, initials: "LM" },
+      // Le nom court (§18.127) : le prénom et l'initiale du nom ; le nom complet ne part pas.
+      { stars: 6, cardId: claimed, name: "Léa M.", login: "LeaMD", avatarUrl: photo, initials: "LM" },
       { stars: 5, cardId: plain, name: undefined, login: "nour-rs", avatarUrl: undefined, initials: "NO" },
-      { stars: 4, cardId: li, name: "Florence Delmas", login: undefined, avatarUrl: undefined, initials: "FD" },
-      { stars: 3, cardId: cv, name: "Yann Perrot", login: undefined, avatarUrl: undefined, initials: "YP" },
+      { stars: 4, cardId: li, name: "Florence D.", login: undefined, avatarUrl: undefined, initials: "FD" },
+      { stars: 3, cardId: cv, name: "Yann P.", login: undefined, avatarUrl: undefined, initials: "YP" },
     ]);
     // Le nom du profil propre à la fiche (§18.107).
     expect(r.json.members[0]!.profile).toEqual(aliasFor(FIXTURES.gold.profile!.id, claimed));
     // Le poste de la fiche, déjà public, distingue deux dossiers du même profil.
     expect(r.json.members.map((m) => m.position)).toEqual(Array(4).fill(FIXTURES.gold.position));
     // Rien d'autre de la fiche ne part : ni l'adresse LinkedIn, ni l'école, ni un rang.
-    expect(JSON.stringify(r.json)).not.toMatch(/linkedin\.com|rang [SABC]|tier|"school"|"club"/);
+    expect(JSON.stringify(r.json)).not.toMatch(/linkedin\.com|linkedinUrl|Martin-Dubois|Delmas|Perrot|rang [SABC]|tier|"school"|"club"/);
   });
 
-  it("une fiche née d'une dénonciation se montre comme les autres, ses logos compris, revendiquée ou non ; un pseudo masqué n'y est pas", async () => {
+  it("une fiche née d'une dénonciation se montre comme les autres, revendiquée ou non, sans lien de profil ; un pseudo masqué n'y est pas", async () => {
     const ctx = setup();
     const by = insert(ctx.store, { login: "balance", stars: 6, name: "Bal Ance" });
     const tip = insert(ctx.store, { login: "victime", stars: 5, name: "Nom Caché", avatarUrl: "https://avatars.githubusercontent.com/u/2?v=4" });
@@ -461,14 +463,14 @@ describe("pages publiques", () => {
     const before = await page();
     // Toutes nommées (§18.119) ; la fiche masquée n'est pas rendue.
     expect(before.members.map((m) => [m.stars, m.cardId ?? null, m.name ?? null, m.login ?? null])).toEqual([
-      [6, by, "Bal Ance", "balance"],
-      [5, tip, "Nom Caché", "victime"],
-      [4, tipLi, "Personne Dénoncée", null],
+      [6, by, "Bal A.", "balance"],
+      [5, tip, "Nom C.", "victime"],
+      [4, tipLi, "Personne D.", null],
     ]);
     expect(before.members[1]!.profile).toEqual(aliasFor(FIXTURES.gold.profile!.id, tip));
     expect(before.members[1]!.avatarUrl).toBe("https://avatars.githubusercontent.com/u/2?v=4");
-    // Ses logos (§18.108) : dénoncée, pas revendiquée, son LinkedIn et son GitHub quand même.
-    expect(before.members[2]!.linkedinUrl).toBe("https://www.linkedin.com/in/personne-denoncee");
+    // Ni son LinkedIn ni son nom complet (§18.127) : les recruteurs passent par Azerit.
+    expect(JSON.stringify(before)).not.toMatch(/linkedin|Dénoncée/);
     expect(before.members[1]!.login).toBe("victime");
     expect(JSON.stringify(before)).not.toMatch(/Partie Loin|"parti"/);
   });
@@ -493,6 +495,32 @@ describe("pages publiques", () => {
     const mine = await call<BandsTop>(ctx, "/api/bands/top?boite=blablacar&ecole=%3Cx%3E");
     expect(mine.json.boite.map((b) => b.id)).toEqual(["doctolib", "meta", "google", "ubisoft", "mistral-ai"]);
     expect(mine.json.mine).toMatchObject({ boite: { place: 6, band: { id: "blablacar", members: 2 } } });
+    // « Voir tout le classement (6) » (§18.126) : le compte de chaque ligue, puis la suite, page par page
+    expect(mine.json.totals).toEqual({ ecole: 0, boite: 6 });
+    const rest = await call<BandLeaguePage>(ctx, "/api/bands/top/boite?offset=5&limit=50");
+    expect(rest.status).toBe(200);
+    expect(rest.json).toMatchObject({ type: "boite", total: 6, entries: [{ place: 6, band: { id: "blablacar" } }] });
+    const all = await call<BandLeaguePage>(ctx, "/api/bands/top/boite?offset=0&limit=500");
+    expect(all.json.entries.map((e) => [e.place, e.band.id])).toEqual([
+      [1, "doctolib"],
+      [2, "meta"],
+      [3, "google"],
+      [4, "ubisoft"],
+      [5, "mistral-ai"],
+      [6, "blablacar"],
+    ]);
+    expect((await call<BandLeaguePage>(ctx, "/api/bands/top/boite?offset=1&limit=2")).json.entries.map((e) => e.place)).toEqual([2, 3]);
+    expect((await call(ctx, "/api/bands/top/ville")).status).toBe(404);
+  });
+
+  it("la suite d'une ligue : 100 lignes au plus par page (§18.126)", () => {
+    const ctx = setup();
+    for (let i = 0; i < 130; i++) put(ctx.store, insert(ctx.store), { type: "boite", id: `boite-${i}`, label: `Boîte ${i}` });
+    forgetBands(ctx.store.db);
+    expect(bandsTop(ctx.store.db).totals).toMatchObject({ boite: 130 });
+    const page = bandsLeague(ctx.store.db, "boite", 100, TOP_PAGE_MAX);
+    expect(page.total).toBe(130);
+    expect(page.entries.map((e) => e.place)).toEqual(Array.from({ length: 30 }, (_, i) => i + 101));
   });
 
   it("la vue publique d'une fiche ne porte pas son école ; la personne fichée la lit", async () => {

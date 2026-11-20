@@ -47,7 +47,7 @@
 import type Database from "better-sqlite3";
 import type { Context, Hono } from "hono";
 import { z } from "zod";
-import { boardPerson } from "../../shared/boardPerson";
+import { boardPerson, seniorityOf } from "../../shared/boardPerson";
 import {
   BAND_ID_MAX,
   BAND_ID_RE,
@@ -65,6 +65,7 @@ import {
   isBlockedBand,
   schoolById,
   type BandBoard,
+  type BandLeaguePage,
   type BandMember,
   type BandPage,
   type BandRef,
@@ -79,6 +80,7 @@ import { starsFor } from "../../shared/types";
 import { frTypo } from "../../shared/typo";
 import type { CardRow, Store } from "./db";
 import { clientIp, type RateLimiter } from "./ratelimit";
+import { pageQuery } from "./top";
 
 /** Id d'une fiche (pipeline.ts, ID_RE), recopié : db.ts importe ce module, qui ne doit pas importer le pipeline. */
 const ID_RE = /^[A-Za-z0-9]{6,32}$/;
@@ -339,14 +341,27 @@ function homeOrder(c: Computed): League[] {
  */
 export function bandsTop(db: Database.Database, now = Date.now(), mine: Partial<Record<BandType, string | null>> = {}): BandsTop {
   const out: BandsTop = { ecole: [], boite: [] };
+  const totals: Partial<Record<BandType, number>> = {};
   for (const type of BAND_TYPES) {
     const c = league(db, type, now);
     const order = homeOrder(c);
     out[type] = order.slice(0, HOME_SIZE).map((b) => toStanding(c, b));
+    totals[type] = order.length;
     const i = mine[type] ? order.findIndex((b) => b.id === mine[type]) : -1;
     if (i >= HOME_SIZE) (out.mine ??= {})[type] = { place: i + 1, band: toStanding(c, order[i]!) };
   }
-  return out;
+  return { ...out, totals };
+}
+
+/**
+ * Une page du classement d'une ligue de l'accueil (§18.126), dans l'ordre de `bandsTop` :
+ * `limit` lignes à partir de la place `offset + 1` (l'appelant borne `limit`, pageQuery).
+ */
+export function bandsLeague(db: Database.Database, type: BandType, offset: number, limit: number, now = Date.now()): BandLeaguePage {
+  const c = league(db, type, now);
+  const order = homeOrder(c);
+  const entries = order.slice(offset, offset + limit).map((b, i) => ({ place: offset + i + 1, band: toStanding(c, b) }));
+  return { type, total: order.length, entries };
 }
 
 /**
@@ -367,9 +382,8 @@ function bandMembers(store: Store, type: BandType, id: string, now: number): Ban
     const position = card?.position;
     const root = row ? rootOf(store, row) : null;
     const login = r.memberLogin ?? (root ? store.loginOf(root) : null);
-    // Son LinkedIn (§18.108), revendiquée ou non : ce ne sont que des données publiques.
-    const linkedinUrl = root ? linkedinOf(root) : null;
-    return { stars: r.stars, profile, ...(position ? { position } : {}), ...(card && root ? boardPerson(card, r.cardId, login, linkedinUrl) : {}) };
+    // Son nom court et son niveau ; ni son LinkedIn ni son nom complet (§18.127) : les recruteurs passent par Azerit.
+    return { stars: r.stars, profile, ...(position ? { position } : {}), ...(card && root ? boardPerson(card, r.cardId, login, seniorityOf(row?.data as Partial<CardData>)) : {}) };
   });
 }
 
@@ -694,6 +708,16 @@ export function mountBands(app: Hono, o: BandsOptions): void {
     };
     c.header("Cache-Control", "public, max-age=60");
     return c.json(bandsTop(store.db, Date.now(), { ecole: own("ecole"), boite: own("boite") }));
+  });
+
+  // GET /api/bands/top/:type?offset=5&limit=50 : la suite du classement d'une ligue, « Voir tout le classement »
+  // (§18.126), 100 lignes au plus. Avant `/api/bands/:type/:id`, qui ne connaît pas « top ».
+  app.get("/api/bands/top/:type", (c) => {
+    const type = c.req.param("type");
+    if (!isBandType(type)) return c.json({ state: "error", code: "internal", message: BAND_MESSAGES.notFound }, 404);
+    const { offset, limit } = pageQuery(c.req.query("offset"), c.req.query("limit"), 50);
+    c.header("Cache-Control", "public, max-age=60");
+    return c.json(bandsLeague(store.db, type, offset, limit));
   });
 
   // GET /api/bands/:type/:id : une bande et ses fiches (ouverte au classement de l'accueil, §18.101).

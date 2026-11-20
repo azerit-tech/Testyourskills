@@ -91,13 +91,17 @@ describe("page partagée, vue par un visiteur", () => {
     const login = FIXTURES.gold.login;
     const fr = renderResult(card(), { owner: false }).replace(/&#x27;/g, "'").replace(/\u00a0/g, " ");
     // Téléphone : au-dessus de la fiche, deux lignes au plus.
-    expect(fr).toContain(`<p class="visitor-lead">La fiche de dev de @${login}.<br/><span class="lead-yours">La tienne prend une minute, sans compte.</span></p>`);
+    // Au bout, « Tu recrutes ? », là où étaient ses profils (§18.127) : il descend au bloc recruteur.
+    expect(fr).toContain(
+      `<p class="visitor-lead">La fiche de dev de @${login}. <a class="link-quiet hire-link lead-hire" href="#recrute">Tu recrutes ?</a><br/><span class="lead-yours">La tienne prend une minute, sans compte.</span></p>`,
+    );
+    expect(fr).toMatch(/<section class="after-block hire" id="recrute"/);
     // Bureau : la phrase entière ouvre « À ton tour », à droite de la fiche.
     expect(fr).toContain(
       `<p class="you-lead">Azerit a dressé la fiche de dev de @${login} comme un recruteur la lirait : l'expérience d'abord, le code comme preuve. La tienne prend une minute, sans compte.</p>`,
     );
     const en = renderResult(card(), { owner: false, lang: "en-US" }).replace(/&#x27;/g, "'");
-    expect(en).toContain(`<p class="visitor-lead">@${login}'s dev rap sheet.<br/><span class="lead-yours">Yours takes one minute, no account.</span></p>`);
+    expect(en).toContain(`<p class="visitor-lead">@${login}'s dev rap sheet. <a class="link-quiet hire-link lead-hire" href="#recrute">Hiring?</a><br/><span class="lead-yours">Yours takes one minute, no account.</span></p>`);
     expect(en).toContain(`<p class="you-lead">Azerit drew up @${login}'s dev rap sheet the way a recruiter would: experience first, code as proof. Yours takes one minute, no account.</p>`);
     expect(renderResult(card({ id: "LeadOwner01" }), { owner: true })).not.toContain("visitor-lead");
   });

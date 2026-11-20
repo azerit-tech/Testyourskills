@@ -31,7 +31,7 @@ import { autoJoinBands, mountBands, rootOf } from "./bands";
 import { mountBandPages } from "./bandPages";
 import { aiStatus as budgetAiStatus, type AiStatus } from "./ai/budget";
 import type { TokenPool } from "./github/tokens";
-import { weekTop, withWeekSpecial } from "./top";
+import { pageQuery, weekTop, withWeekSpecial } from "./top";
 import { normalizeLinkedinUrl, PAID_CALLS_PER_IP, type LinkedinFinder } from "./linkedinProfile/index";
 import { forgetLinkedinOfCard, latestLinkedinCard, recentLinkedinCard } from "./linkedinProfile/cards";
 import type { LinkedinPeople } from "./linkedinProfile/search";
@@ -655,9 +655,10 @@ export function createApp(opts: AppOptions) {
 
   // GET /api/top : le haut du classement de la semaine (§18.22). Rien de privé,
   // ce qui est déjà sur les fiches publiques. Marche aussi sans crédit IA.
+  // `?offset=10&limit=50` : la suite, pour « Voir tout le classement » (§18.126) ; 100 lignes au plus.
   app.get("/api/top", (c) => {
     c.header("Cache-Control", "public, max-age=60");
-    return c.json(weekTop(store.db, { now: Date.now(), limit: 10 }));
+    return c.json(weekTop(store.db, { now: Date.now(), ...pageQuery(c.req.query("offset"), c.req.query("limit"), 10) }));
   });
 
   // POST /api/card : JSON { login, lang, ref? } ou multipart (cv, login?, lang?, ref?).
@@ -1003,8 +1004,9 @@ export function createApp(opts: AppOptions) {
     // et que la fiche n'a toujours qu'une source.
     const offer = person && row.kind === "card" ? openProposal(store.db, row.id) : null;
     const propose = offer && (offer.kind === "github" ? row.source === "linkedin" && !store.loginOf(row) : row.source === "github" && !store.isHidden(store.loginOf(row))) ? offer : null;
-    const links = linksOf(row);
-    const extra = { ...rank, ...(mine ? { mine: true } : {}), ...(links.github || links.linkedin ? { links } : {}) };
+    // Ses profils (§18.108) : à la personne fichée seule depuis le §18.127 ; le visiteur passe par « Tu recrutes ? ».
+    const links = person ? linksOf(row) : null;
+    const extra = { ...rank, ...(mine ? { mine: true } : {}), ...(links && (links.github || links.linkedin) ? { links } : {}) };
     // La page partagée (shared/publicView.ts) : rien de privé ne part vers qui n'est pas la personne fichée.
     const shown = person ? data : publicView(data, { thirdParty: thirdParty(row) });
     const state: JobState =

@@ -92,6 +92,17 @@ export interface BandsTop {
    * sans page publique.
    */
   mine?: Partial<Record<BandType, BandPlace>>;
+  /** Lignes du classement de chaque ligue, toutes places comprises : au-delà de cinq, « Voir tout le classement » (§18.126). */
+  totals?: Partial<Record<BandType, number>>;
+}
+
+/** Une page du classement d'une ligue de l'accueil (`GET /api/bands/top/:type?offset=&limit=`, §18.126). */
+export interface BandLeaguePage {
+  type: BandType;
+  /** Lignes du classement, toutes places comprises. */
+  total: number;
+  /** Les lignes de la page, chacune avec sa place. */
+  entries: BandPlace[];
 }
 
 /** Une bande et sa place dans le classement de l'accueil. */

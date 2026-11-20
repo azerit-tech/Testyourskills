@@ -8,15 +8,14 @@
 // - une fiche LinkedIn seule : sa note, sous le nom de sa fiche.
 // Chaque ligne est la vraie personne (§18.88, shared/boardPerson.ts) : le nom de sa
 // fiche (le @pseudo d'une fiche GitHub sans nom), sa photo ou ses initiales, et le
-// lien vers sa fiche.
+// lien vers sa fiche ; son nom court et son niveau, ni son nom complet ni ses profils (§18.127).
 // Une pièce d'un dossier n'entre jamais : elle n'a pas de note à elle. Un dossier
 // dont le lien n'est pas prouvé (monté par un tiers sur le pseudo d'un autre, ou
 // un CV déposé avec un pseudo) ne classe personne. Pour un login : il n'est pas
 // masqué, son compte a 5 000 abonnés au plus (les célébrités gardent leur fiche
 // mais ne bouchent pas le haut du tableau). Une fiche née d'une dénonciation
 // (`cards.denounce_born`) entre comme les autres, revendiquée ou non, GitHub ou
-// LinkedIn seule (§18.119) : ce ne sont que des données publiques. Elle montre
-// ses logos LinkedIn et GitHub comme les autres (§18.108). Une ligne par personne : son dossier s'il existe, sinon sa fiche seule ; entre
+// LinkedIn seule (§18.119) : ce ne sont que des données publiques. Une ligne par personne : son dossier s'il existe, sinon sa fiche seule ; entre
 // deux du même genre, la meilleure note de la semaine ; à égalité, la plus ancienne
 // passe devant. Tout se calcule à la lecture, rien n'est écrit.
 // Le classement d'une semaine est gardé 60 s en mémoire : il est demandé à
@@ -24,7 +23,7 @@
 // (db.ts) l'oublie dès qu'une fiche naît, part, ou qu'un login est masqué.
 
 import type Database from "better-sqlite3";
-import { boardPerson } from "../../shared/boardPerson";
+import { boardPerson, seniorityOf } from "../../shared/boardPerson";
 import { fileOf } from "../../shared/caseFile";
 import { catalogProfile, withCatalogProfiles } from "../../shared/profileCatalog";
 import type { CardData, ComparisonData, Fact, TopEntry, WeekRank, WeekTop } from "../../shared/types";
@@ -172,14 +171,31 @@ function computeWeek(db: Database.Database, monday: number, now: number): Ranked
     .sort((a, b) => b.overall - a.overall || a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1));
 }
 
-/** Le haut du classement de la semaine en cours. */
-export function weekTop(db: Database.Database, opts: { now?: number; limit?: number } = {}): WeekTop {
+/** Lignes rendues au plus par une lecture paginée d'un classement (`GET /api/top?limit=`, §18.126). */
+export const TOP_PAGE_MAX = 100;
+
+/**
+ * `?offset=&limit=` d'une lecture paginée d'un classement (§18.126) : des entiers positifs,
+ * `limit` ramené à TOP_PAGE_MAX ; une valeur absente ou illisible prend le défaut.
+ */
+export function pageQuery(offset: string | undefined, limit: string | undefined, defaultLimit: number): { offset: number; limit: number } {
+  const int = (v: string | undefined) => (v !== undefined && /^\d{1,9}$/.test(v) ? Number(v) : null);
+  return { offset: int(offset) ?? 0, limit: Math.min(TOP_PAGE_MAX, int(limit) ?? defaultLimit) };
+}
+
+/**
+ * Une page du classement de la semaine en cours : `limit` lignes (la route les borne, pageQuery)
+ * à partir de la place `offset + 1`. Par défaut, les dix premières.
+ */
+export function weekTop(db: Database.Database, opts: { now?: number; limit?: number; offset?: number } = {}): WeekTop {
   const now = opts.now ?? Date.now();
   const limit = Math.max(0, Math.floor(opts.limit ?? 10));
+  const offset = Math.max(0, Math.floor(opts.offset ?? 0));
   const monday = weekStart(now);
   const ranked = rankWeek(db, monday, now);
   const get = db.prepare(`SELECT json, kind FROM cards WHERE id = ?`);
-  const entries: TopEntry[] = ranked.slice(0, limit).map((r, i) => {
+  const entries: TopEntry[] = ranked.slice(offset, offset + limit).map((r, j) => {
+    const i = offset + j;
     const raw = get.get(r.id) as { json: string; kind: string } | undefined;
     // Le nom du profil propre à la fiche (§18.107), comme sur sa page.
     const data = raw ? withCatalogProfiles(JSON.parse(raw.json)) : {};
@@ -188,9 +204,9 @@ export function weekTop(db: Database.Database, opts: { now?: number; limit?: num
     const profile: Fact | undefined = card.profile ? catalogProfile(card.profile).label : undefined;
     return {
       rank: i + 1,
-      // La personne de la fiche : son nom, son visage, sa fiche (une fiche LinkedIn seule comprise).
-      // Son LinkedIn (§18.108), revendiquée ou non : ce ne sont que des données publiques.
-      ...boardPerson(card, r.id, r.login, r.linkedinUrl ?? null),
+      // La personne de la fiche : son nom court, son visage, sa fiche, son niveau (une fiche LinkedIn seule comprise).
+      // Ni son LinkedIn ni son nom complet (§18.127) : les recruteurs passent par Azerit.
+      ...boardPerson(card, r.id, r.login, seniorityOf(data as Partial<CardData>)),
       overall: r.overall,
       stars: starsFor(r.overall),
       ...(profile ? { profile } : {}),

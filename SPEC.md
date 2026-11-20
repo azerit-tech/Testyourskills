@@ -2745,6 +2745,8 @@ Jacques : « génère plein de phrases drôles automatiquement pour que les gens
 
 ### 18.108 Ses profils LinkedIn et GitHub, d'un toucher sur leur logo (20 novembre 2026, branche `site/liens-profils`)
 
+*Changé le 20 novembre 2026, partenaire + Jacques (§18.127) : plus de logo ni de lien de profil dans les classements (top de la semaine, sa suite, ligues, fiches d'une bande) ni pour le visiteur d'une fiche. La personne fichée garde les siens dans la tête de sa fiche ; au visiteur, « Tu recrutes ? » prend leur place. Ce qui suit décrit la règle d'avant, sauf pour la personne fichée.*
+
 Jacques : « Donne la possibilité d'aller voir facilement le LinkedIn ou le GitHub des gens, avec les logos GitHub ou LinkedIn. » Ce paragraphe complète le §18.88 : la ligne d'un classement porte maintenant l'adresse LinkedIn de la personne quand la règle ci-dessous la permet (« Rien d'autre de la fiche ne part : ni l'adresse LinkedIn… » ne vaut plus pour elle ; l'école et l'employeur restent dehors).
 
 - **Ce qu'on voit** : deux logos mats, le « in » de LinkedIn puis la pieuvre de GitHub, 20 px de dessin, 40 px de toucher, lilas, crème au survol, à l'encre sur le ciel clair. Aucun texte à côté. Chacun ouvre le profil dans un nouvel onglet (`target="_blank" rel="noopener noreferrer"`) et se lit « LinkedIn de Léa Martin », « GitHub de @leamd » (« LinkedIn d'Inès », “Léa's LinkedIn”). Seules les sources que la fiche a : un logo, deux, ou rien.
@@ -2990,3 +2992,41 @@ Jacques : « https://github.com/Hennzau : comment ça se fait qu'on n'a pas trou
   - le pseudo.
 
   `denounceMatch.test.ts` couvre la fiche pour soi (forte, moyenne, à vérifier) et `linkedinMatch` ; `rattrapageLinkedin.test.ts` couvre le rattrapage. Les suites `entry`, `proposal`, `linkedinProfile` et `github` passent aussi, avec `tsc -b` et `vite build`. **Pas vérifié** : la production, le rattrapage sur la vraie base, la lecture « à vérifier » avec un vrai profil.
+
+### 18.126 « Voir tout le classement » : tout le monde de la semaine, sur place (20 novembre 2026, branche `site/classement-voir-plus`)
+
+Jacques : « Est-ce que tu peux faire un "voir +" pour voir tous ceux qui ont participé ? » Le top de la semaine de l'accueil montre dix lignes ; la production en compte 27 cette semaine. Ce paragraphe complète le §18.22 (API, accueil) et le §18.103.
+
+- **Le bouton** : sous les dix lignes, « Voir tout le classement (27) » (“See the full ranking (27)”), un bouton en contour de la largeur du tableau. Il n'est là que si `total` (de `GET /api/top`) dépasse dix.
+- **Sur place** : touché, le classement s'ouvre dans la page, sans navigation. Après un filet, les places 11 et suivantes, dans les mêmes lignes que le top : rang, visage ou initiales, nom court, étoiles et niveau, score en % (sans logo depuis le §18.127), et le toucher qui ouvre la fiche. Ma ligne, si elle y est, est mise en évidence comme dans le top.
+- **Lu à la demande** : `GET /api/top?offset=10&limit=50`. Sans paramètre, la route rend toujours les dix premiers. `limit` est borné à 100 (`TOP_PAGE_MAX`) ; une valeur illisible prend le défaut. Même classement, mêmes exclusions et même cache que le top (60 s en mémoire, `Cache-Control: public, max-age=60`). Les pages font 50 lignes. La suivante se lit quand le bas de la liste approche (à 600 px), ou sur « Voir plus », qui sert aussi à réessayer après une panne.
+- **« Réduire »** : un lien discret sous la liste la referme et ramène le bouton à l'écran. Les lignes lues restent en mémoire. Une nouvelle semaine referme la liste.
+- **Les ligues de bandes** : même bouton sous une ligue de plus de cinq bandes. `GET /api/bands/top` rend `totals` (le nombre de lignes de chaque ligue, dans l'ordre de l'accueil). `GET /api/bands/top/:type?offset=5&limit=50` rend la suite, chaque ligne avec sa place (100 au plus, même cache). Ouverte, la ligue montre sa bande à sa place, mise en évidence, et la ligne « plus bas, après un filet » s'efface.
+- **Démo** : `?mock=1&top=27` donne 27 classés (soixante au plus) ; au-delà des dix nommés, des pseudos et des noms inventés, sans photo.
+- **Vérifié** :
+  - `top.test.ts` : pagination, places qui suivent, plafond à 100, valeurs illisibles ;
+  - `bands.test.ts` : `totals`, la suite d'une ligue, le plafond ;
+  - `homeBoards.test.ts` : le bouton seulement au-delà de dix (cinq pour une ligue), la liste ouverte avec ses 27 lignes et leurs liens, ma ligne, « Voir plus », « Réduire » ;
+  - `tsc -b` et `vite build` passent ;
+  - Chrome sans tête et muet, 390 × 844, démo à 27.
+
+  **Pas vérifié** : la production, un vrai iPhone.
+
+### 18.127 Les classements ne donnent ni le nom complet ni les profils : les recruteurs passent par Azerit (20 novembre 2026, branche `site/classement-voir-plus`)
+
+Le partenaire d'Azerit, adopté par Jacques : « Je ne mettrais pas les liens des talents ni leur nom de famille : il faut que les recruteurs vous contactent, pas qu'ils vous volent vos leads. Tu peux mettre aussi le niveau de séniorité. » Ce paragraphe renverse le §18.108 pour les classements et le visiteur, et complète le §18.88.
+
+- **Aucun logo ni lien de profil dans une ligne de classement** : le top de la semaine, sa suite (§18.126), les ligues de bandes et les fiches d'une bande ouverte. Le toucher sur la ligne ouvre toujours la fiche. L'API ne rend plus d'adresse de profil pour ces listes : `linkedinUrl` sort de `BoardPerson` (`GET /api/top`, `GET /api/bands/:type/:id`).
+- **Le nom court** (`shared/shortName.ts`, une seule règle au serveur et en démo) : le prénom, puis l'initiale de ce qui suit. Exemples : « Pierre-Antoine B. », « Charles-Meldhine M. » ; une particule donne la première lettre du nom, « Enzo Le Van » donne « Enzo L. ». Un nom d'un seul mot reste tel quel. `boardPerson` l'applique côté serveur : le nom complet ne quitte plus le serveur pour ces listes. Une ligne sans vrai nom montre son @pseudo GitHub, comme avant : c'est un pseudonyme. Les initiales du visage restent les deux lettres de la fiche.
+- **Le niveau** : sous le nom, après les étoiles, un mot mat en capitales mono : « Étudiant », « Junior », « Confirmé », « Senior », « Expert » ; en anglais « Student », « Junior », « Mid », « Senior », « Expert » (`SENIORITY_TAG`, `shared/gridText.ts`). Il tient sur une ligne à 390 px. Il est lu sur `grid.seniority.code`, celle du dossier ou celle de la fiche seule (barème 0.5.0 et après). Sans niveau (grille d'avant), rien. `BoardPerson.seniority` le porte.
+- **La page d'une fiche, pour le visiteur** : `GET /api/card/:id` ne rend `links` qu'à la personne fichée (`person` : propriétaire connecté, ou jeton d'une fiche qu'elle a faite). Le dénonciateur ne les reçoit pas non plus. La tête ne montre plus ses logos au visiteur, et elle dit le nom court quand la fiche n'a pas de pseudo. La phrase au-dessus de la fiche et « À ton tour » disent aussi le nom court. À la place des logos, un lien discret « Tu recrutes ? » (“Hiring?”) descend au bloc recruteur existant (`Hiring`, ancre `#recrute`). Il est au bout de la phrase au-dessus de la fiche sur téléphone, et sous le nom dans la tête au bureau. Il n'apparaît ni sur une fiche dénoncée vue par sa cible, ni dans le face-à-face. La personne fichée garde son nom entier et ses logos.
+- **Ce qui montre encore le nom complet** : le dessin de la fiche, recto et verso, dans la page, l'image de partage, la story et l'Open Graph. Les balises de `/c/:id` aussi (`og:title`, texte de l'image, pour une fiche sans pseudo). La réponse JSON de la fiche garde aussi `name` et `linkedinUrl` : la cible d'une fiche dénoncée en a besoin pour la refaire depuis son LinkedIn (§18.104). Rien de cela n'est un lien affiché.
+- **Vérifié** :
+  - `boardPerson.test.ts` : le nom court, avec les prénoms composés et les particules, et le niveau ;
+  - `top.test.ts` et `bands.test.ts` : les listes de l'API sans adresse de profil ni nom complet, avec le niveau ;
+  - `app.test.ts` : `links` à la personne fichée seule ;
+  - `profileLinks.test.ts`, `homeBoards.test.ts` et `cardPage.test.ts` : les lignes sans logo, avec le niveau, et la tête du visiteur avec « Tu recrutes ? » ;
+  - la suite entière, `tsc -b`, `vite build` ;
+  - Chrome sans tête et muet, 390 × 844, démo.
+
+  **Pas vérifié** : la production, un vrai iPhone.
