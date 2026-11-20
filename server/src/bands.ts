@@ -494,6 +494,11 @@ export interface AutoJoinOptions {
    * vérifié par l'appelant) : ses bandes suivent, une personne reste une entrée.
    */
   from?: CardRow | null;
+  /**
+   * Une ligue déjà tenue n'est pas touchée du tout, pas même ses étoiles : pour le
+   * rattrapage (rattrapageBandes.ts), qui ne fait qu'ajouter les entrées manquantes.
+   */
+  keepHeld?: boolean;
 }
 
 /**
@@ -529,7 +534,7 @@ export function autoJoinBands(store: Store, row: CardRow, o: AutoJoinOptions = {
   for (const type of ["ecole", "boite"] as const) {
     const held = membership(store.db, key, type);
     if (held) {
-      if (held.card_id === root.id) continue;
+      if (o.keepHeld || held.card_id === root.id) continue;
       const before = store.getCard(held.card_id);
       // Le dossier porte la note de la personne : une pièce seule refaite après lui ne la rabaisse pas.
       if (counts(before, now) && before.kind === "comparison" && root.kind !== "comparison") continue;

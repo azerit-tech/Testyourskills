@@ -46,8 +46,11 @@ scripts/*
 !scripts/recalcule-notes.ts
 # ops/ aussi, sauf le rattrapage du §18.116, lancé dans le conteneur :
 #   docker exec testyourskills node_modules/.bin/tsx ops/rattrapage-dossiers-connectes.ts [--oui]
+# et le rattrapage des bandes (§18.119) :
+#   docker exec testyourskills node_modules/.bin/tsx ops/rattrapage-bandes.ts [--oui]
 ops/*
 !ops/rattrapage-dossiers-connectes.ts
+!ops/rattrapage-bandes.ts
 **/*.test.ts
 vitest.config.ts
 docker-compose.yml

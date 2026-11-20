@@ -86,6 +86,18 @@ const ENTERS_SQL = `c.parent_id IS NULL AND c.degraded = 0
            OR (c.login IS NULL AND c.kind = 'card' AND c.source = 'linkedin')
          )`;
 
+/**
+ * Les fiches racines encore vivantes qui entrent au classement (la règle du top, toutes
+ * semaines confondues), de la plus ancienne à la plus récente. Pour le rattrapage des bandes
+ * (server/src/rattrapageBandes.ts).
+ */
+export function enteringRootIds(db: Database.Database, now = Date.now()): string[] {
+  const rows = db
+    .prepare(`SELECT c.id FROM cards c WHERE ${ENTERS_SQL} ORDER BY c.created_at ASC, c.id ASC`)
+    .all(now, CELEBRITY_FOLLOWERS) as { id: string }[];
+  return rows.map((r) => r.id);
+}
+
 /** Durée pendant laquelle le classement d'une semaine est gardé en mémoire. */
 export const RANK_CACHE_MS = 60_000;
 
