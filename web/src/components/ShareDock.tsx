@@ -12,8 +12,8 @@ import { ShareMain, useSharing } from "./After";
 import type { Shareable } from "./After";
 import { IconArrow } from "./Icons";
 
-/** Le champ du bloc « Dénonce un complice », ou son attente : ce qui rend le rang de la barre inutile. */
-const DENOUNCE_MARKS = ".after-block.denounce .denounce-form .field, .after-block.denounce.is-pending";
+/** Le champ du bloc « Dénonce un complice », toujours là (§18.114) : ce qui rend le rang de la barre inutile. */
+const DENOUNCE_MARKS = ".after-block.denounce .denounce-form .field";
 /** La hauteur de la barre à deux rangs : ce qui est derrière elle n'est pas « à l'écran ». */
 const DOCK_PX = 124;
 
@@ -63,8 +63,8 @@ function Dock({ item, toast, add }: { item: Shareable; toast: (m: string) => voi
   // Du bloc de partage aussi, c'est le bouton qui compte : son titre qui affleure au bas du premier écran ne retire plus le rose.
   // « Oui, ajoute-le » de la proposition sous la fiche (§18.100) est rose lui aussi : la barre s'efface devant.
   const hides = add
-    ? ".after-block.out .out-main, .after-block.denounce.is-done, .after-block.propose .propose-yes, .after-block.add-source .entry-submit"
-    : ".after-block.out .out-main, .after-block.denounce.is-done, .after-block.propose .propose-yes";
+    ? ".after-block.out .out-main, .after-block.denounce .is-lead, .after-block.propose .propose-yes, .after-block.add-source .entry-submit"
+    : ".after-block.out .out-main, .after-block.denounce .is-lead, .after-block.propose .propose-yes";
   useEffect(() => {
     if (typeof IntersectionObserver !== "function") return setBlockSeen(false);
     const seen = new Set<Element>();

@@ -291,13 +291,13 @@ describe("POST /api/card avec denouncedBy", () => {
     for (let i = 0; i < DENOUNCE_PER_DAY; i++) {
       expect((await post(ctx, { login: `suspect-${i}`, denouncedBy: mine.json.id }, nav)).status).toBe(202);
     }
-    const sixth = await post(ctx, { login: "suspect-6", denouncedBy: mine.json.id }, nav);
-    expect(sixth.status).toBe(429);
-    expect(sixth.json.code).toBe("rate_limited");
-    expect(sixth.json.message?.fr).toMatch(/Cinq dénonciations/);
+    const over = await post(ctx, { login: "suspect-de-trop", denouncedBy: mine.json.id }, nav);
+    expect(over.status).toBe(429);
+    expect(over.json.code).toBe("rate_limited");
+    expect(over.json.message?.fr).toMatch(/Dix dénonciations/);
     // Une autre IP peut encore dénoncer, et la même IP peut encore faire une fiche normale.
-    expect((await post(ctx, { login: "suspect-7", denouncedBy: mine.json.id }, { "x-forwarded-for": "198.51.100.8", ...nav })).status).toBe(202);
-    expect((await post(ctx, { login: "suspect-8" }, nav)).status).toBe(202);
+    expect((await post(ctx, { login: "suspect-autre-ip", denouncedBy: mine.json.id }, { "x-forwarded-for": "198.51.100.8", ...nav })).status).toBe(202);
+    expect((await post(ctx, { login: "suspect-normal" }, nav)).status).toBe(202);
   });
 });
 

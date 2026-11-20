@@ -737,7 +737,7 @@ export function createApp(opts: AppOptions) {
       // Login masqué par son propriétaire : personne d'autre que lui n'en refait une fiche (§18.1).
       if (login && hiddenFrom(c, login)) return c.json(errorBody("gone", MESSAGES.gone), 410);
 
-      // Dénonciation (§18.6) : cinq par jour et par IP, vérifiées avant tout calcul.
+      // Dénonciation (§18.6, §18.114) : dix par jour et par IP, vérifiées avant tout calcul.
       const ip = clientIp(c);
       // On dénonce un pseudo GitHub ou un lien LinkedIn (§18.48), jamais un CV.
       const denounce = (login || linkedinUrl) && !pdf ? parseDenunciation(denouncedBy, { login, linkedin: linkedinUrl }, store, c) : undefined;

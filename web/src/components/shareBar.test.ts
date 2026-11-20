@@ -181,8 +181,8 @@ describe("barre du pouce (§18.27)", () => {
 
   it("le champ du bloc « Dénonce un complice » à l'écran, au-dessus de la barre : son rang la quitte, jamais deux fois le même geste", () => {
     const src = readFileSync(join(__dirname, "ShareDock.tsx"), "utf8");
-    // Le champ (ou l'attente) du bloc, pas son titre : derrière la barre, il ne compte pas.
-    expect(src).toContain('const DENOUNCE_MARKS = ".after-block.denounce .denounce-form .field, .after-block.denounce.is-pending";');
+    // Le champ du bloc, toujours là (§18.114), pas son titre : derrière la barre, il ne compte pas.
+    expect(src).toContain('const DENOUNCE_MARKS = ".after-block.denounce .denounce-form .field";');
     expect(src).toContain("{ rootMargin: `0px 0px -${DOCK_PX}px 0px` }");
     expect(src).toContain("setDenounceSeen(above.size > 0)");
     expect(src).toMatch(/const who = !denounceSeen && \(\s*<button type="button" className="dock-who"/);
@@ -201,7 +201,7 @@ describe("barre du pouce (§18.27)", () => {
     }
     // La barre s'efface aussi devant le bloc de la source, dont le bouton est le rose.
     // Et devant « Oui, ajoute-le » de la proposition sous la fiche (§18.100).
-    expect(readFileSync(join(__dirname, "ShareDock.tsx"), "utf8")).toContain('".after-block.out .out-main, .after-block.denounce.is-done, .after-block.propose .propose-yes, .after-block.add-source .entry-submit"');
+    expect(readFileSync(join(__dirname, "ShareDock.tsx"), "utf8")).toContain('".after-block.out .out-main, .after-block.denounce .is-lead, .after-block.propose .propose-yes, .after-block.add-source .entry-submit"');
   });
 
   it("pas pendant la révélation, pas sur ordinateur", () => {

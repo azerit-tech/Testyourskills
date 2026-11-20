@@ -49,15 +49,72 @@
   text-overflow: ellipsis;
 }
 
-/* attente : sous « @x est dans le viseur », une ligne et une barre plate qui avance (--p), dans le bloc */
-.denounce-pending {
-  display: grid;
-  gap: 12px;
-}
-.denounce .denounce-pending p {
-  font: 500 var(--t-16) / 1.4 var(--f-text);
+/* sous le titre : ce qui va se passer (avant la première dénonciation seulement) */
+.denounce-intro {
+  margin: 0;
+  font: 400 var(--t-14) / 1.45 var(--f-text);
   color: var(--c-text);
 }
+
+/* ---------- les dénonciations de la séance (§18.114) : une ligne chacune, la plus récente en haut ---------- */
+
+.denounce-lines {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* le visage, le nom et sa ligne (barre, étoiles et note, ou l'erreur), puis l'envoi au bout */
+.denounce-line {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 12px;
+  min-height: 60px;
+  padding: 8px 8px 8px 12px;
+  border-radius: var(--r-item);
+  background: var(--s-item);
+}
+.denounce-line .board-avatar {
+  background: var(--s-field);
+}
+.denounce-line-who {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.denounce-line-name {
+  overflow: hidden;
+  font: 700 var(--t-16) / 1.2 var(--f-name);
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--cream);
+}
+.denounce-line-score {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.denounce-line-score b {
+  font: 700 var(--t-16) / 1 var(--f-name);
+  color: var(--cream);
+}
+.denounce-line-err {
+  font: 400 var(--t-14) / 1.35 var(--f-text);
+  color: var(--c-error);
+}
+.denounce-line-wait {
+  display: block;
+  padding: 6px 0;
+}
+.denounce-tag {
+  font: 700 var(--t-14) / 1.2 var(--f-name);
+  text-transform: uppercase;
+  color: var(--c-text);
+}
+/* la barre de l'interrogatoire : plate, elle avance (--p) */
 .denounce-bar {
   position: relative;
   display: block;
@@ -75,85 +132,29 @@
   background: var(--cream);
   transition: width 0.5s linear;
 }
-
-/* prêt à partager (prune, comme le bloc qu'il remplace : le partage au-dessus est marine) */
-/* sous le titre : ce qui va se passer */
-.denounce-intro {
-  margin: 0;
-  font: 400 var(--t-14) / 1.45 var(--f-text);
-  color: var(--c-text);
-}
-.denounce-head {
-  overflow-wrap: anywhere;
-}
-/* sous le titre, sa ligne : les étoiles (22 px) puis le profil */
-.denounce-level {
+.denounce-line-send {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 12px;
-  margin: 0;
-}
-.denounce-tag {
-  font: 700 var(--t-16) / 1.2 var(--f-name);
-  text-transform: uppercase;
-  color: var(--cream);
-}
-.denounce-actions {
-  display: grid;
   gap: 8px;
 }
-/* « Envoyer à @pseudo » : un pseudo trop long se coupe, le bouton ne déborde pas */
-.denounce-actions .pill {
-  min-width: 0;
+/* WhatsApp et Copier : deux ronds de 44 px, l'icône seule (son nom est dans aria-label) */
+.denounce-line-icon {
+  width: var(--h-tap);
+  padding: 0;
 }
-.denounce-send {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.denounce-line-go {
+  padding: 0 16px;
 }
-/* ce qui part (§18.94) : l'image du duel, telle que la messagerie la montrera ; le ratio est réservé */
-.denounce-preview {
-  display: block;
-  width: 100%;
-  height: auto;
-  aspect-ratio: 1200 / 630;
-  border-radius: var(--r-item);
-  background: var(--c-line);
+/* le rose de la séance : l'envoi de la dernière fiche prête ; les plus anciennes restent en contour */
+.denounce-line .is-lead {
+  background: var(--c-action);
+  box-shadow: none;
+  color: var(--c-on-action);
 }
-/* les canaux : WhatsApp et SMS sous le gros bouton (téléphone), la rangée entière au bureau */
-.denounce-via-row {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+/* presse-papiers refusé : le message à copier à la main, sous la ligne, de bord à bord */
+.denounce-line > :not(.board-avatar, .denounce-line-who, .denounce-line-send) {
+  grid-column: 1 / -1;
 }
-/* 360 px : « WhatsApp » tient en entier dans sa moitié de rangée */
-.denounce-via-row .denounce-via {
-  min-width: 0;
-  gap: 6px;
-  padding: 0 10px;
-}
-.denounce-via span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.denounce-via-row.is-desk {
-  display: flex;
-  flex-wrap: wrap;
-}
-.denounce-via-row.is-desk .denounce-via {
-  flex: 1 1 auto;
-}
-.denounce-via-row.is-desk .pill-big {
-  flex: 1 1 100%;
-}
-.denounce-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 16px;
-}
-/* une fiche de complice prête à envoyer : « Envoyer à @x » est le rose de l'écran ; le partage, juste dessous
+/* une fiche de complice prête à envoyer : son envoi est le rose de l'écran ; le partage, juste dessous
    depuis le §18.83, passe en contour tant qu'elle est là (§18.48, un seul rose par écran) */
 .after-block.denounce.is-done ~ .after-block.out .out-main {
   background: transparent;
@@ -167,9 +168,6 @@
   }
   .denounce-form .pill {
     width: auto;
-  }
-  .denounce-actions:not(.denounce-via-row) {
-    justify-items: start;
   }
 }
 

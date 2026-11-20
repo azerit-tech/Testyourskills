@@ -794,6 +794,8 @@ const fr = frTypoDeep({
     /* quand le serveur lit LinkedIn (§18.48, §18.81) : un nom, un pseudo, ou un lien de profil */
     labelBoth: "Nom, pseudo GitHub ou lien LinkedIn du complice",
     placeholderBoth: "Son nom, son pseudo ou un lien",
+    /* après une première dénonciation (§18.114) : le champ vide, prêt pour le suivant */
+    placeholderNext: "Le suivant ?",
     invalidBoth: "Choisis quelqu'un dans la liste, ou colle un lien LinkedIn ou un pseudo GitHub.",
     githubOnly: "Pour l'instant, par pseudo GitHub seulement.",
     btn: "Dénoncer",
@@ -801,10 +803,13 @@ const fr = frTypoDeep({
     pending: "Interrogatoire en cours…",
     self: "C'est ta propre fiche. Dénonce quelqu'un d'autre.",
     invalid: "Choisis quelqu'un dans la liste, ou tape son pseudo GitHub.",
-    inSights: "est dans le viseur",
-    charge: (status: string) => `Chef d'accusation : ${status}`,
+    /** Les dénonciations de la séance, sous le champ (lu par les lecteurs d'écran). */
+    listLabel: "Tes dénonciations",
     /* le seul bouton : à la personne elle-même, pour qu'elle la reprenne (parcours 2 et 25) */
     send: (who: string) => `Envoyer à ${who}`,
+    sendShort: "Envoyer",
+    waTo: (who: string) => `Envoyer à ${who} sur WhatsApp`,
+    copyFor: (who: string) => `Copier le message pour ${who}`,
     /* le message envoyé (§18.94) : on l'a dénoncé, le duel en chiffres, puis le lien. `them` nul : dossier scellé ; `me` nul : sa note inconnue */
     sendText: (who: string, me: number | null, them: number | null, lead: string) =>
       me === null
@@ -816,20 +821,7 @@ const fr = frTypoDeep({
     iLead: (gap: string) => `j'ai ${gap}`,
     youLead: (gap: string) => `tu as ${gap}`,
     sendTie: "égalité parfaite",
-    mailSubject: "Je viens de te dénoncer sur Azerit",
-    /** Les canaux de l'envoi : téléphone (raccourcis sous le bouton) et ordinateur (la rangée). */
-    viaWhatsapp: "WhatsApp",
-    viaSms: "SMS",
-    viaEmail: "E-mail",
-    viaLinkedin: "LinkedIn",
-    viaCopy: "Copier",
-    linkedinCopied: "Message copié : colle-le dans LinkedIn.",
-    previewAlt: (who: string) => `Le face-à-face envoyé à ${who}`,
     sendCopied: (who: string) => `Message copié : envoie-le à ${who}.`,
-    see: "Voir sa fiche",
-    copyLink: "Copier le lien",
-    linkCopied: "Lien copié.",
-    again: "Dénoncer quelqu'un d'autre",
     /* à l'arrivée de la cible */
     /* un titre qui vaut pour la personne visée comme pour un tiers ; qui a dénoncé est dit une fois, au-dessus (§18.52) */
     isYou: "C'est toi ?",
@@ -1570,6 +1562,7 @@ const en: Dict = {
     placeholder: "Their name or username",
     labelBoth: "Accomplice's name, GitHub username or LinkedIn link",
     placeholderBoth: "Their name, username or a link",
+    placeholderNext: "Who's next?",
     invalidBoth: "Pick someone from the list, or paste a LinkedIn link or a GitHub username.",
     githubOnly: "For now, GitHub username only.",
     btn: "Turn in",
@@ -1577,9 +1570,11 @@ const en: Dict = {
     pending: "Interrogation under way…",
     self: "That's your own sheet. Turn in someone else.",
     invalid: "Pick someone from the list, or type their GitHub username.",
-    inSights: "is in the crosshairs",
-    charge: (status) => `Charge: ${status}`,
+    listLabel: "Your tip-offs",
     send: (who) => `Send to ${who}`,
+    sendShort: "Send",
+    waTo: (who) => `Send to ${who} on WhatsApp`,
+    copyFor: (who) => `Copy the message for ${who}`,
     sendText: (who, me, them, lead) =>
       me === null
         ? `${who}, I just turned you in on Azerit. Your move:`
@@ -1589,19 +1584,7 @@ const en: Dict = {
     iLead: (gap) => `I'm ${gap}`,
     youLead: (gap) => `you're ${gap}`,
     sendTie: "a dead heat",
-    mailSubject: "I just turned you in on Azerit",
-    viaWhatsapp: "WhatsApp",
-    viaSms: "Text",
-    viaEmail: "Email",
-    viaLinkedin: "LinkedIn",
-    viaCopy: "Copy",
-    linkedinCopied: "Message copied: paste it into LinkedIn.",
-    previewAlt: (who) => `The face-off sent to ${who}`,
     sendCopied: (who) => `Message copied: send it to ${who}.`,
-    see: "See their sheet",
-    copyLink: "Copy link",
-    linkCopied: "Link copied.",
-    again: "Turn in someone else",
     isYou: "Is this you?",
     verify: "Check it yourself",
     notMe: "Not me: get mine",
