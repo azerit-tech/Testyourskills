@@ -1153,10 +1153,10 @@ export function createApp(opts: AppOptions) {
   mountRemoval(app, { store, limiter, leadsEndpoint: opts.leadsEndpoint, baseUrl, fetchImpl });
   // La trace du film sur un vrai téléphone, seulement si on l'a demandée (filmTrace.ts).
   if (opts.filmTraceFile) mountFilmTrace(app, { file: opts.filmTraceFile });
-  // Les bandes (§18.38) : les tableaux, la page d'une bande, entrer et sortir (bands.ts).
+  // Les bandes (§18.38) : les classements de l'accueil, les fiches d'une bande, entrer et sortir (bands.ts).
   mountBands(app, { store, limiter, ownedBy, tokenMatches, hiddenFrom, notFound: MESSAGES.not_found, withdrawn: MESSAGES.withdrawn });
-  // Leur partage : l'image 1200 × 630 d'une bande et les balises de /bandes (bandPages.ts).
-  mountBandPages(app, { store, baseUrl, ogDir, render: (input) => deps.renderImage(input), indexHtml: opts.indexHtml });
+  // Les anciennes adresses /bandes et /bandes/… : 301 vers le classement de l'accueil (§18.101, bandPages.ts).
+  mountBandPages(app);
   // Les primes (§18.4, §18.5) : tout part de data/season.json ; sans prime, rien ne change (primes.ts).
   mountPrimes(app, {
     store,

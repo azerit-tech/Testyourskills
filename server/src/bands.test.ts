@@ -519,26 +519,22 @@ describe("le nom libre d'une boîte", () => {
       .prepare(`INSERT INTO band_members (person_key, kind, band_id, label, card_id, login, stars, joined_at) VALUES (?, 'boite', ?, ?, ?, NULL, 4, ?)`)
       .run(`card:${cardId}`, bandId, label, cardId, Date.now());
 
-  it("avant trois dossiers : ni page, ni image, ni tableau ; sous sa fiche, la personne la voit", async () => {
+  it("avant trois dossiers : ni fiches publiques, ni tableau ; sous sa fiche, la personne la voit", async () => {
     const ctx = setup();
     const a = insert(ctx.store);
     const r = await join_(ctx, a, { type: "boite", name: "🚀 PETITE BOÎTE ★" });
     expect(r.status).toBe(200);
     expect(r.json.boite).toMatchObject({ id: "petite-boite", label: "Petite Boîte", members: 1, rank: null, hasPage: false });
     expect((await call(ctx, "/api/bands/boite/petite-boite")).status).toBe(404);
-    expect((await ctx.app.request("/og/b/boite/petite-boite.png")).status).toBe(404);
-    expect((await ctx.app.request("/bandes/boite/petite-boite")).status).toBe(404);
     expect((await call<BandBoard>(ctx, "/api/bands?type=boite&with=petite-boite")).json.extra).toBeNull();
     // En formation, elle reste cachée du tableau public ; une boîte de la table d'alias s'y montre.
     expect((await join_(ctx, insert(ctx.store), { type: "boite", name: "Facebook" }, { ip: "203.0.113.200" })).status).toBe(200);
     expect((await call<BandBoard>(ctx, "/api/bands?type=boite")).json.forming.map((b) => b.id)).toEqual(["meta"]);
-    // Trois dossiers : la page, l'image et le tableau.
+    // Trois dossiers : ses fiches publiques et le tableau.
     for (const id of [insert(ctx.store), insert(ctx.store)]) expect((await join_(ctx, id, { type: "boite", name: "Petite boîte" }, { ip: `203.0.113.${id.slice(-2)}` })).status).toBe(200);
     const page = await call<BandPage>(ctx, "/api/bands/boite/petite-boite");
     expect(page.status).toBe(200);
     expect(page.json.band).toMatchObject({ label: "Petite Boîte", members: 3, rank: 1, hasPage: true });
-    expect((await ctx.app.request("/og/b/boite/petite-boite.png")).status).toBe(200);
-    expect((await ctx.app.request("/bandes/boite/petite-boite")).status).toBe(200);
   });
 
   it("une boîte de la table d'alias a sa page dès le premier dossier", async () => {
@@ -569,7 +565,6 @@ describe("le nom libre d'une boîte", () => {
     expect(bandBoard(ctx.store.db, "boite").entries).toEqual([]);
     expect(bandStanding(ctx.store.db, "boite", "boite-propre")).toBeNull();
     expect((await call(ctx, "/api/bands/boite/boite-propre")).status).toBe(404);
-    expect((await ctx.app.request("/og/b/boite/boite-propre.png")).status).toBe(404);
     expect((await call<MyBands>(ctx, `/api/card/${ids[0]}/bands`, { token: `tok-${ids[0]}` })).json.boite).toBeNull();
     // On n'y entre plus par son id.
     const late = insert(ctx.store);

@@ -1,4 +1,4 @@
-// La personne d'une ligne de classement (SPEC §18.88) : la page d'une bande et le
+// La personne d'une ligne de classement (SPEC §18.88) : les fiches d'une bande et le
 // top de la semaine montrent la vraie personne, comme sa fiche. Pur.
 //
 // - Son nom : celui de la fiche. Une fiche GitHub sans nom (le bandeau y répète le

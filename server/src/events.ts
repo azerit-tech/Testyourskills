@@ -24,7 +24,7 @@ export const EVENT_NAMES = [
   "plea",
   // Le film (§18.36, docs/cinematique-poursuite.md §5.6) : une fois par lecture, ce qu'il en est advenu.
   "film",
-  // Les bandes (§18.38) : entrer et sortir, par le serveur seul ; la page d'une bande vue et son partage, par le front.
+  // Les bandes (§18.38) : entrer et sortir, par le serveur seul ; une bande ouverte au classement de l'accueil et son partage, par le front (§18.101).
   "band_join",
   "band_leave",
   "band_view",

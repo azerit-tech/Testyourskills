@@ -10,7 +10,7 @@
 // Raccourcis : coller une URL GitHub ou LinkedIn, ou déposer un PDF, n'importe où sur
 // la page lance la carte.
 import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
-import type { FormEvent, ReactNode } from "react";
+import type { FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { detectEntry, normalizeLinkedinUrl, parseGithubLogin, resolveDoor } from "../../../shared/entry";
 import type { Door } from "../../../shared/entry";
@@ -19,7 +19,7 @@ import { api, ApiError, isMock, tokens } from "../lib/api";
 import { loadAccount, mockLinkCard, signOut, useAccount } from "../lib/account";
 import { doneReturn, findPct, getReturn, leadReturn, releaseReturn, startGithubLogin, startLinkedinLogin, subscribeReturn } from "../lib/entryApi";
 import { errorFact } from "../lib/errors";
-import { navigate, onLinkClick } from "../lib/router";
+import { navigate, onLinkClick, RANKING_HREF } from "../lib/router";
 import { loadCardPage } from "../pages/cardPageLoader";
 import { unlockAudio } from "../lib/audio";
 import { unlockFilm } from "../film/unlock";
@@ -37,13 +37,9 @@ interface Props {
   inputRef?: React.RefObject<HTMLInputElement | null>;
   /** « inline » : sans onglets ni CV, pour le bandeau d'une carte partagée. */
   variant?: "full" | "inline";
-  /** Une ligne posée entre la pilule et les liens du pied (ce qu'il faut faire ensuite, sur la page d'une bande). */
-  note?: ReactNode;
   /** Un second formulaire sur la même page (le bas de l'accueil) : ni focus d'emblée, ni
    * raccourcis de page (collage, dépôt de PDF), que le premier porte déjà. */
   secondary?: boolean;
-  /** La fiche vient d'être créée, avant de partir vers elle (la page d'une bande y accroche sa bande). */
-  onCreated?: (id: string) => void;
   /** Ouvert par « Faire une autre fiche » : les boutons d'aujourd'hui, jamais « Voir ma fiche » (§18.91). */
   another?: boolean;
 }
@@ -143,7 +139,7 @@ function intoView(el: HTMLElement | null) {
   el.scrollIntoView({ block: "center", behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
 }
 
-export function EntryForm({ inputRef, variant = "full", note, secondary = false, onCreated, another = false }: Props) {
+export function EntryForm({ inputRef, variant = "full", secondary = false, another = false }: Props) {
   const inline = variant === "inline";
   const { t, lang } = useT();
   const h = t.home;
@@ -292,7 +288,6 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
         if (isMock()) mockLinkCard(res.id);
         void loadAccount(true);
       }
-      onCreated?.(res.id);
       navigate(`/c/${res.id}`);
     } catch (err) {
       busyRef.current = false;
@@ -650,10 +645,10 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
       onClick={() => {
         const board = document.getElementById(WEEK_ID);
         if (board) board.scrollIntoView({ block: "start", behavior: "smooth" });
-        else navigate("/bandes");
+        else navigate(RANKING_HREF);
       }}
     >
-      {document.getElementById(WEEK_ID) ? h.meanwhileTop : h.meanwhileBands}
+      {document.getElementById(WEEK_ID) ? h.meanwhileTop : h.meanwhileRanking}
     </button>
   );
   /** GitHub vient de rendre la main : un aller-retour, son bouton attend. */
@@ -923,8 +918,6 @@ export function EntryForm({ inputRef, variant = "full", note, secondary = false,
       {meanwhile}
 
       {submitBtn(mode === "both" ? h.submitBoth : h.submit)}
-
-      {note}
 
       {orLine}
       <div className="entry-foot" id={buttonsOn ? undefined : `${uid}-hint`}>

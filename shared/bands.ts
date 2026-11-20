@@ -17,7 +17,7 @@
 import raw from "../data/bands.json";
 import type { BoardPerson, Fact, Position } from "./types";
 
-/** Les deux ligues, telles qu'elles s'écrivent dans les adresses (/bandes/ecole/:id). */
+/** Les deux ligues, telles qu'elles s'écrivent dans les adresses de l'API (/api/bands/ecole/:id). */
 export type BandType = "ecole" | "boite";
 export const BAND_TYPES: readonly BandType[] = ["ecole", "boite"];
 
@@ -102,7 +102,7 @@ export interface BandPlace {
 }
 
 /**
- * Un membre sur la page d'une bande (§18.88) : la personne de la fiche, son nom, son
+ * Un membre d'une bande, ouverte au classement de l'accueil (§18.88, §18.101) : la personne de la fiche, son nom, son
  * visage et l'adresse de sa fiche (BoardPerson). Sans `cardId` : une fiche née d'une
  * dénonciation et pas encore revendiquée, comptée sans être montrée.
  */
@@ -381,6 +381,3 @@ export function bandHasPage(type: BandType, id: string, members: number): boolea
 }
 
 export const isBandType = (x: unknown): x is BandType => x === "ecole" || x === "boite";
-
-/** Adresse de la page d'une bande. */
-export const bandPath = (b: { type: BandType; id: string }): string => `/bandes/${b.type}/${b.id}`;

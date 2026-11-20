@@ -104,7 +104,8 @@ describe("les libellés qui tranchent (§18.48)", () => {
     expect(DICTS.fr.home.submitting).toBe("On ouvre ton dossier…");
     expect(DICTS.en.home.submitting).toBe("Opening your file…");
     expect(DICTS.fr.home.hookPlay).toBe("De une à six étoiles, en une minute. Sans compte.");
-    expect(DICTS.fr.bands.home.hook).toBe("Fais ta fiche. Fais gagner ta bande.");
+    expect(DICTS.fr.chrome.ranking).toBe("Classement");
+    expect(DICTS.en.chrome.ranking).toBe("Ranking");
   });
 
   it("« C'est moi » réclame, « Faire appel » conteste, dans les deux langues", () => {
@@ -162,8 +163,8 @@ describe("pluriels et comptes à zéro", () => {
     expect([0, 1, 2].map((k) => fr.bands.dossiers(k))).toEqual(["0 fiche", "1 fiche", "2 fiches"]);
     expect([0, 1, 2].map((k) => en.primes.page.total(k))).toEqual(["0 sheets in the race", "1 sheet in the race", "2 sheets in the race"]);
     expect([0, 1, 2].map((k) => fr.primes.page.total(k))).toEqual(["0 fiche en course", "1 fiche en course", "2 fiches en course"]);
-    expect(en.bands.board.rowLabel(1, "X", 0, 1)).toBe("#1, X, 0 stars, 1 sheet");
-    expect(fr.bands.board.rowLabel(1, "X", 1, 3)).toBe("n° 1, X, 1 étoile, 3 fiches");
+    expect(en.bands.home.rowLabel(1, "X", 0, 1, false).replace(/\s/g, " ")).toBe("Spot 1: X, 0 stars, 1 sheet");
+    expect(fr.bands.home.rowLabel(1, "X", 1, 3, false).replace(/\s/g, " ")).toBe("Place 1 : X, 1 étoile, 3 fiches");
   });
 
   it("le compte à rebours d'une prime : « 1 day left », « Terminée »", () => {

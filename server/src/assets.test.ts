@@ -89,7 +89,6 @@ describe("préchargement des pages du front", () => {
     expect(pageModule("/", 200)).toBe("src/pages/Home.tsx");
     expect(pageModule("/c/abc", 200)).toBe("src/pages/CardPage.tsx");
     expect(pageModule("/c/inconnue", 404)).toBe("src/pages/CardPage.tsx");
-    expect(pageModule("/bandes/ecole/insa", 200)).toBe("src/pages/Bands.tsx");
     expect(pageModule("/primes", 200)).toBe("src/pages/Primes.tsx");
     expect(pageModule("/reglement", 200)).toBe("src/pages/Rules.tsx");
     expect(pageModule("/privacy", 200)).toBe("src/pages/Privacy.tsx");
@@ -113,6 +112,6 @@ describe("préchargement des pages du front", () => {
 
   it("laisse le HTML tel quel pour un module absent du manifeste", () => {
     const html = "<html><head></head></html>";
-    expect(withPreloads(html, MANIFEST, "/bandes", 200)).toBe(html);
+    expect(withPreloads(html, MANIFEST, "/reglement", 200)).toBe(html);
   });
 });

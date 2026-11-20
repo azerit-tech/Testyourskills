@@ -5,7 +5,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { NotFound } from "./components/ErrorPage";
 import { LangProvider } from "./i18n";
 import { isMock } from "./lib/api";
-import { navigate, routeOf, usePath } from "./lib/router";
+import { navigate, RANKING_HREF, routeOf, usePath } from "./lib/router";
 import { DirectCard } from "./pages/DirectCard";
 import { loadCardPage, loadedCardPage } from "./pages/cardPageLoader";
 
@@ -18,8 +18,6 @@ function CardPage({ id }: { id: string }) {
   const [mod] = useState(loadedCardPage);
   return mod ? <mod.CardPage id={id} /> : <CardPageLazy id={id} />;
 }
-const Bands = lazy(() => import("./pages/Bands").then((m) => ({ default: m.Bands })));
-const BandPage = lazy(() => import("./pages/Bands").then((m) => ({ default: m.BandPage })));
 const PrimesList = lazy(() => import("./pages/Primes").then((m) => ({ default: m.PrimesList })));
 const PrimePage = lazy(() => import("./pages/Primes").then((m) => ({ default: m.PrimePage })));
 const Rules = lazy(() => import("./pages/Rules").then((m) => ({ default: m.Rules })));
@@ -56,6 +54,12 @@ function BackHome() {
   return null;
 }
 
+/** Les anciennes adresses des bandes (§18.101) : l'accueil, ouvert sur son classement. */
+function ToRanking() {
+  useEffect(() => navigate(RANKING_HREF, { replace: true }), []);
+  return null;
+}
+
 function Routes() {
   const route = routeOf(usePath());
   switch (route.kind) {
@@ -67,10 +71,8 @@ function Routes() {
       return <Privacy />;
     case "credits":
       return <Credits />;
-    case "bands":
-      return <Bands />;
-    case "band":
-      return <BandPage key={`${route.type}/${route.id}`} type={route.type} id={route.id} />;
+    case "ranking":
+      return <ToRanking />;
     // Les primes et le règlement lisent eux-mêmes le serveur : une saison sans prime ramène
     // à l'accueil, une prime inconnue ou un règlement non publié le disent, une panne aussi.
     case "primes":

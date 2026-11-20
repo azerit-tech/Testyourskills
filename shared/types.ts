@@ -312,7 +312,7 @@ export interface WeekRank {
 }
 
 /**
- * La personne d'une ligne de classement (top de la semaine, page d'une bande, §18.88) :
+ * La personne d'une ligne de classement (top de la semaine, fiches d'une bande, §18.88) :
  * ce que sa fiche montre déjà. Construite par shared/boardPerson.ts.
  */
 export interface BoardPerson {

@@ -553,7 +553,7 @@ describe("image d'aperçu de l'accueil (/og/home.png)", () => {
     writeFileSync(join(root, "index.html"), INDEX);
     const p1 = { id: "p1", company: "Entreprise Démo", contract: "stage" as const, positions: ["BE" as const], languages: [], interviews: 3, remote: true, pitch: { fr: "a", en: "b" } };
     const ctx = setup({}, { staticRoot: root, indexHtml: async () => INDEX, season: { number: 2, start: "2020-01-01", end: "2099-12-31", primes: [p1], rulesPublished: true }, rules: "# Règlement\n\nArticle 1." });
-    for (const path of ["/", "/bandes", "/privacy"]) {
+    for (const path of ["/", "/primes", "/privacy"]) {
       const html = await (await ctx.app.request(path)).text();
       const raw = /<script id="tys-config" type="application\/json">(.*?)<\/script>/.exec(html)?.[1];
       expect(raw, path).toBeTruthy();
@@ -1199,7 +1199,7 @@ describe("page /c/:id et images", () => {
     expect(map.headers.get("content-type")).toContain("application/xml");
     const xml = await map.text();
     expect(xml).toContain("<loc>https://skills.test/</loc>");
-    expect(xml).toContain("<loc>https://skills.test/bandes</loc>");
+    expect(xml).not.toContain("/bandes");
     expect(xml).not.toContain("/primes");
     expect(xml).not.toContain("/c/");
   });
@@ -1662,19 +1662,19 @@ describe("pages servies sans le site, et code HTTP des adresses inconnues (§18.
     expect(await res.text()).toContain('<link rel="stylesheet" crossorigin href="/assets/index-abc.css">');
   });
 
-  it("une fiche, une bande, une prime, une adresse inexistantes : 404 ; les pages du site : 200", async () => {
+  it("une fiche, une prime, une adresse inexistantes : 404 ; les pages du site : 200", async () => {
     const root = mkdtempSync(join(tmpdir(), "tys-web-"));
     const index = `<html><head></head><body><div id="root"></div></body></html>`;
     writeFileSync(join(root, "index.html"), index);
     const ctx = setup({}, { staticRoot: root, indexHtml: async () => index });
     const { id } = await generate(ctx);
-    for (const path of ["/c/Inconnue01", "/bandes/ecole/nexistepas", "/bandes/zzz/zzz", "/zzz/zzz", "/c/abc/def", "/un.point.dans.le.nom", "/reglement"]) {
+    for (const path of ["/c/Inconnue01", "/zzz/zzz", "/c/abc/def", "/un.point.dans.le.nom", "/reglement"]) {
       const res = await ctx.app.request(path);
       expect(res.status, path).toBe(404);
       // Le front, qui dessine sa page introuvable.
       expect(await res.text(), path).toContain('<div id="root">');
     }
-    for (const path of ["/", "/confidentialite", "/privacy", "/bandes", `/c/${id}`, "/kevin-dev42", "/%40octocat"]) {
+    for (const path of ["/", "/confidentialite", "/privacy", `/c/${id}`, "/kevin-dev42", "/%40octocat"]) {
       expect((await ctx.app.request(path)).status, path).toBe(200);
     }
     // Sans le front : la page de message du serveur, dans la langue du navigateur.

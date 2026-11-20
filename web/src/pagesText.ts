@@ -198,7 +198,7 @@ const fr = {
     plate: { none: "Inconnu", down: "Hors ligne", crash: "Hors ligne" },
     plateSub: "N° ?????? · ??.??.??",
     /** Le titre de l'onglet, propre à chaque page d'erreur. */
-    tab: { card: "Fiche introuvable", band: "Bande introuvable", prime: "Prime introuvable", down: "Commissariat injoignable", crash: "Page interrompue" },
+    tab: { card: "Fiche introuvable", prime: "Prime introuvable", down: "Commissariat injoignable", crash: "Page interrompue" },
     /** Le serveur ne répond pas : jamais « introuvable », toujours « Réessayer ». */
     down: {
       title: "Le commissariat ne répond pas",
@@ -215,12 +215,6 @@ const fr = {
       title: "Cette fiche n'existe pas, ou plus",
       text: "Elle a peut-être été supprimée.",
       action: "Faire ma fiche",
-    },
-    band: {
-      title: "Cette bande n'est pas au tableau",
-      text: "Trois fiches d'une même école ou d'une même boîte suffisent pour la monter.",
-      action: "Faire ma fiche",
-      alt: "Toutes les bandes",
     },
     prime: {
       title: "Cette prime n'existe pas",
@@ -344,10 +338,10 @@ const fr = {
         h: "Les bandes",
         blocks: [
           [
-            "La fiche que tu fais entre d'office dans la bande de l'école et de la boîte lues sur ton profil, une de chaque au plus ; faite depuis la page d'une bande, elle entre dans celle-là. Une fiche faite par quelqu'un d'autre pour te dénoncer n'y entre pas tant que tu ne l'as pas revendiquée.",
+            "La fiche que tu fais entre d'office dans la bande de l'école et de la boîte lues sur ton profil, une de chaque au plus. Une fiche faite par quelqu'un d'autre pour te dénoncer n'y entre pas tant que tu ne l'as pas revendiquée.",
             "On garde cette entrée avec l'identifiant de la fiche et ses étoiles ; si tu sors, on retient ta sortie pour ne pas t'y remettre.",
             "L'école lue sur ton profil ne s'affiche pas sur ta fiche : elle ne sert qu'à ta bande.",
-            "Le nom et la photo de ta fiche s'affichent sur la page de la bande de ton école et de ta boîte, avec un lien vers ta fiche ; ils en partent quand tu sors de la bande ou que tu supprimes ta fiche.",
+            "Le nom et la photo de ta fiche s'affichent sous ton école et ta boîte, au classement de l'accueil, avec un lien vers ta fiche ; ils en partent quand tu sors de la bande ou que tu supprimes ta fiche.",
             "Pour changer ou en sortir : « Changer » ou « Sortir », sous ta fiche. Supprimer ta fiche t'en retire aussi, la masquer la retire du compte.",
           ],
         ],
@@ -375,7 +369,7 @@ const fr = {
             "les dénonciations envoyées, les visites d'une fiche dénoncée, les fiches dénoncées revendiquées ;",
             "les votes du jury, les plaidoyers ;",
             "le déroulement du film ;",
-            "les entrées et sorties de bande, les pages de bande vues et partagées ;",
+            "les entrées et sorties de bande, les bandes ouvertes au classement et partagées ;",
             "les pages de prime vues, les inscriptions et retraits de prime.",
           ],
           "Gardés 180 jours, puis effacés. Une fiche supprimée n'y est plus nommée. Pas de cookie publicitaire, pas d'outil tiers.",
@@ -410,7 +404,7 @@ const en: PagesDict = {
     stamp: { none: "Not found", down: "No answer", crash: "Cut off" },
     plate: { none: "Unknown", down: "Offline", crash: "Offline" },
     plateSub: "No. ?????? · ??.??.??",
-    tab: { card: "Sheet not found", band: "Crew not found", prime: "Bounty not found", down: "Station not answering", crash: "Page cut off" },
+    tab: { card: "Sheet not found", prime: "Bounty not found", down: "Station not answering", crash: "Page cut off" },
     down: {
       title: "The station is not answering",
       text: "Nothing is lost. Try again in a moment.",
@@ -426,12 +420,6 @@ const en: PagesDict = {
       title: "This sheet doesn't exist, or no longer does",
       text: "It may have been deleted.",
       action: "Get my rap sheet",
-    },
-    band: {
-      title: "This crew is not on the board",
-      text: "Three sheets from the same school or company are enough to start it.",
-      action: "Get my rap sheet",
-      alt: "All crews",
     },
     prime: {
       title: "This bounty doesn't exist",
@@ -553,10 +541,10 @@ const en: PagesDict = {
         h: "Crews",
         blocks: [
           [
-            "The sheet you make joins the crew of the school and of the company read from your profile, one of each at most; made from a crew's page, it joins that one. A sheet someone else made to tip you off stays out until you claim it.",
+            "The sheet you make joins the crew of the school and of the company read from your profile, one of each at most. A sheet someone else made to tip you off stays out until you claim it.",
             "We keep that entry with the sheet's ID and its stars; if you leave, we remember it so you aren't put back in.",
             "The school read from your profile isn't shown on your sheet: it only serves your crew.",
-            "Your sheet's name and photo show on the page of your school's crew and your company's crew, with a link to your sheet; they go when you leave the crew or delete your sheet.",
+            "Your sheet's name and photo show under your school and your company, in the home ranking, with a link to your sheet; they go when you leave the crew or delete your sheet.",
             "To switch or leave: “Switch” or “Leave”, under your sheet. Deleting your sheet removes you too, hiding it takes it out of the count.",
           ],
         ],
@@ -584,7 +572,7 @@ const en: PagesDict = {
             "tip-offs sent, visits to a tipped-off sheet, tipped-off sheets claimed;",
             "jury votes, pleas;",
             "how the film played;",
-            "crews joined and left, crew pages viewed and shared;",
+            "crews joined and left, crews opened in the ranking and shared;",
             "bounty pages viewed, bounties entered and withdrawn.",
           ],
           "Kept 180 days, then erased. A deleted sheet is no longer named in them. No ad cookies, no third-party tools.",
