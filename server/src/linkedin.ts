@@ -19,6 +19,7 @@ import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Context, Hono } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
+import { fileOf } from "../../shared/caseFile";
 import type { CardData, ComparisonData } from "../../shared/types";
 import { linkedinKey, type AccountKit } from "./account";
 import { ownerFromRequest, safeReturnPath, sign, unsign } from "./auth";
@@ -65,6 +66,36 @@ export async function readAvatar(avatarDir: string, file: string): Promise<{ byt
   if (!m) return null;
   const bytes = await readFile(join(avatarDir, file)).catch(() => null);
   return bytes ? { bytes, type: MIME[m[2] as Ext] } : null;
+}
+
+/**
+ * Range une photo sous le nom de la fiche (`{id}.jpg`) et rend son adresse chez nous,
+ * qui change à chaque photo (`?v=`). Une photo de LinkedIn est une adresse signée qui
+ * expire : la fiche n'en garde jamais que cette copie (§18.99).
+ */
+export async function savePhoto(avatarDir: string, baseUrl: string, id: string, photo: { bytes: Uint8Array; ext: Ext }): Promise<string> {
+  await mkdir(avatarDir, { recursive: true });
+  await removeAvatars(avatarDir, [id]);
+  const path = join(avatarDir, `${id}.${photo.ext}`);
+  const tmp = `${path}.${process.pid}.tmp`;
+  await writeFile(tmp, photo.bytes);
+  await rename(tmp, path);
+  return `${baseUrl}/avatar/${id}.${photo.ext}?v=${Date.now().toString(36)}`;
+}
+
+/** Télécharge une photo LinkedIn (media.licdn.com) et la range sous le nom de la fiche : son adresse chez nous. */
+export async function keepPhoto(url: string, id: string, o: { avatarDir: string; baseUrl: string; fetchImpl: typeof fetch }): Promise<string> {
+  return savePhoto(o.avatarDir, o.baseUrl, id, await downloadPhoto(url, o.fetchImpl));
+}
+
+/** La photo servie par nous (`{baseUrl}/avatar/{fichier}`), lue sur disque ; null pour toute autre adresse. */
+export async function ownPhoto(avatarUrl: string | undefined, baseUrl: string, avatarDir: string): Promise<{ bytes: Uint8Array; ext: Ext } | null> {
+  const prefix = `${baseUrl}/avatar/`;
+  if (!avatarUrl?.startsWith(prefix)) return null;
+  const file = avatarUrl.slice(prefix.length).split(/[?#]/)[0] ?? "";
+  const m = AVATAR_FILE_RE.exec(file);
+  const found = m ? await readAvatar(avatarDir, file) : null;
+  return found && m ? { bytes: found.bytes, ext: m[2] as Ext } : null;
 }
 
 /**
@@ -216,6 +247,34 @@ function withPhoto(card: CardData, avatarUrl: string, name?: string): CardData {
   // Pas de vrai nom (le bandeau affichait le pseudo) : on prend celui de LinkedIn.
   const useName = name && card.login && card.name === card.login;
   return { ...card, avatarUrl, photoSource: "linkedin", ...(useName ? { name } : {}) };
+}
+
+/** La fiche montre-t-elle déjà une photo LinkedIn (§18.99) ? Un dossier : sa fiche. */
+export function showsLinkedinPhoto(row: CardRow): boolean {
+  const card = row.kind === "comparison" ? fileOf(row.data as ComparisonData) : (row.data as CardData);
+  return !!card.avatarUrl && card.photoSource === "linkedin";
+}
+
+/**
+ * La photo que « Se connecter avec LinkedIn » vient de rendre, posée sur la fiche de la
+ * personne qui n'en montre pas encore (§18.99) : sa fiche retrouvée par son compte, ou
+ * resservie du cache. Rien ne change si la fiche a déjà la sienne ; une panne ne casse rien.
+ */
+export async function giveSignInPhoto(
+  row: CardRow,
+  picture: string | undefined,
+  o: { store: Store; avatarDir: string; baseUrl: string; fetchImpl: typeof fetch; removeImages(ids: string[]): Promise<void> },
+): Promise<boolean> {
+  const file = o.store.fileRow(row.id) ?? row;
+  if (!picture || showsLinkedinPhoto(file)) return false;
+  try {
+    const avatarUrl = await keepPhoto(picture, file.id, o);
+    await o.removeImages(applyPhoto(o.store, file, avatarUrl));
+    return true;
+  } catch (err) {
+    console.warn(`[linkedin ${file.id}] photo de connexion non posée :`, (err as Error).message);
+    return false;
+  }
 }
 
 /** Pose la photo sur la carte visée et dans tout son groupe. Renvoie les ids touchés. */
@@ -376,7 +435,11 @@ export function mountLinkedin(app: Hono, o: LinkedinRoutesOptions) {
         const account = kit && profile.sub ? kit.signIn(c, { linkedinKey: linkedinKey(kit.secret, profile.sub) }) : null;
         // Sa fiche est en ligne : droit dessus, sans recherche ni calcul. « Refaire ma fiche » passe outre.
         const mine = account && !entering?.redo ? kit!.cardOf(account) : null;
-        if (mine) return c.redirect(`${o.baseUrl}/c/${mine.id}`, 302);
+        if (mine) {
+          // Sa fiche n'a pas encore de photo LinkedIn : celle que LinkedIn vient de rendre (§18.99).
+          await giveSignInPhoto(mine, profile.picture, o);
+          return c.redirect(`${o.baseUrl}/c/${mine.id}`, 302);
+        }
         const done = await o.enter.finish(c, enterPath, profile, account?.id);
         return done;
       } catch (err) {
@@ -388,22 +451,16 @@ export function mountLinkedin(app: Hono, o: LinkedinRoutesOptions) {
     const code = c.req.query("code");
     // Annulation côté LinkedIn : ?error=user_cancelled_login, pas de code.
     if (!code || c.req.query("error")) return c.redirect(back(id, "error"), 302);
-    const row = o.store.getCard(id);
+    // La fiche qui se montre à cette adresse (§18.99) : le dossier qui a remplacé la fiche, ou celui
+    // d'une pièce. La photo posée sur la fiche remplacée ne se verrait pas.
+    const row = o.store.fileRow(id);
     if (!row) return c.redirect(back(null, "error"), 302);
+    const fileId = row.id;
 
     try {
       const profile = await fetchProfile(code, o.config, redirectUri, o.fetchImpl);
       if (!profile.picture) throw new PhotoError("pas de photo sur ce profil");
-      const { bytes, ext } = await downloadPhoto(profile.picture, o.fetchImpl);
-
-      await mkdir(o.avatarDir, { recursive: true });
-      await removeAvatars(o.avatarDir, [id]);
-      const path = join(o.avatarDir, `${id}.${ext}`);
-      const tmp = `${path}.${process.pid}.tmp`;
-      await writeFile(tmp, bytes);
-      await rename(tmp, path);
-
-      const avatarUrl = `${o.baseUrl}/avatar/${id}.${ext}?v=${Date.now().toString(36)}`;
+      const avatarUrl = await keepPhoto(profile.picture, fileId, o);
       const ids = applyPhoto(o.store, row, avatarUrl, profile.name);
       await o.removeImages(ids);
       return c.redirect(back(id, "linkedin"), 302);

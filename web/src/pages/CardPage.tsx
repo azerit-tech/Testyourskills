@@ -2,7 +2,7 @@
 // affichage direct (sans pack) pour un lien partagé.
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
-import { fileOf } from "../../../shared/caseFile";
+import { fileOf, shownPhoto } from "../../../shared/caseFile";
 import type { CardData, Fact, Finding, JobState, ProgressEvent } from "../../../shared/types";
 import { declaredOf, LEVEL_LABELS, starsFor } from "../../../shared/types";
 import { AddSource, Claim, Contest, EmailForm, Hiring, LinkedInPhoto, ShareBar, useMe, useToast } from "../components/After";
@@ -818,7 +818,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
             <RecruiterRead item={item} shared={false} />
             {/* Ses pièces à conviction sont au dos de la fiche (§18.27), dossier à deux pièces compris. */}
             <Claim cardId={id} login={cardLogin} lawyer={!owner} me={me} onMe={onMe} toast={toast.show} />
-            <LinkedInPhoto cardId={id} hasAvatar={item.kind === "card" ? !!item.card.avatarUrl : !!item.comparison.cv.avatarUrl} />
+            <LinkedInPhoto cardId={id} photo={shownPhoto(main)} />
             {item.kind === "card" && !proveFirst && <AddSource card={item.card} />}
             <EmailForm cardId={id} />
             <Contest card={main} cardId={id} onDeleted={onDeleted} />

@@ -118,6 +118,8 @@ export interface EntryIdentity {
   profileHow: "email" | "photo" | "employer" | "picked";
   /** Le compte de la personne connectée (§18.91), sinon absent. */
   accountId?: string;
+  /** La photo que LinkedIn vient de rendre (§18.99) : la photo de sa fiche, d'office. */
+  picture?: string;
 }
 
 export interface LinkedinEnterOptions {
@@ -447,6 +449,7 @@ export function createLinkedinEnter(app: Hono, o: LinkedinEnterOptions) {
       sureProfile: sure && r.how !== "employer",
       profileHow: sure && r.how ? r.how : "picked",
       ...(found.session.accountId ? { accountId: found.session.accountId } : {}),
+      ...(found.session.picture ? { picture: found.session.picture } : {}),
       used() {
         sessions.delete(found.id);
         deleteCookie(c, ENTER_COOKIE, cookieBase);
