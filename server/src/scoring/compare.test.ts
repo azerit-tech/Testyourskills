@@ -108,13 +108,13 @@ describe("un dossier à deux pièces : aucun écart, aucun titre", () => {
     });
   }
 
-  it("Jacques : la note du dossier, 80 (72 sous 0.5.0, la preuve +1) ; Lumine : 75 (66, les mois de fondatrice cumulés), code non prouvé, pièce GitHub trop mince pour juger", () => {
+  it("Jacques : la note du dossier, 80 (72 sous 0.5.0, la preuve +1) ; Lumine : 76 (75 sous 0.6.0, la courbe de la note), code non prouvé, pièce GitHub trop mince pour juger", () => {
     const j = jacquesDossier().cmp;
     expect(j.grid!.overall).toBe(80);
     expect(j.github.unjudged).toBeUndefined();
     expect(codeJudged(j)).toBe(true);
     const l = lumineDossier().cmp;
-    expect(l.grid!.overall).toBe(75);
+    expect(l.grid!.overall).toBe(76);
     expect(l.grid!.rule).toBe("capped_unproven");
     expect(l.github.unjudged).toBe(true);
     expect(codeJudged(l)).toBe(false);

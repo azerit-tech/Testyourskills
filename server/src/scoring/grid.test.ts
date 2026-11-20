@@ -125,15 +125,16 @@ describe("les deux fondateurs (§7), à un point près", () => {
   // Barème 0.6.0 (§18.106) : la preuve +1 sur chaque critère montré par GitHub (stack 9, code 8, activité 9,
   // ownership 9, open source 7) et sur le poste confirmé par le code (expérience 7) ; Azerit fondée et tenue
   // 7 mois se lit dans la table LinkedIn de l'ownership (6, compté). GitHub 77 → 87, dossier 72 → 80 ;
-  // la pièce LinkedIn recoupée par le code 60 → 67 (seule, toujours 60).
-  it("Jacques, niveau « Junior » : LinkedIn 67 recoupé (60 seul), GitHub 87 (77 sous 0.5.0), dossier 80 (72) : la preuve +1", () => {
+  // la pièce LinkedIn recoupée par le code 60 → 67 (seule, toujours 60). 0.7.0, la courbe de la note
+  // (§18.117) : la pièce LinkedIn 67 → 73, GitHub et dossier inchangés.
+  it("Jacques, niveau « Junior » : LinkedIn 73 recoupé (67 sous 0.6.0), GitHub 87, dossier 80 : la preuve +1, la courbe", () => {
     expect(scores(jLinkedin)).toEqual({ EDU: 6, XP: 3, EMP: 7, STK: null, CODE: null, ACT: null, OWN: 6, OSS: null });
     expect(scores(jGithub)).toEqual({ EDU: null, XP: 4, EMP: null, STK: 9, CODE: 8, ACT: 9, OWN: 9, OSS: 7 });
     expect(scores(jCase)).toEqual({ EDU: 6, XP: 3, EMP: 7, STK: 9, CODE: 8, ACT: 9, OWN: 9, OSS: 7 });
     expect(jLinkedin.seniority).toEqual({ code: "junior", months: 13.5, source: "linkedin" });
     expect(jGithub.seniority).toEqual({ code: "junior", months: 24, source: "github" });
     expect(jCase.seniority).toEqual(jLinkedin.seniority);
-    expect(jLinkedin.overall).toBe(67);
+    expect(jLinkedin.overall).toBe(73);
     expect(jGithub.overall).toBe(87);
     expect(jCase.overall).toBe(80);
     // L'expérience ne pèse plus, nulle part : elle garde sa lecture, hors moyenne.
@@ -150,14 +151,15 @@ describe("les deux fondateurs (§7), à un point près", () => {
 
   // Barème 0.4.0 : LinkedIn 45, dossier 45. 0.5.0 : 66. 0.6.0 : deux entreprises fondées, 21 mois cumulés,
   // l'expérience à 8 (au lieu de 6, chacune lue seule) et l'ownership déclaré à 6 (au lieu de 4) : 75.
-  it("Lumine, niveau « Junior » : LinkedIn 75 (66 sous 0.5.0, les mois de fondatrice cumulés), GitHub 20 (dossier vide), dossier 75 « code non prouvé »", () => {
+  // 0.7.0 : la courbe de la note, 75 → 76.
+  it("Lumine, niveau « Junior » : LinkedIn 76 (75 sous 0.6.0, 66 sous 0.5.0), GitHub 20 (dossier vide), dossier 76 « code non prouvé »", () => {
     expect(scores(lLinkedin)).toEqual({ EDU: 8, XP: 3, EMP: 8, STK: null, CODE: null, ACT: null, OWN: 6, OSS: null });
     expect(lLinkedin.seniority?.code).toBe("junior");
-    expect(lLinkedin.overall).toBe(75);
+    expect(lLinkedin.overall).toBe(76);
     expect(lGithub.overall).toBe(20);
     expect(lGithub.rule).toBe("empty_file");
     expect(lGithub.criteria.every((c) => c.score === null && !c.counted)).toBe(true);
-    expect(lCase.overall).toBe(75);
+    expect(lCase.overall).toBe(76);
     expect(lCase.rule).toBe("capped_unproven");
     expect(crit(lCase, "STK").state).toBe("unproven");
     expect(crit(lCase, "ACT").state).toBe("unproven");
@@ -174,7 +176,7 @@ describe("les deux fondateurs (§7), à un point près", () => {
     expect(sp(crit(jLinkedin, "EMP").next?.fr)).toBe("Pour 9 : un an dans une équipe produit exigeante (startup, scale-up), ou une entreprise fondée tenue un an.");
     // La table lue est celle du niveau, portée par la grille : la ligne obtenue y figure.
     expect(crit(jLinkedin, "EMP").table?.map((r) => r.score)).toEqual(GRID.EMP.tables.junior.map((r) => r.score));
-    expect(sp(crit(jLinkedin, "EMP").table?.find((r) => r.score === 6)?.text.fr)).toBe("6 mois dans une équipe produit exigeante (startup, scale-up), ou une entreprise fondée tenue 6 mois, ou un poste tenu 2 ans.");
+    expect(sp(crit(jLinkedin, "EMP").table?.find((r) => r.score === 6)?.text.fr)).toBe("6 mois dans une équipe produit exigeante (startup, scale-up), ou une entreprise fondée tenue 6 mois, ou un poste tenu 2 ans, ou 12 mois de stage ou d'alternance cumulés, ou un stage ou une alternance de 4 mois ou plus dans une équipe produit exigeante (startup, scale-up).");
     expect(sp(crit(jGithub, "STK").next?.fr)).toBe("Pour 10 : 600 commits dans ton langage principal (tu en as 329).");
     expect(sp(crit(jGithub, "OWN").reached.fr)).toBe("Un projet porté 6 mois ou plus (50 commits), et de quoi mettre en production (sequence-mail).");
     expect(sp(crit(jGithub, "OWN").next?.fr)).toBe("Pour 10 : un projet porté un an ou plus (100 commits), publié, utilisé par d'autres (25 stars GitHub ou 2 comptes externes qui contribuent).");
@@ -223,7 +225,7 @@ describe("les recoupements LinkedIn × GitHub : la pièce « recoupé » (§3, �
     // Le poste confirmé par le code : l'expérience 6 → 7, la seule note qui bouge.
     expect(scores(jDeclared())).toEqual({ ...scores(alone), EMP: score(alone, "EMP")! + 1 });
     expect(crit(jDeclared(), "EMP").bonus).toBe(1);
-    expect([alone.overall, jDeclared().overall]).toEqual([60, 67]);
+    expect([alone.overall, jDeclared().overall]).toEqual([69, 73]);
     // Au dossier, les notes déclarées sont celles de la pièce lue seule, plus la preuve quand le code la confirme.
     for (const c of jCase().criteria) if (c.declared != null) expect(c.declared, c.code).toBe(score(jDeclared(), c.code));
   });
@@ -314,7 +316,7 @@ describe("aucune note par addition", () => {
       }
   });
 
-  it("la note finale est la moyenne pondérée, vérifiée à la main", () => {
+  it("la note finale est la moyenne pondérée passée par la courbe, vérifiée à la main", () => {
     const c = (code: CriterionCode, score: number | null): Omit<GridCriterion, "counted"> => ({
       code,
       score,
@@ -325,27 +327,29 @@ describe("aucune note par addition", () => {
     });
     // Le niveau ne pèse pas (coefficient 0) ; l'expérience pèse 4 depuis 0.6.0. Sans l'école ni l'open source :
     // (4 × 4 + 8 × 2 + 6 × 1,5 + 2 × 1,5 + 10) ÷ 10 = 54 ÷ 10 = 5,4.
-    // École 4 sous 5,4 : dehors. Open source 8 au-dessus : dedans, 58 ÷ 10,5 = 5,52 → 55 (58 sous 0.5.0, l'expérience à 2,5).
+    // École 4 sous 5,4 : dehors. Open source 8 au-dessus : dedans, 58 ÷ 10,5 = 5,52, une moyenne de 55,2 sur 100.
+    // La courbe (0.7.0, §18.117) : entre 35 et 55, 1,6 point par point de moyenne ; entre 55 et 77, 0,45 :
+    // 67 + 0,24 × 10 ÷ 22 = 67,1 → 67 (55 sous 0.6.0).
     const g = finalize([c("EDU", 4), c("XP", 4), c("EMP", 4), c("STK", 6), c("CODE", 8), c("ACT", 10), c("OWN", 2), c("OSS", 8)]);
-    expect(g.overall).toBe(55);
+    expect(g.overall).toBe(67);
     expect(g.criteria.filter((x) => !x.counted).map((x) => x.code)).toEqual(["EDU", "XP"]);
     expect(g.weights).toEqual(GRID.weights);
     // Dix ans ou un an d'expérience : la même note, à critères égaux.
-    expect(finalize([c("EDU", 4), c("XP", 10), c("EMP", 4), c("STK", 6), c("CODE", 8), c("ACT", 10), c("OWN", 2), c("OSS", 8)]).overall).toBe(55);
-    // (7 × 4 + 7 × 2 + 6 × 1,5 + 6 × 1,5 + 8) ÷ 10 = 6,8 → 68 ; arrondi au supérieur à ,5 : (60 + 7 + 3,5) ÷ 11,5 = 6,13 → 61.
-    expect(finalize([c("EDU", 6), c("XP", 3), c("EMP", 7), c("STK", 6), c("CODE", 7), c("ACT", 8), c("OWN", 6), c("OSS", 6)]).overall).toBe(68);
-    expect(finalize([c("EDU", 7), c("XP", 3), c("EMP", 5), c("STK", 6), c("CODE", 7), c("ACT", 8), c("OWN", 6), c("OSS", 7)]).overall).toBe(61);
-    // Rien n'est ajouté à une base : tous les critères à n donnent 10 × n.
-    for (const n of [2, 5, 8]) expect(finalize(CRITERION_CODES.map((k) => c(k, n))).overall).toBe(10 * n);
+    expect(finalize([c("EDU", 4), c("XP", 10), c("EMP", 4), c("STK", 6), c("CODE", 8), c("ACT", 10), c("OWN", 2), c("OSS", 8)]).overall).toBe(67);
+    // (7 × 4 + 7 × 2 + 6 × 1,5 + 6 × 1,5 + 8) ÷ 10 = 6,8, 68 → 72,9 → 73 ; arrondi au supérieur à ,5 : (60 + 7 + 3,5) ÷ 11,5 = 6,13, 61,3 → 69,9 → 70.
+    expect(finalize([c("EDU", 6), c("XP", 3), c("EMP", 7), c("STK", 6), c("CODE", 7), c("ACT", 8), c("OWN", 6), c("OSS", 6)]).overall).toBe(73);
+    expect(finalize([c("EDU", 7), c("XP", 3), c("EMP", 5), c("STK", 6), c("CODE", 7), c("ACT", 8), c("OWN", 6), c("OSS", 7)]).overall).toBe(70);
+    // Rien n'est ajouté à une base : tous les critères à n donnent la courbe de 10 × n, n elle-même sous 3,5 et à partir de 7,7.
+    expect([2, 5, 8].map((n) => finalize(CRITERION_CODES.map((k) => c(k, n))).overall)).toEqual([20, 59, 80]);
     // Déclaré (LinkedIn ou CV, sans preuve) : compté comme le reste depuis 0.6.0, vers le haut comme vers le bas.
-    // Expérience 8 et stack 4 : (8 × 4 + 4 × 1,5) ÷ 5,5 = 6,91 → 69 (80 sous 0.5.0, la stack hors moyenne) ;
-    // expérience 5 et stack 6 : (5 × 4 + 6 × 1,5) ÷ 5,5 = 5,27 → 53.
+    // Expérience 8 et stack 4 : (8 × 4 + 4 × 1,5) ÷ 5,5 = 6,91 → 73 (69 sous 0.6.0, 80 sous 0.5.0, la stack hors moyenne) ;
+    // expérience 5 et stack 6 : (5 × 4 + 6 × 1,5) ÷ 5,5 = 5,27 → 63 (53).
     const declared = (code: CriterionCode, n: number): Omit<GridCriterion, "counted"> => ({ ...c(code, n), state: "declared", source: "linkedin" });
     const none = (code: CriterionCode) => c(code, null);
     const li = (emp: number, stk: number) => finalize([none("EDU"), none("XP"), { ...c("EMP", emp), source: "linkedin" }, declared("STK", stk), none("CODE"), none("ACT"), none("OWN"), none("OSS")]);
-    expect(li(8, 4).overall).toBe(69);
+    expect(li(8, 4).overall).toBe(73);
     expect(li(8, 4).criteria.find((x) => x.code === "STK")!.counted).toBe(true);
-    expect(li(5, 6).overall).toBe(53);
+    expect(li(5, 6).overall).toBe(63);
   });
 
   it("un chef d'accusation ne change aucune note", () => {
@@ -555,7 +559,7 @@ describe("les traces dans le code (§3.4)", () => {
     const withGh = declaredGrid(decl(r), gh(facts()));
     const without = declaredGrid(decl(r));
     expect([crit(without, "STK").score, crit(withGh, "STK").score]).toEqual([4, 5]);
-    expect([without.overall, withGh.overall]).toEqual([56, 58]);
+    expect([without.overall, withGh.overall]).toEqual([67, 68]);
     // Sans seuil : une techno sur deux absente suffit, la retrouvée n'est pas citée
     const few = cvReading({ technos_listed: ["Kubernetes", "TypeScript"], technos_described: [] });
     expect(stackFlags(decl(few), gh(facts())).filter((x) => /^À confirmer/.test(x.fr)).map((x) => [x.fr, x.en])).toEqual([
@@ -645,21 +649,22 @@ describe("des débuts de carrière différents n'ont plus la même note (les tro
   it("cinq débuts de carrière, moins d'un an comptés chacun : plus une seule et même note, et plus 38 (0.6.0 : la stack déclarée compte, plafond 80)", () => {
     const notes = all.map((g) => g.overall);
     expect(notes).not.toEqual([38, 38, 38, 38, 38]);
-    // Deux stages : 55 (60 sous 0.5.0 : deux technos rattachées, la stack à 4, compte maintenant comme sur GitHub).
+    // Deux stages : 55 sous 0.6.0 (60 sous 0.5.0 : deux technos rattachées, la stack à 4, compte maintenant comme sur GitHub).
     // Un premier poste et un stage : 56 (60). Dix-huit mois d'alternance et de stage : 70. Un premier poste ailleurs : 60.
     // Dix mois chez un employeur très sélectif : 80, le plafond sans code prouvé (85 sous 0.5.0).
-    expect(notes).toEqual([55, 56, 70, 60, 80]);
+    // 0.7.0, la courbe de la note (§18.117) : 67, 68, 74, 69, 80, toujours cinq notes et le même ordre.
+    expect(notes).toEqual([67, 68, 74, 69, 80]);
     for (const g of all) expect(g.seniority?.code).toBe("student");
   });
 
   // Les deux fiches réelles du 19 novembre, telles que la prod les a lues (école de rang B, 6).
-  it("18 mois de stage et d'alternance (0,8 an compté, LinkedIn seul) : 38 sous 0.4.0, 70 et quatre étoiles", () => {
+  it("18 mois de stage et d'alternance (0,8 an compté, LinkedIn seul) : 38 sous 0.4.0, 70 sous 0.6.0, 74 et quatre étoiles", () => {
     const g = early([role("Alternant ingénieur logiciel", "Opérateur Télécom", "2025-09", "2026-09"), role("Stagiaire développeur", "Atelier Brume", "2025-02", "2025-08")]);
     expect(sp(crit(g, "XP").evidence?.text.fr)).toMatch(/^0,8 an compté, poste par poste\. 18 mois de stage ou d'alternance comptés pour moitié\./);
     expect(g.seniority).toEqual({ code: "student", months: 9, source: "linkedin" });
     expect(scores(g)).toMatchObject({ EDU: 6, XP: 2, EMP: 7 });
     expect(sp(crit(g, "EMP").reached.fr)).toBe("18 mois de stage ou d'alternance cumulés.");
-    expect(g.overall).toBe(70);
+    expect(g.overall).toBe(74);
     expect(starsFor(g.overall)).toBe(4);
   });
 
@@ -670,8 +675,9 @@ describe("des débuts de carrière différents n'ont plus la même note (les tro
     const highBar = early([role("Software Engineer Intern", "Fictiva Labs", "2026-03", "2026-09"), role("Stagiaire", "Usine Navale", "2025-06", "2025-08")]);
     for (const g of [one, two, product, highBar]) expect(g.seniority).toMatchObject({ code: "student", months: 4 });
     expect([one, two, product, highBar].map((g) => score(g, "EMP"))).toEqual([5, 6, 7, 10]);
-    // Un seul stage : 52 (53 sous 0.5.0, l'école à 6 pèse moins face à l'expérience au coefficient 4).
-    expect([one, two, product, highBar].map((g) => g.overall)).toEqual([52, 60, 70, 80]);
+    // Un seul stage : 52 sous 0.6.0 (53 sous 0.5.0, l'école à 6 pèse moins face à l'expérience au coefficient 4).
+    // 0.7.0, la courbe : 62, 69, 74, 80 (52, 60, 70, 80).
+    expect([one, two, product, highBar].map((g) => g.overall)).toEqual([62, 69, 74, 80]);
     expect(sp(crit(highBar, "EMP").reached.fr)).toBe("Un stage ou une alternance de 6 mois chez Fictiva Labs, employeur très sélectif à l'embauche.");
   });
 

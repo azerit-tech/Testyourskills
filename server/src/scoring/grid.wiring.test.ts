@@ -258,12 +258,13 @@ describe("les deux profils d'exemple, du fournisseur à la note de la fiche Link
 
   // 0.6.0 : exemple un, deux technos rattachées à un poste lisent la stack à 4, et elle compte comme sur GitHub (60 → 56) ;
   // exemple deux, deux entreprises fondées, 21 mois cumulés : l'expérience à 8, l'ownership à 6 (66 → 75).
-  it("exemple un : 56 ; exemple deux : 75 (60 et 66 sous 0.5.0, 41 et 45 sous 0.4.0 ; docs/bareme-recrutement.md §7)", () => {
+  // 0.7.0, la courbe de la note (§18.117) : 56 → 68, 75 → 76.
+  it("exemple un : 68 ; exemple deux : 76 (56 et 75 sous 0.6.0, 60 et 66 sous 0.5.0, 41 et 45 sous 0.4.0 ; docs/bareme-recrutement.md §7)", () => {
     const un = card(itemUn(), rawUn());
     expect(un.grid!.criteria.find((c) => c.code === "XP")!.evidence!.text.fr).toBe(
       "1,1 an compté, poste par poste. 13 mois de stage ou d'alternance comptés pour moitié. 7 mois à la tête d'Azerit. Centrale Méditerranée Finance est une association : non compté.",
     );
-    expect(un.overall).toBe(56);
-    expect(card(itemDeux(), rawDeux()).overall).toBe(75);
+    expect(un.overall).toBe(68);
+    expect(card(itemDeux(), rawDeux()).overall).toBe(76);
   });
 });

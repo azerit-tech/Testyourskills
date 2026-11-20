@@ -70,20 +70,21 @@ describe("la note dit à quel point les recruteurs te cherchent (barème 0.6.0 ;
     expect(starsFor(a.linkedin.overall)).toBe(5);
   });
 
-  it("(b) le même stage dans une entreprise que rien ne distingue : nettement plus bas, 60 (55 sous 0.5.0, la preuve +1)", () => {
+  // 0.7.0 (§18.117) : la courbe lève le milieu, pas le haut : (b) 60 → 69, (c) 49 → 58, (a) reste à 80.
+  it("(b) le même stage dans une entreprise que rien ne distingue : plus bas, 69 (60 sous 0.6.0, 55 sous 0.5.0)", () => {
     expect(scores(b.dossier)).toMatchObject({ EMP: 5, STK: 7, CODE: 7, ACT: 5, OWN: 7 });
-    expect(b.dossier.overall).toBe(60);
+    expect(b.dossier.overall).toBe(69);
     expect(starsFor(b.dossier.overall)).toBe(4);
     expect(starsFor(a.dossier.overall) - starsFor(b.dossier.overall)).toBe(1);
     expect(a.dossier.overall - b.dossier.overall).toBeGreaterThanOrEqual(10);
-    expect(a.linkedin.overall - b.linkedin.overall).toBeGreaterThanOrEqual(25);
+    expect(a.linkedin.overall - b.linkedin.overall).toBeGreaterThanOrEqual(10);
   });
 
-  it("(c) douze ans dans le même poste et des preuves médiocres ne passent plus devant (a) par les années : 49 (43 sous 0.5.0, la preuve +1)", () => {
+  it("(c) douze ans dans le même poste et des preuves médiocres ne passent plus devant (a) par les années : 58 (49 sous 0.6.0, 43 sous 0.5.0)", () => {
     expect(c.dossier.seniority).toMatchObject({ code: "expert", source: "linkedin" });
     expect(scores(c.dossier)).toMatchObject({ XP: 10, EMP: 5, STK: 5, CODE: 5, ACT: 3, OWN: 5 });
     expect(crit(c.dossier, "XP").counted).toBe(false);
-    expect(c.dossier.overall).toBe(49);
+    expect(c.dossier.overall).toBe(58);
     expect(starsFor(c.dossier.overall)).toBe(3);
     expect(c.dossier.overall).toBeLessThan(b.dossier.overall);
     expect(c.linkedin.overall).toBeLessThan(a.linkedin.overall);
@@ -118,8 +119,8 @@ describe("le profil type : une école d'ingénieurs, deux stages, quelques commi
   it("de bons stages : quatre étoiles, seul comme au dossier", () => {
     expect(good.linkedin.seniority).toEqual({ code: "student", months: 4, source: "linkedin" });
     expect(scores(good.linkedin)).toMatchObject({ EDU: 6, XP: 2, EMP: 7 });
-    expect(good.linkedin.overall).toBe(70);
-    expect(good.dossier.overall).toBe(70);
+    expect(good.linkedin.overall).toBe(74);
+    expect(good.dossier.overall).toBe(74);
     expect(starsFor(good.dossier.overall)).toBe(4);
   });
 
@@ -134,9 +135,9 @@ describe("le profil type : une école d'ingénieurs, deux stages, quelques commi
     expect(crit(proven.dossier, "CODE").state).toBe("scored");
   });
 
-  it("deux stages que rien ne distingue : 60, la note suit ce que valent les stages", () => {
+  it("deux stages que rien ne distingue : 69 (60 sous 0.6.0), la note suit ce que valent les stages", () => {
     expect(scores(plain.linkedin)).toMatchObject({ EMP: 6 });
-    expect(plain.dossier.overall).toBe(60);
-    expect(plain.linkedin.overall).toBe(60);
+    expect(plain.dossier.overall).toBe(69);
+    expect(plain.linkedin.overall).toBe(69);
   });
 });
