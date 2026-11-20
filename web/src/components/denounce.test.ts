@@ -130,7 +130,7 @@ describe("Dénoncer à la suite, sans recharger (§18.114)", () => {
     for (const ch of ["native", "whatsapp", "copy"]) expect(SRC).toContain(`track("${ch}")`);
     expect(SRC).toContain('api.track("card_shared", card.id, { channel, kind: "denounce" })');
     // Un seul rose par écran : le partage, juste dessous, passe en contour dès qu'une fiche est prête.
-    expect(readFileSync(join(__dirname, "denounce.css"), "utf8")).toContain(".after-block.denounce.is-done ~ .after-block.out .out-main {");
+    expect(readFileSync(join(__dirname, "denounce.css"), "utf8")).toContain(".after-block.denounce ~ .after-block.out .out-main {");
   });
 });
 
@@ -146,8 +146,8 @@ describe("Dénoncer : le champ et le message", () => {
     const e = DICTS.en.denounce;
     expect(e.sendText("@camroux", 79, 67, e.iLead(e.starsAhead(1)))).toBe("@camroux, I just turned you in on Azerit: 79 vs 67, I'm one star ahead. Your move:");
     expect(e.sendText("@camroux", 79, null, "")).toBe("@camroux, I just turned you in on Azerit. Your sheet is waiting: can you beat my 79?");
-    expect(DICTS.fr.denounce.verify).toBe("Vérifie-la toi-même");
-    expect(DICTS.en.denounce.verify).toBe("Check it yourself");
+    expect(DICTS.fr.denounce.itsMe).toBe("C'est bien moi");
+    expect(DICTS.en.denounce.itsMe).toBe("That's me");
   });
 
   it("le champ : un nom, un pseudo GitHub ou un lien LinkedIn quand le serveur lit LinkedIn, sinon GitHub seul, et il le dit", () => {
@@ -163,7 +163,7 @@ describe("Dénoncer : le champ et le message", () => {
     desk();
     const html = renderToStaticMarkup(createElement(LangProvider, null, createElement(Denounce, { cardId: "AbCdEf1234", selfLogin: "leamd", toast: () => undefined })));
     expect(html).toMatch(/<div class="field field-who"><label[^>]*>Nom, pseudo GitHub ou lien LinkedIn du complice<\/label><input[^>]*placeholder="Son nom, son pseudo ou un lien"[^>]*role="combobox"/);
-    expect(html).toContain('<button type="submit" class="pill">Dénoncer</button>');
+    expect(html).toContain('<button type="submit" class="pill pill-big denounce-go">Dénoncer</button>');
     expect(SRC).toContain("useSuggestions(value, { github: true, linkedin: mixed }, false)");
     expect(SRC).toContain("useSuggestBox({ id: `${uid}-sg`, items: people, onPick: pickOne, mixed, label })");
     expect(SRC).toContain("p.login.toLowerCase() === selfLogin.toLowerCase()");

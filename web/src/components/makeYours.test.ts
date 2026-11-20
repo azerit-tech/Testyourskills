@@ -33,13 +33,13 @@ describe("la barre « Faire ma fiche » du visiteur", () => {
     expect(render(true, "en-US")).toContain(">Get my rap sheet</button>");
   });
 
-  it("fiche dénoncée qu'on peut reprendre : « Vérifie-la toi-même », seul bouton, rose (§18.104)", () => {
+  it("fiche dénoncée qu'on peut reprendre : « C'est bien moi », seul bouton, rose (§18.104, §18.118)", () => {
     const html = render(true, "fr-FR", { watch: true, onLawyer: () => undefined });
     expect(html.match(/<button/g)).toHaveLength(1);
-    expect(html).toMatch(/^<div class="dock make-yours" role="region" aria-label="Vérifie-la toi-même" inert="">/);
-    expect(html).toContain('<button type="button" class="pill pill-big dock-main">Vérifie-la toi-même</button>');
+    expect(html).toMatch(/^<div class="dock make-yours" role="region" aria-label="C&#x27;est bien moi" inert="">/);
+    expect(html).toContain('<button type="button" class="pill pill-big dock-main">C&#x27;est bien moi</button>');
     expect(html).not.toContain("Faire ma fiche");
-    expect(render(true, "en-US", { onLawyer: () => undefined })).toContain(">Check it yourself</button>");
+    expect(render(true, "en-US", { onLawyer: () => undefined })).toContain(">That&#x27;s me</button>");
   });
 
   it("pas sur ordinateur : « À ton tour » ouvre la colonne de droite, sous la tête", () => {
@@ -104,7 +104,7 @@ describe("la barre « Faire ma fiche » du visiteur", () => {
   });
 
   it("le bouton de la barre, cas par cas : vérifier sa fiche reçue, faire la sienne, ou rien (§18.104)", () => {
-    // Fiche dénoncée reçue, sans fiche ici, puis avec une autre fiche ici : « Vérifie-la toi-même » les deux fois.
+    // Fiche dénoncée reçue, sans fiche ici, puis avec une autre fiche ici : « C'est bien moi » les deux fois.
     expect(visitorBar({ verify: true, hasOwn: false })).toBe("verify");
     expect(visitorBar({ verify: true, hasOwn: true })).toBe("verify");
     // Sans fiche à soi : « Faire ma fiche », inchangé.

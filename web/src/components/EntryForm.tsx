@@ -296,6 +296,13 @@ export function EntryForm({ inputRef, variant = "full", secondary = false, anoth
       const res = await api.createCard({ login: input.login, linkedin: input.linkedin, cv: input.file ?? undefined, lang, ...(input.noGithub ? { noGithub: true } : {}), ...(input.noLinkedin ? { noLinkedin: true } : {}) });
       await page;
       if (res.deleteToken) tokens.set(res.id, res.deleteToken);
+      // Revenue de LinkedIn sur la fiche qu'on lui a dénoncée, c'est la même (§18.118) : elle vient d'être reprise,
+      // avec son jeton neuf. La page se recharge à son nom, sans révélation ; le bandeau le dit.
+      if (input.viaLogin && window.location.pathname === `/c/${res.id}`) {
+        doneReturn();
+        window.location.replace(`/c/${res.id}?claim=li`);
+        return;
+      }
       // « Réessayer » remet le lien LinkedIn dans le champ unique.
       rememberInput({ login: input.login ?? input.linkedin, file: input.file ?? null });
       markFresh(res.id, input.login, input.linkedin, !!input.file);

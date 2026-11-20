@@ -9,7 +9,7 @@ import { AddSource, Claim, Contest, EmailForm, Hiring, LinkedInPhoto, ShareBar, 
 import type { Shareable } from "../components/After";
 import { BandPick } from "../components/BandPick";
 import { Denounce } from "../components/Denounce";
-import { Denounced, useRemake } from "../components/Denounced";
+import { Denounced, useRemake, type SignIn } from "../components/Denounced";
 import { Duel, useDuelSend } from "../components/Duel";
 import { useVsSender, VsPair } from "../components/VsPair";
 import { EntryForm } from "../components/EntryForm";
@@ -38,7 +38,7 @@ import { Waiting } from "../components/Waiting";
 import { pick, useT } from "../i18n";
 import { api, ApiError, isMine, tokens, type CaseInfo } from "../lib/api";
 import { signOut, useAccount } from "../lib/account";
-import { onMine } from "../lib/entryApi";
+import { onMine, returnPending, startLinkedinLogin } from "../lib/entryApi";
 import { isClosed, isInputError } from "../lib/errors";
 import { useHold, type SceneState } from "../lib/hold";
 import { gaveUp, nextPatience, type Patience } from "../lib/patience";
@@ -223,6 +223,8 @@ export function CardPage({ id }: { id: string }) {
   const [notice, setNotice] = useState<{ text: string; n: number } | null>(null);
   // « C'est moi » vient de réussir : le pseudo GitHub repris, pour le bandeau en haut de la fiche.
   const [claimedAs, setClaimedAs] = useState<string | null>(null);
+  // « C'est bien moi » par LinkedIn vient de réussir (§18.118) : le bandeau, sans pseudo.
+  const [claimedLi, setClaimedLi] = useState(false);
   const { view, setView, sawPending, offline, onRetry } = useJob(id, nonce);
   const { kase, late: caseLate } = useCase(id, nonce);
   const fresh = freshSince(id) !== null;
@@ -265,6 +267,12 @@ export function CardPage({ id }: { id: string }) {
       const qs = params.toString();
       window.history.replaceState(window.history.state, "", window.location.pathname + (qs ? `?${qs}` : ""));
       const c = t.result.claim;
+      // Reprise par LinkedIn (§18.118) : la page a été rechargée avec le jeton neuf ; le bandeau le dit en haut.
+      if (claim === "li") {
+        setClaimedLi(true);
+        window.scrollTo(0, 0);
+        return;
+      }
       // Reprise réussie (§18.52) : pas un message qui passe, la page remonte et le dit en haut, avec « Voir ma poursuite ».
       if (claim === "ok" && as) {
         setClaimedAs(as.toLowerCase());
@@ -451,6 +459,7 @@ export function CardPage({ id }: { id: string }) {
         kase={kase}
         caseLate={caseLate}
         claimedAs={claimedAs}
+        claimedLi={claimedLi}
         notice={notice}
         me={me}
         onMe={setMe}
@@ -477,13 +486,15 @@ export interface ResultProps {
   caseLate: boolean;
   /** « C'est moi » vient de réussir pour ce pseudo : le bandeau en haut de la fiche. */
   claimedAs?: string | null;
+  /** « C'est bien moi » par LinkedIn vient de réussir (§18.118). */
+  claimedLi?: boolean;
   notice: { text: string; n: number } | null;
   me: Awaited<ReturnType<typeof api.getMe>>;
   onMe: (me: Awaited<ReturnType<typeof api.getMe>>) => void;
   onDeleted: () => void;
 }
 
-export function Result({ item, animate, start, abort, onScene, owner, fresh, kase, caseLate, claimedAs = null, notice, me, onMe, onDeleted }: ResultProps) {
+export function Result({ item, animate, start, abort, onScene, owner, fresh, kase, caseLate, claimedAs = null, claimedLi = false, notice, me, onMe, onDeleted }: ResultProps) {
   const { t, lang } = useT();
   const id = item.kind === "card" ? item.card.id : item.comparison.id;
   // Un dossier à deux pièces s'affiche comme une fiche seule : la fiche du dossier, sa note (§18.36).
@@ -579,6 +590,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
   const [claimOn, setClaimOn] = useState(() => api.knownConfig()?.claim ?? false);
   // Le serveur lit LinkedIn : « Ajoute ton LinkedIn » existe (AddLinkedin.tsx lit la même valeur).
   const [liOn, setLiOn] = useState(() => api.knownConfig()?.linkedinEntry ?? true);
+  // « Se connecter avec LinkedIn » existe : « C'est bien moi » d'une fiche LinkedIn passe par là (§18.118).
+  const [liLogin, setLiLogin] = useState(() => api.knownConfig()?.linkedinLogin ?? false);
   // Relue quand elle change : le serveur peut la rendre après le premier rendu (qui s'est connecté ici, §18.90).
   const [mine, setMine] = useState<MyCard | null>(() => myCard());
   useEffect(() => onMine(() => setMine(myCard())), []);
@@ -588,6 +601,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
       if (!alive) return;
       setClaimOn(c.claim);
       setLiOn(c.linkedinEntry);
+      setLiLogin(c.linkedinLogin);
     });
     return () => {
       alive = false;
@@ -648,20 +662,30 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
   // « Revoir ma poursuite » : dans la tête de la fiche ; sur un téléphone court, la tête se masque
   // et le lien descend sous la fiche, à côté de « Pièces à conviction » (le CSS choisit).
   const chase = scene === "film" && settled ? <ChaseLink mine={!visitor} seen={chaseWatched(id)} onPlay={playChase} /> : null;
-  // Fiche dénoncée : « Vérifie-la toi-même » reprend par GitHub, ou refait la fiche depuis son lien LinkedIn.
-  // Qui reçoit sa fiche voit d'abord sa note, puis ce seul rose, au bloc comme dans la barre,
-  // qu'il ait ou non une autre fiche dans ce navigateur (§18.104).
-  const remake = useRemake(wantedYou && !cardLogin && main.linkedinUrl ? main.linkedinUrl : null, toast.show);
+  // Fiche dénoncée (§18.104, §18.118) : « C'est bien moi », en très grand, ouvre la connexion de la fiche :
+  // GitHub pour un pseudo (la revendication du §18.1), LinkedIn pour un profil (l'entrée connectée du §18.80,
+  // dont le retour reprend la fiche) ; un dossier qui porte les deux : GitHub en grand, LinkedIn en lien.
+  // Connexion LinkedIn éteinte : la fiche se refait depuis son lien. Qui reçoit sa fiche voit d'abord sa note,
+  // puis ce seul rose, au bloc comme dans la barre, qu'il ait ou non une autre fiche dans ce navigateur.
   const claimHere = wantedYou && claimOn && cardLogin ? () => api.startClaim(id, cardLogin) : null;
-  const lawyer = claimHere ?? remake?.go ?? null;
+  const liHere = wantedYou && liLogin && main.linkedinUrl ? () => startLinkedinLogin() : null;
+  const signIns: SignIn[] = [...(claimHere ? [{ via: "github" as const, go: claimHere }] : []), ...(liHere ? [{ via: "linkedin" as const, go: liHere }] : [])];
+  const remake = useRemake(wantedYou && !cardLogin && !liHere && main.linkedinUrl ? main.linkedinUrl : null, toast.show);
+  const lawyer = signIns[0]?.go ?? remake?.go ?? null;
+  // Revenu de LinkedIn sur cette page (?li=) : le formulaire de « À ton tour » mène la suite, même pour qui a sa fiche ici.
+  const [loginBack] = useState(() => visitor && returnPending());
   // Qui a sa fiche : le duel, plus bas, l'envoi en contour ; jamais dans la barre ni dans le premier écran (§18.104).
   const duel = useDuelSend(visitor ? other : null, main, toast.show);
   // « À ton tour » : en fin de page sur téléphone (la barre fixe y mène) ; au bureau, en tête de la colonne de droite,
   // avec la phrase qui dit ce qu'on regarde (sous le bloc d'une fiche dénoncée, qui a son propre bouton rose).
-  // Qui a déjà sa fiche : le duel à la place ; sur une fiche dénoncée, l'écart seul, rien à envoyer.
-  const turn = !visitor ? null : other ? (
-    <Duel mine={other} card={main} duel={duel} info={wantedYou} />
-  ) : self && !another ? (
+  // Qui a déjà sa fiche : le duel à la place ; sur une fiche dénoncée, l'écart seul, rien à envoyer. Sur la fiche
+  // d'un autre, « Dénonce un complice » suit, en grand, au nom de sa propre fiche (§18.118).
+  const turn = !visitor ? null : other && !loginBack ? (
+    <>
+      <Duel mine={other} card={main} duel={duel} info={wantedYou} />
+      {!wantedYou && <Denounce cardId={other.id} selfLogin={other.login ?? undefined} mine={other.overall} toast={toast.show} />}
+    </>
+  ) : self && !another && !loginBack ? (
     <>
       {self.id !== id && (
         <section className="you you-mine" id="you" aria-label={t.home.back.see}>
@@ -711,6 +735,12 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
       {claimed && !me?.hidden && claimedAs === cardLogin?.toLowerCase() && (
         <p className="hidden-banner" role="status">
           {t.result.claim.claimedBanner(claimedAs)}
+        </p>
+      )}
+      {/* « C'est bien moi » par LinkedIn réussi (§18.118) : la même phrase, sans pseudo. */}
+      {claimedLi && !visitor && (
+        <p className="hidden-banner" role="status">
+          {t.result.claim.claimedBannerLi}
         </p>
       )}
 
@@ -796,7 +826,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
           <div className="visitor-col">
             {/* Fiche dénoncée (§18.6, §18.48) : qui l'a dénoncée, « C'est moi », « Ce n'est pas moi », la demande de retrait, en un bloc. */}
             {wantedYou && (
-              <Denounced who={who} by={kase?.by ?? null} onLawyer={claimHere} onRemake={remake} notMe={!other}>
+              <Denounced who={who} by={kase?.by ?? null} signIns={signIns} onRemake={remake} notMe={!other}>
                 {!cardLogin && <RemovalRequest cardId={id} short />}
               </Denounced>
             )}
@@ -805,8 +835,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
             <div className="rest">
               {/* « Comment c'est noté » (§18.37, §18.76) : un pli fermé ; ni nom d'école ni d'ancien employeur. */}
               <RecruiterRead item={item} shared />
-              {/* Fiche dénoncée : « Vérifie-la toi-même » est déjà sous la fiche. */}
-              {!(wantedYou && claimOn) && <Claim cardId={id} login={cardLogin} lawyer me={me} onMe={onMe} toast={toast.show} />}
+              {/* Fiche dénoncée : « C'est bien moi » est déjà sous la fiche, en grand ; pas de second (§18.118). */}
+              {!wantedYou && <Claim cardId={id} login={cardLogin} lawyer me={me} onMe={onMe} toast={toast.show} />}
             </div>
           </div>
         )}
@@ -828,10 +858,10 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
             <JuryLine jury={kase?.jury ?? null} />
           </div>
         )}
+        {/* Dénonce un complice (§18.6), en grand, le premier bloc sous le verdict (§18.83, §18.118) : avant le jury, le partage et le reste. */}
+        {!visitor && <Denounce cardId={id} selfLogin={cardLogin} mine={main.sealed ? null : main.overall} toast={toast.show} />}
         {/* Sous trois étoiles : « Ajoute ton LinkedIn » (ou ton GitHub) tout de suite, avant le partage. */}
         {low && missing}
-        {/* Dénonce un complice (§18.6), le premier bloc sous le verdict (§18.83) : au bureau, dans le premier écran avec le partage. */}
-        {!visitor && <Denounce cardId={id} selfLogin={cardLogin} mine={main.sealed ? null : main.overall} toast={toast.show} />}
         {/* Fiche masquée : /og/* et /c/:id répondent 404 / 410 à tous, l'image ne se télécharge pas et le lien ne montre rien. */}
         {fromRival && <Duel mine={own} card={fromRival} duel={fromDuel} from />}
         {!visitor && !(claimed && me?.hidden) && <ShareBar item={item} toast={toast.show} second={!!addFirst || !!offer} />}

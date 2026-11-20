@@ -1,8 +1,9 @@
-// La fiche d'une personne dénoncée (§18.6, §18.48, §18.52, §18.104), vue par tout visiteur sauf
-// qui l'a dénoncée : « C'est toi ? », qui vaut pour la personne visée comme pour un tiers, puis
-// les sorties. « Vérifie-la toi-même » d'abord, seul rose, qu'on ait ou non une autre fiche ici :
-// par GitHub, la personne reprend cette fiche ; par un lien LinkedIn (rien à prouver), elle la
-// refait elle-même et la nouvelle est la sienne. Aucune ligne d'explication dessous.
+// La fiche d'une personne dénoncée (§18.6, §18.48, §18.52, §18.104, §18.118), vue par tout visiteur
+// sauf qui l'a dénoncée : le premier bloc sous la fiche. « C'est bien moi », en très grand, seul rose,
+// qu'on ait ou non une autre fiche ici : un toucher ouvre la connexion de la fiche, GitHub pour un
+// pseudo, LinkedIn pour un profil (un dossier qui porte les deux : GitHub en grand, LinkedIn en lien).
+// Au retour, la fiche est la sienne ; une ligne dit ce que ça ouvre (la refaire, la cacher, la partager).
+// Connexion LinkedIn éteinte : la refaire depuis son lien, comme avant.
 // Puis « Ce n'est pas moi : faire la mienne », en lien (le formulaire est dans « À ton tour »).
 // Sans pseudo GitHub, la demande de retrait est dans le bloc.
 import { useCallback, useRef, useState } from "react";
@@ -16,6 +17,7 @@ import { navigate } from "../lib/router";
 import { markFresh, rememberInput } from "../lib/session";
 import { useReducedMotion } from "../lib/util";
 import { unlockFilm } from "../film/unlock";
+import { IconGithub, IconLinkedIn } from "./Icons";
 import { toYourTurn } from "./MakeYours";
 
 /**
@@ -56,14 +58,23 @@ export function useRemake(linkedinUrl: string | null, toast: (m: string) => void
   return linkedinUrl ? { go: () => void run(), busy: going } : null;
 }
 
+/** Une connexion qui reprend la fiche (§18.118) : GitHub pour un pseudo, LinkedIn pour un profil. */
+export interface SignIn {
+  via: "github" | "linkedin";
+  go: () => void;
+}
+
 interface Props {
   /** La personne fichée : « @pseudo », sinon son nom. */
   who: string;
   /** Qui a dénoncé, nommé s'il ou elle a repris sa fiche ; sinon « Quelqu'un ». */
   by: string | null;
-  /** La reprise par GitHub ; null sans pseudo GitHub ou si elle est éteinte. */
-  onLawyer: (() => void) | null;
-  /** Sans GitHub, dénoncée par son LinkedIn : la refaire soi-même depuis ce lien. */
+  /**
+   * « C'est bien moi » (§18.118) : les connexions de la fiche, la première en grand, la seconde (un
+   * dossier qui porte les deux) en lien dessous. Vide : rien à reprendre par une connexion.
+   */
+  signIns: SignIn[];
+  /** Connexion LinkedIn éteinte, dénoncée par son LinkedIn : la refaire soi-même depuis ce lien. */
   onRemake: Remake | null;
   /** Le visiteur n'a pas encore sa fiche : « Ce n'est pas moi : faire la mienne ». */
   notMe: boolean;
@@ -71,25 +82,44 @@ interface Props {
   children?: ReactNode;
 }
 
-export function Denounced({ who, by, onLawyer, onRemake, notMe, children }: Props) {
+const ICON = { github: IconGithub, linkedin: IconLinkedIn } as const;
+const NAME = { github: "GitHub", linkedin: "LinkedIn" } as const;
+
+export function Denounced({ who, by, signIns, onRemake, notMe, children }: Props) {
   const { t } = useT();
   const d = t.denounce;
   const reduced = useReducedMotion();
-  const mine = onLawyer ?? onRemake?.go ?? null;
-  const going = !onLawyer && !!onRemake?.busy;
-  // Un seul rose : « Vérifie-la toi-même » s'il existe, sinon « Ce n'est pas moi ».
-  // Un bouton par intention (§18.52) : avec « C'est moi », « Ce n'est pas moi » n'est qu'un lien, « À ton tour » a le formulaire.
+  const first = signIns.at(0);
+  const second = signIns.at(1);
+  const mine = first?.go ?? onRemake?.go ?? null;
+  const going = !first && !!onRemake?.busy;
+  const Icon = first ? ICON[first.via] : null;
+  // Un seul rose : « C'est bien moi », en très grand, sinon « Ce n'est pas moi ».
+  // Un bouton par intention (§18.52) : avec « C'est bien moi », « Ce n'est pas moi » n'est qu'un lien, « À ton tour » a le formulaire.
   return (
-    <section className="denounced" aria-labelledby="denounced-title">
+    <section className={`denounced${mine ? " has-claim" : ""}`} aria-labelledby="denounced-title">
       {/* Qui a dénoncé : dit une fois. Sur téléphone, la phrase au-dessus de la fiche le dit (ce rappel s'y masque) ; au bureau, ici. */}
       <p className="denounced-by">{t.result.leadDenounced(who, by)}</p>
-      <h2 className="denounced-title" id="denounced-title">
+      {/* « C'est toi ? » : la question que le bouton tranche ; lue, pas montrée, quand le bouton est là. */}
+      <h2 className={mine ? "sr-only" : "denounced-title"} id="denounced-title">
         {d.isYou}
       </h2>
       {mine && (
-        <button type="button" className="pill pill-big" aria-busy={going || undefined} onClick={mine}>
-          {going ? t.home.submitting : d.verify}
-        </button>
+        <>
+          <button type="button" className="pill denounced-me" aria-busy={going || undefined} aria-describedby="denounced-why" onClick={mine}>
+            {Icon && <Icon />}
+            <span>{going ? t.home.submitting : d.itsMe}</span>
+            {first && <span className="sr-only">{d.itsMeVia(NAME[first.via])}</span>}
+          </button>
+          <p className="denounced-why" id="denounced-why">
+            {d.itsMeWhy}
+          </p>
+          {second && (
+            <button type="button" className="link-alt denounced-also" onClick={second.go}>
+              {d.itsMeAlso(NAME[second.via])}
+            </button>
+          )}
+        </>
       )}
       {notMe && (
         <button type="button" className={mine ? "link-alt denounced-notme" : "pill pill-big"} onClick={() => toYourTurn(reduced)}>
