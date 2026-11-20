@@ -183,7 +183,7 @@
   border-radius: var(--r-block);
   background: var(--s-info);
 }
-/* 320 px : « C'est moi, je reprends ma fiche » passe à la ligne plutôt que d'élargir le bloc */
+/* 320 px : un libellé long passe à la ligne plutôt que d'élargir le bloc */
 .denounced .pill {
   max-width: 100%;
   white-space: normal;
@@ -209,21 +209,14 @@
 .denounced .denounced-notme {
   justify-self: start;
 }
-/* les deux sorties, empilées pleine largeur sur téléphone ; ce que fait la première, dit dessous */
+/* les sorties, empilées pleine largeur sur téléphone ; aucune ligne d'explication (§18.104) */
 .denounced .pill {
   width: 100%;
-}
-.denounced-hint {
-  font: var(--font-small);
-  color: var(--c-text);
-}
-.denounced .denounced-hint + .pill {
-  margin-top: 2px;
 }
 .denounced .removal {
   margin: 0;
 }
-/* Bureau : le bloc dénoncé et « À ton tour » tiennent dans le même écran ; « C'est moi » (ou « Ce n'est pas moi »)
+/* Bureau : le bloc dénoncé et « À ton tour » tiennent dans le même écran ; « Vérifie-la toi-même » (ou « Ce n'est pas moi »)
    y est le seul rose, le bouton du formulaire passe en contour (44 px). */
 @media (min-width: 900px) {
   .page-result.is-wanted .you .entry-submit:not(:disabled):not(.is-busy) {

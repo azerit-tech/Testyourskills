@@ -17,7 +17,7 @@ import { PrimeRace } from "../components/Primes";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { CardNotFound, Unreachable } from "../components/ErrorPage";
 import { Jury, JuryLine } from "../components/Jury";
-import { MakeYours } from "../components/MakeYours";
+import { MakeYours, visitorBar } from "../components/MakeYours";
 import { PleaStrip, PleaVerdict } from "../components/Plea";
 import { RecruiterRead } from "../components/RecruiterRead";
 import { RemovalRequest } from "../components/Removal";
@@ -645,18 +645,19 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
   // « Revoir ma poursuite » : dans la tête de la fiche ; sur un téléphone court, la tête se masque
   // et le lien descend sous la fiche, à côté de « Pièces à conviction » (le CSS choisit).
   const chase = scene === "film" && settled ? <ChaseLink mine={!visitor} seen={chaseWatched(id)} onPlay={playChase} /> : null;
-  // Fiche dénoncée : « C'est moi » reprend par GitHub, ou refait la fiche depuis son lien LinkedIn.
-  // Le bloc le montre à tous (en contour pour qui a déjà sa fiche) ; la barre, seulement à qui n'a pas de fiche.
+  // Fiche dénoncée : « Vérifie-la toi-même » reprend par GitHub, ou refait la fiche depuis son lien LinkedIn.
+  // Qui reçoit sa fiche voit d'abord sa note, puis ce seul rose, au bloc comme dans la barre,
+  // qu'il ait ou non une autre fiche dans ce navigateur (§18.104).
   const remake = useRemake(wantedYou && !cardLogin && main.linkedinUrl ? main.linkedinUrl : null, toast.show);
   const claimHere = wantedYou && claimOn && cardLogin ? () => api.startClaim(id, cardLogin) : null;
-  const lawyer = other ? null : (claimHere ?? remake?.go ?? null);
-  // Qui a sa fiche : le duel, et le même envoi dans la barre fixe.
+  const lawyer = claimHere ?? remake?.go ?? null;
+  // Qui a sa fiche : le duel, plus bas, l'envoi en contour ; jamais dans la barre ni dans le premier écran (§18.104).
   const duel = useDuelSend(visitor ? other : null, main, toast.show);
   // « À ton tour » : en fin de page sur téléphone (la barre fixe y mène) ; au bureau, en tête de la colonne de droite,
   // avec la phrase qui dit ce qu'on regarde (sous le bloc d'une fiche dénoncée, qui a son propre bouton rose).
-  // Qui a déjà sa fiche : le duel à la place, avec le score à envoyer.
+  // Qui a déjà sa fiche : le duel à la place ; sur une fiche dénoncée, l'écart seul, rien à envoyer.
   const turn = !visitor ? null : other ? (
-    <Duel mine={other} card={main} duel={duel} strong />
+    <Duel mine={other} card={main} duel={duel} info={wantedYou} />
   ) : self && !another ? (
     <>
       {self.id !== id && (
@@ -677,9 +678,14 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
       <EntryForm variant="inline" another={another} />
     </section>
   );
-  // Au bureau, l'ordre du document suit l'écran : « À ton tour » avant la colonne, sauf sous une fiche dénoncée (son bloc d'abord).
+  // Au bureau, l'ordre du document suit l'écran : « À ton tour » avant la colonne, sauf sous une fiche dénoncée
+  // (son bloc d'abord) et pour le duel, qui reste en bas de la colonne, hors du premier écran (§18.104).
   const desk = useMediaQuery("(min-width: 900px)");
-  const turnFirst = desk && !wantedYou;
+  const turnFirst = desk && !wantedYou && !other;
+  // La barre fixe du visiteur sur téléphone (§18.48, §18.104) : « Vérifie-la toi-même » sur une fiche dénoncée
+  // qu'on peut reprendre, « Faire ma fiche » sans fiche à soi, rien pour qui a la sienne. Sur la fiche de sa
+  // propre personne (`self`), son bloc mène déjà à « Voir ma fiche ».
+  const bar = visitor && settled && !(self && !another) ? visitorBar({ verify: !!lawyer, hasOwn: !!other }) : null;
   // Sa fiche toute neuve, après être arrivé par celle d'un autre : le duel en tête du partage, une fois.
   const fromRival = !visitor && fresh && rival && rival.id !== id && !(rival.login && main.login && rival.login.toLowerCase() === main.login.toLowerCase()) ? rival : null;
   const own: MyCard = { id, login: main.login ?? null, overall: main.overall };
@@ -774,7 +780,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
           <div className="visitor-col">
             {/* Fiche dénoncée (§18.6, §18.48) : qui l'a dénoncée, « C'est moi », « Ce n'est pas moi », la demande de retrait, en un bloc. */}
             {wantedYou && (
-              <Denounced who={who} by={kase?.by ?? null} onLawyer={claimHere} onRemake={remake} notMe={!other} quiet={!!other}>
+              <Denounced who={who} by={kase?.by ?? null} onLawyer={claimHere} onRemake={remake} notMe={!other}>
                 {!cardLogin && <RemovalRequest cardId={id} short />}
               </Denounced>
             )}
@@ -783,7 +789,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
             <div className="rest">
               {/* « Comment c'est noté » (§18.37, §18.76) : un pli fermé ; ni nom d'école ni d'ancien employeur. */}
               <RecruiterRead item={item} shared />
-              {/* Fiche dénoncée : « C'est moi » est déjà sous la fiche. */}
+              {/* Fiche dénoncée : « Vérifie-la toi-même » est déjà sous la fiche. */}
               {!(wantedYou && claimOn) && <Claim cardId={id} login={cardLogin} lawyer me={me} onMe={onMe} toast={toast.show} />}
             </div>
           </div>
@@ -846,8 +852,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
       </div>
       {/* La barre du pouce (§18.27) : mêmes conditions que le bloc de partage, une fois la fiche posée. Avant le toast, qui se cale dessus. */}
       {!visitor && !(claimed && me?.hidden) && <ShareDock item={item} ready={settled} toast={toast.show} add={addFirst} />}
-      {/* La barre fixe du visiteur sur téléphone (§18.48) : « Faire ma fiche », « C'est moi » sur une fiche dénoncée, ou « Lui envoyer mon score ». */}
-      {!(self && !another) && visitor && settled && (!other || duel.send) && <MakeYours watch={wantedYou} onLawyer={lawyer} onSend={other ? duel.send : null} />}
+      {/* La barre fixe du visiteur sur téléphone : un seul bouton, jamais « Lui envoyer ma note » (§18.104). */}
+      {bar && <MakeYours watch={wantedYou} onLawyer={bar === "verify" ? lawyer : null} />}
       {toast.node}
     </main>
   );

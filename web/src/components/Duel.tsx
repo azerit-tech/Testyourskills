@@ -1,9 +1,9 @@
-// Le duel (§18.7, §18.48) : qui a déjà sa fiche lit, sous celle d'une autre personne,
-// « 83/100 contre 68/100 : une étoile d'avance », et peut lui envoyer son score avec
-// le lien de sa propre fiche. Face à un dossier scellé, la note ne se dit pas : il ne
-// reste que « Ma fiche ». L'envoi est un crochet : la barre fixe du téléphone fait le
-// même geste que le bouton du bloc. Sur sa propre fiche toute neuve, le même duel
-// face à la fiche par laquelle on est arrivé, en tête du partage (« Tu viens de… »).
+// Le duel (§18.7, §18.48, §18.104) : qui a déjà sa fiche lit, plus bas sous celle d'une autre
+// personne, « 83/100 contre 68/100 : une étoile d'avance », et peut lui envoyer son score avec
+// le lien de sa propre fiche, en contour : jamais le rose, jamais dans la barre du pouce.
+// Sur une fiche dénoncée (qu'on vient peut-être de recevoir), l'écart seul, rien à envoyer.
+// Face à un dossier scellé, la note ne se dit pas : il ne reste que « Ma fiche ». Sur sa
+// propre fiche toute neuve, le même duel face à la fiche par laquelle on est arrivé (« Tu viens de… »).
 import { useCallback, useState } from "react";
 import type { CardData } from "../../../shared/types";
 import { useT } from "../i18n";
@@ -66,13 +66,13 @@ interface Props {
   /** La fiche regardée. */
   card: Rival;
   duel: DuelSend;
-  /** Le seul rose de l'écran (visiteur) ; en contour sous le partage de sa propre fiche. */
-  strong?: boolean;
+  /** Fiche dénoncée (§18.104) : l'écart pour information, sans bouton d'envoi. */
+  info?: boolean;
   /** Sur sa propre fiche : la fiche par laquelle on est arrivé, sans lien « Ma fiche ». */
   from?: boolean;
 }
 
-export function Duel({ mine, card, duel, strong = false, from = false }: Props) {
+export function Duel({ mine, card, duel, info = false, from = false }: Props) {
   const { t } = useT();
   const d = t.denounce;
   if (from) {
@@ -105,14 +105,16 @@ export function Duel({ mine, card, duel, strong = false, from = false }: Props) 
       </section>
     );
 
-  const send = duel.send;
+  const send = info ? null : duel.send;
   return (
     <section className="you duel" id="you" aria-labelledby="you-title">
       <h2 id="you-title">{d.versus(mine.overall, card.overall, said(d, mine.overall, card.overall).text)}</h2>
       <div className="duel-actions">
-        <button type="button" className={strong ? "pill pill-big" : "pill"} onClick={() => void send()}>
-          {d.sendScore}
-        </button>
+        {send && (
+          <button type="button" className="pill" onClick={() => void send()}>
+            {d.sendScore}
+          </button>
+        )}
         {mineLink}
       </div>
       {duel.manual && <ManualCopy m={{ kind: "message", value: duel.manual }} />}

@@ -123,8 +123,9 @@ describe("Dénoncer : la fiche du complice", () => {
     const e = DICTS.en.denounce;
     expect(e.sendText("@camroux", 79, 67, e.iLead(e.starsAhead(1)))).toBe("@camroux, I just turned you in on Azerit: 79 vs 67, I'm one star ahead. Your move:");
     expect(e.sendText("@camroux", 79, null, "")).toBe("@camroux, I just turned you in on Azerit. Your sheet is waiting: can you beat my 79?");
-    expect(fr(DICTS.fr.denounce.lawyerLinkedinHint)).toMatch(/^Reprends-la : /);
-    expect(DICTS.en.denounce.lawyerLinkedinHint).toMatch(/^Take it back: /);
+    // Ce que la personne reçue voit d'abord : vérifier elle-même (§18.104).
+    expect(DICTS.fr.denounce.verify).toBe("Vérifie-la toi-même");
+    expect(DICTS.en.denounce.verify).toBe("Check it yourself");
   });
 
   it("le champ : un nom, un pseudo GitHub ou un lien LinkedIn quand le serveur lit LinkedIn, sinon GitHub seul, et il le dit", () => {

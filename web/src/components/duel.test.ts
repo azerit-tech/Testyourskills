@@ -11,9 +11,9 @@ import { Duel, useDuelSend } from "./Duel";
 import { Jury } from "./Jury";
 import type { MyCard } from "../lib/session";
 
-/** Le duel tel que la page le monte pour un visiteur : l'envoi en crochet, le bouton en rose. */
-function DuelWith({ mine, card: c }: { mine: MyCard; card: CardData }) {
-  return createElement(Duel, { mine, card: c, duel: useDuelSend(mine, c, () => undefined), strong: true });
+/** Le duel tel que la page le monte pour un visiteur : plus bas que la fiche, l'envoi en contour (§18.104). */
+function DuelWith({ mine, card: c, info }: { mine: MyCard; card: CardData; info?: boolean }) {
+  return createElement(Duel, { mine, card: c, duel: useDuelSend(mine, c, () => undefined), info });
 }
 
 const jurySrc = readFileSync(join(__dirname, "Jury.tsx"), "utf8");
@@ -54,16 +54,24 @@ describe("le jury, une fois le vote posé", () => {
 });
 
 describe("le duel de qui a déjà sa fiche", () => {
-  const duel = (overall: number, over: Partial<CardData> = {}, lang?: string) =>
-    render(createElement(DuelWith, { mine: { id: "MyCard00001", login: "leamd", overall }, card: { ...card, ...over } }), lang);
+  const duel = (overall: number, over: Partial<CardData> = {}, lang?: string, info?: boolean) =>
+    render(createElement(DuelWith, { mine: { id: "MyCard00001", login: "leamd", overall }, card: { ...card, ...over }, info }), lang);
 
-  it("les deux notes en titre, l'écart ensuite ; « Lui envoyer ma note » en rose (le visiteur n'a que ce geste), « Ma fiche » en lien", () => {
+  it("les deux notes en titre, l'écart ensuite ; « Lui envoyer ma note » en contour, jamais le rose (§18.104), « Ma fiche » en lien", () => {
     const html = duel(83).replace(/\u00a0/g, " ");
     expect(html).toContain('<h2 id="you-title">83/100 contre 68/100 : une étoile d\'avance</h2>');
-    expect(html).toMatch(/<button type="button" class="pill pill-big">Lui envoyer ma note<\/button><a class="link-alt" href="\/c\/MyCard00001">Ma fiche<\/a>/);
+    expect(html).toMatch(/<button type="button" class="pill">Lui envoyer ma note<\/button><a class="link-alt" href="\/c\/MyCard00001">Ma fiche<\/a>/);
+    expect(html).not.toContain("pill-big");
     const en = duel(83, {}, "en-US");
     expect(en).toContain(">83/100 vs 68/100: one star ahead</h2>");
     expect(en).toContain(">Send them my rating</button>");
+  });
+
+  it("sur une fiche dénoncée : l'écart pour information, rien à envoyer (§18.104)", () => {
+    const html = duel(83, {}, undefined, true).replace(/\u00a0/g, " ");
+    expect(html).toContain(">83/100 contre 68/100 : une étoile d'avance</h2>");
+    expect(html).not.toContain("<button");
+    expect(html).toContain(">Ma fiche</a>");
   });
 
   it("un dossier scellé : ni note, ni score à envoyer", () => {
