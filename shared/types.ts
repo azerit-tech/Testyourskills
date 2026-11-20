@@ -192,6 +192,11 @@ export interface Grid {
   overall: number;
   /** capped_unproven : aucun code prouvé (plafond 85 sous 0.5.0, 80 depuis 0.6.0) ; empty_file : moins d'un quart des coefficients noté (note 20). */
   rule?: "capped_unproven" | "empty_file";
+  /**
+   * 0.8.0 (SPEC §18.124) : au dossier, les points que le GitHub prouvé et actif ajoute à la note
+   * (de 3 à 5), dits sur le site. Absent : pas de dossier, GitHub mince ou inactif, ou grille d'avant.
+   */
+  githubBonus?: number;
   /** Le niveau d'expérience auquel la grille a été lue (0.5.0). Absent : inconnu, ou grille d'avant. */
   seniority?: GridSeniority;
   /** Les coefficients qui ont fait la moyenne (0.5.0). Absents : ceux du barème 0.4.0. */

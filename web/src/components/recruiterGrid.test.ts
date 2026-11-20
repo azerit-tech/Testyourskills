@@ -132,7 +132,8 @@ const dossier = (declared: Parameters<typeof scoreDossier>[0], github: Parameter
 /** Les lignes du bloc, par nom de critère. */
 function rowsOf(html: string): Map<string, string> {
   const rows = new Map<string, string>();
-  for (const chunk of html.split('<li class="rg-row').slice(1)) {
+  // La dernière ligne s'arrête avant le bloc de la note finale.
+  for (const chunk of html.split('class="rg-final"')[0]!.split('<li class="rg-row').slice(1)) {
     const name = /<span class="rg-name">([^<]+)<\/span>/.exec(chunk)?.[1];
     if (name) rows.set(name.replace(/&#x27;/g, "'"), chunk);
   }
@@ -311,9 +312,14 @@ describe("une vraie grille du serveur, à travers le bloc : les deux profils d'e
     // Ni « ÷ n » ni moyenne chiffrée à l'écran : la note d'une fiche porte un petit aléa, jamais dit (§18.106).
     expect(formula).not.toContain("÷");
     expect(final).not.toMatch(/=\s\d+(?:[,.]\d+)?\s(?:sur|out of)\s10/);
-    // La grille du moteur, avant l'aléa : sa note se refait sur les termes affichés, la moyenne passée par la courbe (0.7.0).
-    const raw = Math.floor(interpolate(GRID.final.curve, (10 * num2) / den2) + 0.5 + 1e-9);
-    expect(grid.rule === "capped_unproven" ? Math.min(raw, GRID_CAP_UNPROVEN) : raw).toBe(grid.overall);
+    // La grille du moteur, avant l'aléa : sa note se refait sur les termes affichés, la moyenne passée par la courbe (0.7.0),
+    // plus la preuve du dossier (0.8.0), dite en une ligne ; le dossier lu sans GitHub garde le plafond d'une pièce LinkedIn.
+    const exact = interpolate(GRID.final.curve, (10 * num2) / den2);
+    const bonus = grid.githubBonus ?? 0;
+    const round = (x: number) => Math.floor(x + bonus + 0.5 + 1e-9);
+    if (bonus) expect(final).toContain(`+${bonus}`);
+    const ok = grid.rule === "capped_unproven" ? [Math.min(round(exact), GRID_CAP_UNPROVEN)] : [round(exact), round(Math.min(exact, GRID_CAP_UNPROVEN))];
+    expect(ok).toContain(grid.overall);
   }
 
   for (const [label, { li, gh, cmp, names }] of exemples) {

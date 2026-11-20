@@ -1,6 +1,36 @@
 # Le barème de recrutement
 
-*Proposition du 10 novembre 2026, construite depuis (barème 0.4.0, SPEC §18.37). Le barème qui tourne est le 0.7.0 du 20 novembre : sa section, juste dessous, fait foi là où elle contredit la suite ; puis celle du 0.6.0, celle du 0.5.0, puis la proposition.*
+*Proposition du 10 novembre 2026, construite depuis (barème 0.4.0, SPEC §18.37). Le barème qui tourne est le 0.8.0 du 20 novembre : sa section, juste dessous, fait foi là où elle contredit la suite ; puis celle du 0.7.0, celle du 0.6.0, celle du 0.5.0, puis la proposition.*
+
+## Barème 0.8.0 : un GitHub ne fait que monter (20 novembre 2026)
+
+*Le moteur tel qu'il tourne (`data/grid.json`, `final.githubBonus` ; `server/src/scoring/grid.ts`, `finalize` ; SPEC §18.124). Il complète au dossier la section 0.6.0 (point 2, la preuve) et la section 0.7.0.*
+
+Jacques, sur Florent : « Pourquoi il n'a pas reçu de point bonus avec son GitHub ? » Sa fiche LinkedIn seule : école 8, expérience 7, exact 75. Son dossier : les mêmes, plus stack 7, code 5, activité 5, ownership 7 (preuve +1 comprise) : exact 72. Le GitHub, sous sa moyenne LinkedIn, la faisait baisser.
+
+1. **Au dossier, la plus haute de deux lectures.** Le dossier entier, ou le dossier sans les critères que seul GitHub montre (code, activité, open source ; stack et ownership quand LinkedIn ou le CV n'en dit rien), lu comme une pièce LinkedIn seule, plafond de 80 compris. Le dossier ne descend jamais sous sa pièce LinkedIn ou CV.
+2. **La preuve du dossier, de 3 à 5 points**, après la courbe et le plafond. Un GitHub prouvé (code lu) et actif (13 semaines actives sur 52 ou plus) ajoute la moitié de sa moyenne GitHub (stack, code, activité, ownership, preuve comprise), bornée de 3 à 5. Seulement si LinkedIn ou le CV porte un critère compté. Une pièce seule n'en a pas.
+
+   | Moyenne GitHub, sur 10 | sous 7 | de 7 à moins de 9 | 9 et plus |
+   |---|---|---|---|
+   | Preuve du dossier | +3 | +4 | +5 |
+
+3. **Pourquoi pas « chaque critère GitHub ne compte que s'il fait monter »** : essayé, un stage d'exception (expérience 10) restait seul dans la moyenne, sans plafond puisque le code est prouvé : 99, six étoiles, sans preuve du code. Le maximum des deux lectures garde le plafond de la pièce LinkedIn.
+
+**Note exacte avant l'aléa, 0.7.0 → 0.8.0 :**
+
+| Dossier | LinkedIn seul | Dossier 0.7.0 | Dossier 0.8.0 |
+|---|---|---|---|
+| Florent (production), GitHub correct et actif | 75 | 72 | 78 (+3) |
+| Jacques | 69 (73 recoupé) | 80 | 84 (+4) |
+| Lumine, GitHub trop mince | 76 | 76 | 76 |
+| (a) Stage très sélectif, GitHub correct | 80 | 80 | 83 (+3) |
+| (b) Stage ordinaire, même GitHub | 62 | 69 | 72 (+3) |
+| (c) Douze ans, GitHub médiocre, peu actif | 62 | 58 | 62 (sa pièce LinkedIn) |
+| (d) École, commits de cours trop minces | 74 | 74 | 74 |
+
+**Le recalcul** (`scripts/recalcule-notes.ts`, à blanc par défaut) refait les dossiers depuis leurs critères rangés : chacun garde ses deux côtés (`declared`, `proven`).
+
 
 ## Barème 0.7.0 : moins dur au milieu (20 novembre 2026)
 

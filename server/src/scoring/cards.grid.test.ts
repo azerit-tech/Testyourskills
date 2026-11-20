@@ -14,11 +14,12 @@ describe("les fiches prennent la note de la grille", () => {
   // Barème 0.4.0 : 41, 61, 57. L'expérience donne le niveau (« Junior ») et ne pèse plus (0.5.0) : 60, 77, 72.
   // 0.6.0 : la preuve +1 sur chaque critère montré par GitHub, l'expérience au coefficient 4 : 60, 87, 80.
   // 0.7.0 : la courbe de la note (SPEC §18.117) lève le milieu, pas le haut : 69, 87, 80.
-  it("Jacques : LinkedIn 69 (60 sous 0.6.0), GitHub 87, dossier 80 (à un point près)", () => {
+  // 0.8.0 : un GitHub prouvé et actif ajoute la moitié de sa moyenne au dossier (SPEC §18.124) : 69, 87, 84.
+  it("Jacques : LinkedIn 69 (60 sous 0.6.0), GitHub 87, dossier 84 (80 sous 0.7.0, à un point près)", () => {
     const { github, linkedin, cmp } = jacques();
     expect(Math.abs(linkedin.overall - 69)).toBeLessThanOrEqual(1);
     expect(Math.abs(github.overall - 87)).toBeLessThanOrEqual(1);
-    expect(Math.abs(cmp.grid!.overall - 80)).toBeLessThanOrEqual(1);
+    expect(Math.abs(cmp.grid!.overall - 84)).toBeLessThanOrEqual(1);
     expect(cmp.grid!.seniority?.code).toBe("junior");
     expect(linkedin.overall).toBe(linkedin.grid!.overall);
     expect(github.overall).toBe(github.grid!.overall);

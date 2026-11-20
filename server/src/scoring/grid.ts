@@ -1704,6 +1704,14 @@ export function stkCrossCheck(draft: Draft, d: DeclaredInput, gh: GithubSide): D
  * du niveau (`final.floors`), et la moyenne passe par la courbe (`final.curve`)
  * avant le plafond. Arrondi au supérieur à ,5, bornes 1 à 99.
  *
+ * 0.8.0 (SPEC §18.124), au dossier seulement (ses critères portent leurs deux côtés,
+ * `declared` et `proven`) : GitHub ne fait que monter. (5) La note est la plus haute de
+ * deux lectures : le dossier entier, ou le dossier sans les critères que seul GitHub
+ * montre (code, activité, et la stack ou l'ownership quand LinkedIn n'en dit rien), lu
+ * comme une pièce LinkedIn seule, plafond compris. Le dossier ne descend donc jamais sous
+ * sa pièce LinkedIn ou CV. (6) Un GitHub prouvé et actif ajoute à la note la moitié de sa
+ * moyenne, de 3 à 5 points (`githubBonus`), après le plafond.
+ *
  * Idempotent sur ses propres critères : refaire la note d'une grille rangée depuis
  * ses critères (scripts/recalcule-notes.ts) donne la même note.
  */
@@ -1726,24 +1734,70 @@ export function finalize(input: Draft[], seniority?: GridSeniority): Grid {
   if (scored2 < F.emptyBelowShare * total2) {
     return { criteria: ordered.map((d) => ({ ...d, counted: false })), overall: F.emptyScore, rule: "empty_file", ...meta };
   }
-  const base = scored.filter((d) => !never(d));
-  const n0 = base.reduce((s, d) => s + d.score! * w2(d.code), 0);
-  const d0 = base.reduce((s, d) => s + w2(d.code), 0);
-  const counted = new Set<CriterionCode>(base.map((d) => d.code));
-  for (const d of scored) if (never(d) && (d0 === 0 || d.score! * d0 > n0)) counted.add(d.code);
-  const inMean = scored.filter((d) => counted.has(d.code));
-  const n = inMean.reduce((s, d) => s + d.score! * w2(d.code), 0);
-  const den = inMean.reduce((s, d) => s + w2(d.code), 0);
-  // 10 × n / den, la moyenne sur 100, puis la courbe (0.7.0), arrondie au supérieur à ,5.
-  let overall = den ? roundHalfUp(interpolate(F.curve, (10 * n) / den)) : F.bounds.min;
+  /** La note exacte (avant l'arrondi) de ces critères notés, et ceux qui entrent dans la moyenne. */
+  const read = (pool: Draft[], capped: boolean): { exact: number; counted: Set<CriterionCode> } => {
+    const base = pool.filter((d) => !never(d));
+    const n0 = base.reduce((s, d) => s + d.score! * w2(d.code), 0);
+    const d0 = base.reduce((s, d) => s + w2(d.code), 0);
+    const counted = new Set<CriterionCode>(base.map((d) => d.code));
+    for (const d of pool) if (never(d) && (d0 === 0 || d.score! * d0 > n0)) counted.add(d.code);
+    const inMean = pool.filter((d) => counted.has(d.code));
+    const n = inMean.reduce((s, d) => s + d.score! * w2(d.code), 0);
+    const den = inMean.reduce((s, d) => s + w2(d.code), 0);
+    // 10 × n / den, la moyenne sur 100, puis la courbe (0.7.0), puis le plafond sans code prouvé.
+    const exact = den ? interpolate(F.curve, (10 * n) / den) : F.bounds.min;
+    return { exact: capped ? Math.min(exact, F.capUnproven) : exact, counted };
+  };
   const codeProven = byCode.get("CODE")?.score != null;
-  let rule: Grid["rule"];
-  if (!codeProven) {
-    rule = "capped_unproven";
-    overall = Math.min(overall, F.capUnproven);
+  let { exact, counted } = read(scored, !codeProven);
+  // Un dossier à deux pièces : ses critères gardent ce que dit chaque côté (mergeDrafts).
+  const dossier = ordered.some((d) => d.declared !== undefined || d.proven !== undefined);
+  // Ce que seul GitHub montre au dossier : rien côté LinkedIn ou CV, une note côté GitHub.
+  const githubOnly = (d: Draft) => dossier && d.declared == null && d.proven != null;
+  const declaredSide = scored.filter((d) => !githubOnly(d));
+  let githubBonus = 0;
+  // Seulement quand LinkedIn ou le CV porte un critère compté : la preuve s'ajoute à l'expérience.
+  if (dossier && declaredSide.some((d) => !never(d))) {
+    // 0.8.0 : GitHub ne fait que monter. Sans ses critères, le dossier se lit comme une pièce LinkedIn seule.
+    const without = read(declaredSide, true);
+    if (without.exact > exact) ({ exact, counted } = without);
+    githubBonus = githubBonusOf(byCode);
   }
-  overall = Math.min(F.bounds.max, Math.max(F.bounds.min, overall));
-  return { criteria: ordered.map((d) => ({ ...d, counted: counted.has(d.code) })), overall, ...(rule ? { rule } : {}), ...meta };
+  // Arrondie au supérieur à ,5, la preuve du dossier comprise (0.8.0), bornes 1 à 99.
+  const overall = Math.min(F.bounds.max, Math.max(F.bounds.min, roundHalfUp(exact + githubBonus)));
+  const rule: Grid["rule"] = codeProven ? undefined : "capped_unproven";
+  return {
+    criteria: ordered.map((d) => ({ ...d, counted: counted.has(d.code) })),
+    overall,
+    ...(rule ? { rule } : {}),
+    ...(githubBonus ? { githubBonus } : {}),
+    ...meta,
+  };
+}
+
+/** Les critères dont la moyenne fait la preuve du dossier : ce que GitHub montre de la personne. */
+const BONUS_CODES: CriterionCode[] = ["STK", "CODE", "ACT", "OWN"];
+
+/**
+ * La preuve du dossier (0.8.0, SPEC §18.124) : un GitHub prouvé (le code lu) et actif (l'activité
+ * lue au moins `minActLevel` avant la preuve, 13 semaines actives sur 52) ajoute la moitié de sa
+ * moyenne, preuve comprise, bornée de `min` à `max` points. Lue sur le côté GitHub de chaque
+ * critère (`proven`) : refaite à l'identique depuis une grille rangée. 0 sinon.
+ */
+function githubBonusOf(byCode: Map<CriterionCode, Draft>): number {
+  const B = GRID.final.githubBonus;
+  if (byCode.get("CODE")?.proven == null) return 0;
+  const act = byCode.get("ACT");
+  if (act?.proven == null || act.proven - (act.bonus ?? 0) < B.minActLevel) return 0;
+  let n = 0;
+  let den = 0;
+  for (const code of BONUS_CODES) {
+    const p = byCode.get(code)?.proven;
+    if (p == null) continue;
+    n += p * GRID.weights[code];
+    den += GRID.weights[code];
+  }
+  return den ? Math.min(B.max, Math.max(B.min, roundHalfUp(n / den / 2))) : 0;
 }
 
 /**

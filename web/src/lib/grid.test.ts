@@ -120,6 +120,27 @@ describe("la ligne de la note finale", () => {
     expect(finalLines(hit, FR, "fr").rule).not.toContain("90");
   });
 
+  it("la preuve du dossier (0.8.0, §18.124) : « GitHub prouvé et actif : +3 », et ce que GitHub ne fait pas monter sort sans le faire baisser", () => {
+    const side = (declared: number | null, proven: number | null) => ({ declared, proven, source: (proven === null ? "linkedin" : "github") as GridCriterion["source"] });
+    const grid: Grid = {
+      overall: 80,
+      githubBonus: 3,
+      criteria: [
+        crit("EDU", 8, side(8, null)),
+        crit("EMP", 7, side(7, null)),
+        crit("STK", 7, { ...side(null, 7), counted: false }),
+        crit("CODE", 5, { ...side(null, 5), counted: false }),
+        crit("ACT", 5, { ...side(null, 5), counted: false }),
+      ],
+    };
+    const f = finalLines(grid, FR, "fr");
+    expect(f.rule).toBe(FR.final.githubBonus(3));
+    expect(f.rule!.replace(/\u00a0/g, " ")).toBe("GitHub prouvé et actif : +3 sur la note.");
+    expect(f.out.join(" ")).toContain(FR.final.belowWhyCase);
+    expect(f.out.join(" ")).not.toContain(FR.final.belowWhy);
+    expect(finalLines(grid, EN, "en").rule).toBe(EN.final.githubBonus(3));
+  });
+
   it("dossier vide : pas de formule, la règle et la note plancher", () => {
     const f = finalLines(githubGridMock("unknownLang", "x")!, FR, "fr");
     expect(f.formula).toBeNull();
