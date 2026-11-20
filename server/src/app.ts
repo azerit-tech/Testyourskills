@@ -921,6 +921,8 @@ export function createApp(opts: AppOptions) {
           ? { signedInGithub: { name: who.name, ...(who.github?.how === "email" && who.github.login.toLowerCase() === login.toLowerCase() ? { email: true } : {}) } }
           : {}),
         ...(who?.picture ? { photo: who.picture } : {}),
+        // Le LinkedIn que l'entrée GitHub lui a montré, trouvé en lien fort (§18.124) : le dossier est prouvé « match ».
+        ...(ghLinked && ghAsked?.strong ? { linkedinMatch: true } : {}),
         // Sa propre fiche, jamais une dénonciation : l'autre source se cherche pour la lui proposer (§18.100) ;
         // jamais après « Je n'en ai pas » (§18.111).
         ...(!denounce && !pdf && !noGithub && !noLinkedin ? { propose: true, searchSpend: () => limiter.take("li-search", ip, SEARCHES_PER_IP) } : {}),

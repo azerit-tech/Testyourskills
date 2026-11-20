@@ -28,7 +28,8 @@ import { GH_AUTHORIZE_URL, SESSION_COOKIE, SESSION_TTL_MS, fetchGithubUser, safe
 import type { Store } from "../db";
 import { SEARCHES_PER_IP } from "../linkedinProfile/search";
 import { FIND_BUDGET_MS } from "../match/github";
-import type { GithubHints, LinkedinProposal } from "../match/linkedin";
+import { asLinkedinMatch, type GithubHints, type LinkedinMatch, type LinkedinProposal } from "../match/linkedin";
+import type { Proposal } from "../../../shared/types";
 import { clientIp, type RateLimiter } from "../ratelimit";
 import type { RegistryPort } from "../registry/index";
 import type { LinkedinSuggestion } from "../../../shared/entry";
@@ -69,7 +70,7 @@ export interface GithubEnterOptions {
   limiter: RateLimiter;
   fetchImpl: typeof fetch;
   /** La recherche de son LinkedIn par le nom (§18.100) ; absente : rien n'est proposé avant le jugement. */
-  findLinkedin?: (gh: GithubHints, opts: { spend?: () => boolean; signal: AbortSignal }) => Promise<{ kind: string } | null>;
+  findLinkedin?: (gh: GithubHints, opts: { spend?: () => boolean; signal: AbortSignal }) => Promise<LinkedinMatch | Proposal | null>;
   /** Le registre de l'App (§18.95) : un LinkedIn déjà relié à ce GitHub n'est pas proposé. */
   registry?: Pick<RegistryPort, "linkedinOf">;
 }
@@ -77,7 +78,7 @@ export interface GithubEnterOptions {
 /** Ce que l'entrée GitHub rend à la création de la fiche (§18.113). */
 export interface GithubEnterKit {
   /** Le LinkedIn montré à ce compte pour ce pseudo, si c'est celui-là (usage unique) : sa force pour le registre. */
-  takeAsked(accountId: string, login: string, url: string): { sure: boolean } | null;
+  takeAsked(accountId: string, login: string, url: string): { sure: boolean; strong: boolean } | null;
 }
 
 /** La proposition telle que le front la montre : rien de plus que « C'est toi ? ». */
@@ -101,9 +102,9 @@ function sameState(a: string, b: string): boolean {
 export function mountGithubEnter(app: Hono, o: GithubEnterOptions): GithubEnterKit {
   const cfg = o.config;
   /** Les recherches de son LinkedIn, lancées au retour de GitHub, rendues une fois par l'échange du pseudo. */
-  const finds = new Map<string, { p: Promise<LinkedinProposal | null>; exp: number }>();
+  const finds = new Map<string, { p: Promise<LinkedinMatch | null>; exp: number }>();
   /** Le LinkedIn montré à un compte (« J'ai trouvé ton LinkedIn »), en attendant la fiche. */
-  const asked = new Map<string, { login: string; url: string; sure: boolean; exp: number }>();
+  const asked = new Map<string, { login: string; url: string; sure: boolean; strong: boolean; exp: number }>();
   const sweep = () => {
     const now = Date.now();
     for (const [k, v] of finds) if (v.exp < now) finds.delete(k);
@@ -114,7 +115,7 @@ export function mountGithubEnter(app: Hono, o: GithubEnterOptions): GithubEnterK
       const v = asked.get(accountId);
       if (!v || v.exp < Date.now() || v.login !== login.toLowerCase() || v.url !== url) return null;
       asked.delete(accountId);
-      return { sure: v.sure };
+      return { sure: v.sure, strong: v.strong };
     },
   };
   // Toujours là : le front demande sans savoir si la connexion est configurée.
@@ -136,9 +137,11 @@ export function mountGithubEnter(app: Hono, o: GithubEnterOptions): GithubEnterK
     const key = typeof p.k === "string" ? p.k : null;
     const find = key ? finds.get(key) : undefined;
     if (key) finds.delete(key);
-    const found = find ? await within(find.p, FIND_BUDGET_MS + 200) : null;
-    // Retenu pour son compte : la fiche lancée avec ce LinkedIn est la sienne, le lien va au registre.
-    if (found && account) asked.set(account.id, { login: login.toLowerCase(), url: found.url, sure: found.sure, exp: Date.now() + LOGIN_TTL_MS });
+    const m = find ? await within(find.p, FIND_BUDGET_MS + 200) : null;
+    const found = m?.proposal ?? null;
+    // Retenu pour son compte : la fiche lancée avec ce LinkedIn est la sienne, le lien va au registre ;
+    // un lien fort (§18.124) rend le dossier prouvé « match ».
+    if (found && account) asked.set(account.id, { login: login.toLowerCase(), url: found.url, sure: found.sure, strong: m!.strength === "strong", exp: Date.now() + LOGIN_TTL_MS });
     return c.json({ signedIn: true, login, ...(found ? { found: shown(found) } : {}) });
   });
 
@@ -156,11 +159,15 @@ export function mountGithubEnter(app: Hono, o: GithubEnterOptions): GithubEnterK
     const self = user.self;
     if (!finder || !self || self.linkedinShown || linkedinAccount || !self.name) return null;
     sweep();
-    const hints: GithubHints = { login: user.login, name: self.name, company: self.company };
+    const hints: GithubHints = { login: user.login, name: self.name, company: self.company, location: self.location, blog: self.blog, bio: self.bio };
     const signal = AbortSignal.timeout(FIND_BUDGET_MS);
     const known = o.registry ? within(o.registry.linkedinOf(user.login), REGISTRY_WAIT_MS) : Promise.resolve(null);
     const search = finder(hints, { spend: () => o.limiter.take("li-search", ip, SEARCHES_PER_IP), signal }).catch(() => null);
-    const p = Promise.all([known, search]).then(([k, r]) => (k || !r || r.kind !== "linkedin" ? null : (r as LinkedinProposal)));
+    // Aucune lecture payée avant le jugement : un homonyme « à vérifier » n'est pas montré.
+    const p = Promise.all([known, search]).then(([k, r]) => {
+      const m = k ? null : asLinkedinMatch(hints, r);
+      return m && m.strength !== "verify" ? m : null;
+    });
     p.catch(() => {});
     const k = randomBytes(12).toString("base64url");
     finds.set(k, { p, exp: Date.now() + LOGIN_TTL_MS });

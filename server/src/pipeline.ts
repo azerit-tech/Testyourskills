@@ -25,7 +25,7 @@ import { githubDeclaredOf, githubShowsLinkedin } from "./linkedinProfile/url";
 import { githubFitsName, samePublicFullName } from "./names";
 import { linkedinSlug, normalizeLinkedinUrl } from "../../shared/entry";
 import { matchGithub, nameFromSlug, sameSearch, type GithubFound, type PersonHints } from "./match/github";
-import { strongLinkedin, type GithubHints } from "./match/linkedin";
+import { asLinkedinMatch, profileNamesOrg, type GithubHints, type LinkedinMatch } from "./match/linkedin";
 import { saveProposal } from "./match/store";
 import { asLinkedinCard, asLinkedinComparison, profileToText } from "./linkedinProfile/text";
 import { linkedinFindings } from "./linkedinProfile/findings";
@@ -387,7 +387,8 @@ export interface PipelineOptions {
    */
   propose?: {
     github?: (person: PersonHints, signal: AbortSignal) => Promise<Proposal | null>;
-    linkedin?: (gh: GithubHints, opts: { spend?: () => boolean; signal: AbortSignal }) => Promise<Proposal | null>;
+    /** Le LinkedIn d'un GitHub et sa force (§18.124) ; une proposition nue vaut l'ancienne règle (`strongLinkedin`). */
+    linkedin?: (gh: GithubHints, opts: { spend?: () => boolean; signal: AbortSignal }) => Promise<LinkedinMatch | Proposal | null>;
     /** Les comptes GitHub à ce nom, pas encore notés (§18.121) : la dénonciation les cherche dès son départ. */
     githubAccounts?: (name: string, signal: AbortSignal) => Promise<GithubFound | null>;
   };
@@ -474,6 +475,13 @@ export interface JobInput {
    * touchée, qui lance la recherche du GitHub dès le départ, pendant la lecture du profil.
    */
   match?: { name?: string };
+  /**
+   * Le LinkedIn donné avec ce pseudo a été trouvé par le nom, en lien fort (§18.124) : l'entrée
+   * GitHub connectée qui l'a montré (« J'ai trouvé ton LinkedIn »), ou le rattrapage des fiches du
+   * top. Posé par le serveur seul, jamais par le corps d'une requête. Le dossier est prouvé
+   * `"match"` si le profil lu porte le nom du GitHub.
+   */
+  linkedinMatch?: boolean;
   /** Prend une unité de la limite par IP des recherches de profils par nom (§18.90) ; false : refusé. */
   searchSpend?: () => boolean;
   /** Le coloris de la fiche que ce dossier complète (§18.102) : la personne garde sa couleur. Absent : tiré au hasard. */
@@ -540,8 +548,9 @@ export function signedInProof(input: JobInput, login: string | undefined, linked
 function githubHints(facts: unknown): GithubHints | null {
   const gh = githubDeclaredOf(facts);
   if (!gh) return null;
-  const company = (facts as { profile?: { company?: unknown } } | null)?.profile?.company;
-  return { login: gh.login, name: gh.name ?? null, company: typeof company === "string" ? company : null };
+  const p = (facts as { profile?: { company?: unknown; location?: unknown } } | null)?.profile;
+  const str = (v: unknown) => (typeof v === "string" ? v : null);
+  return { login: gh.login, name: gh.name ?? null, company: str(p?.company), location: str(p?.location), blog: gh.blog, bio: gh.bio };
 }
 
 /** Ce que la grille lit du profil LinkedIn : postes datés, formation, compétences, adresse. */
@@ -963,40 +972,37 @@ export class Pipeline {
 
     const finder = !pdf ? this.opts.linkedin : undefined;
     const slow = linkedinSlow(ctx);
-    // Dénonciation par GitHub (§18.121) : rien n'a donné son LinkedIn, il se cherche par le nom ; le
-    // profil dont le titre nomme l'entreprise de son GitHub est lu et attaché, un autre proposé.
-    const matchLinkedin = !entry && input.match && login && !linkedinAsked ? this.opts.propose?.linkedin : undefined;
+    // Fiche GitHub, faite pour soi ou dénoncée, dont rien n'a donné le LinkedIn (§18.100, §18.121,
+    // §18.124) : il se cherche par le nom, une recherche, pendant la collecte. Fort : lu et attaché,
+    // prouvé « match ». À vérifier : le premier homonyme sans poste est lu (une lecture payée, en
+    // cache, sous la limite de l'IP) et attaché s'il nomme son école ou son employeur. Moyen :
+    // proposé sous la fiche (« C'est ton LinkedIn ? »). Faible : rien.
+    const byNameFor = !entry && login && !linkedinAsked && (input.match || propose) ? this.opts.propose?.linkedin : undefined;
     let matchedUrl: string | null = null;
     const onFacts =
       finder && !entry
         ? (facts: unknown) => {
             let found = finder.forGithub(facts, { url: linkedinAsked, spend: input.linkedinSpend, onSlow: slow, signal: ctx.signal });
             const hints = githubHints(facts);
-            if (matchLinkedin && hints) {
+            if (byNameFor && hints) {
               const first = found;
               found = first.then(async (r) => {
                 if (r) return r;
-                const p = await phase("correspondance", () => matchLinkedin(hints, { spend: input.searchSpend, signal: ctx.signal })).catch(() => null);
-                if (p?.kind !== "linkedin") return null;
-                if (!strongLinkedin(hints, p)) {
-                  offer.p = Promise.resolve(p);
+                const step = input.match ? "correspondance" : "proposition";
+                const m = asLinkedinMatch(hints, await phase(step, () => byNameFor(hints, { spend: input.searchSpend, signal: ctx.signal })).catch(() => null));
+                if (!m) return null;
+                if (m.strength === "medium") {
+                  offer.p = Promise.resolve(m.proposal);
                   return null;
                 }
-                const read = await finder.forGithub(facts, { url: p.url, spend: input.linkedinSpend, onSlow: slow, signal: ctx.signal });
+                const read = await finder.forGithub(facts, { url: m.proposal.url, spend: input.linkedinSpend, onSlow: slow, signal: ctx.signal });
                 if (!read || !samePublicFullName(read.profile.name, hints.name)) return null;
-                matchedUrl = normalizeLinkedinUrl(read.profile.url) ?? normalizeLinkedinUrl(p.url);
+                if (m.strength === "verify" && !profileNamesOrg(hints, read.profile)) return null;
+                matchedUrl = normalizeLinkedinUrl(read.profile.url) ?? normalizeLinkedinUrl(m.proposal.url);
                 return read;
               });
             }
             lk.p = this.linkedinBranch(found, ctx, true);
-            // Fiche GitHub dont rien n'a donné le LinkedIn (§18.100) : il se cherche par le nom, pour le lui proposer.
-            if (!linkedinAsked && hints && propose?.linkedin) {
-              offer.p = found.then(
-                (r) => (r ? null : phase("proposition", () => propose.linkedin!(hints, { spend: input.searchSpend, signal: ctx.signal }))),
-                () => null,
-              );
-              offer.p.catch(() => {});
-            }
             lk.p.then((r) => keep(r?.profile.photoUrl), () => {});
           }
         : undefined;
@@ -1109,7 +1115,10 @@ export class Pipeline {
     // jamais devant la fiche GitHub du pseudo et n'entre pas au top (§18.24).
     const vouchedLink = !!vouched && linkedinAsked === vouched.linkedinUrl;
     // La correspondance d'une dénonciation (§18.121) : son nom et un employeur ou une école en commun.
-    const matchProof = !!linkedinUrl && ((!!matchedLogin && login === matchedLogin) || (!!matchedUrl && normalizeLinkedinUrl(linkedinUrl) === matchedUrl)) ? ("match" as const) : null;
+    // Le LinkedIn donné avec le pseudo, trouvé par le nom en lien fort (§18.124) : le profil lu porte le nom du GitHub.
+    const givenMatch =
+      !!input.linkedinMatch && !!li && !!linkedinUrl && !!input.linkedinUrl && normalizeLinkedinUrl(linkedinUrl) === normalizeLinkedinUrl(input.linkedinUrl) && samePublicFullName(li.profile.name, githubDeclaredOf(gh.facts)?.name);
+    const matchProof = !!linkedinUrl && ((!!matchedLogin && login === matchedLogin) || (!!matchedUrl && normalizeLinkedinUrl(linkedinUrl) === matchedUrl) || givenMatch) ? ("match" as const) : null;
     const shownProven = !!li && !!linkedinUrl && (li.proven || vouchedLink || identityProven || githubShowsLinkedin(gh.facts, linkedinUrl));
     // Connectée à LinkedIn, elle a donné ou confirmé ce GitHub, plausiblement le sien (§18.116).
     const signedProof = !shownProven && !!li && !!linkedinUrl ? (signedInProof(input, login, linkedinUrl, gh.facts, li.profile.name) ?? matchProof) : null;

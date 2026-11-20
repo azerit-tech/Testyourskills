@@ -246,4 +246,50 @@ describe("dénonciation par GitHub : le LinkedIn trouvé d'office", () => {
     expect(read).toEqual([]);
     expect(row).toMatchObject({ kind: "card", source: "github" });
   });
+
+  // §18.124 : la même correspondance pour la fiche faite pour soi, et sa force dite par le chercheur.
+  const proposal = { kind: "linkedin" as const, url: CAMILLE_URL, name: "Camille Ardent", headline: "Paris", sure: false };
+
+  it("sa propre fiche GitHub, un lien fort (nom rare, même ville) : lu et attaché, prouvé « match »", async () => {
+    const read: string[] = [];
+    const { run } = setup({ over: { collectGithub: async () => OCTO }, linkedin: finder(read), propose: { linkedin: async () => ({ proposal, strength: "strong" as const, why: ["city"] }) } });
+    const { row } = await run({ login: "camille-ardent", propose: true });
+    expect(read).toEqual([CAMILLE_URL]);
+    expect(row).toMatchObject({ kind: "comparison", source: "linkedin", login: "camille-ardent" });
+    expect(row!.facts).toMatchObject({ linkedinUrl: CAMILLE_URL, linkedinProven: true, linkedinProof: "match" });
+  });
+
+  it("sa propre fiche GitHub, un lien moyen : rien de lu, proposé sous la fiche", async () => {
+    const read: string[] = [];
+    const { run, store } = setup({ over: { collectGithub: async () => OCTO }, linkedin: finder(read), propose: { linkedin: async () => ({ proposal, strength: "medium" as const, why: ["rare", "other_city"] }) } });
+    const { id, row } = await run({ login: "camille-ardent", propose: true });
+    expect(read).toEqual([]);
+    expect(row).toMatchObject({ kind: "card", source: "github" });
+    expect(openProposal(store.db, id)).toMatchObject({ kind: "linkedin", url: CAMILLE_URL });
+  });
+
+  it("à vérifier : une lecture ; attaché si le profil nomme son employeur, sinon rien", async () => {
+    const verify = { linkedin: async () => ({ proposal, strength: "verify" as const, why: ["namesakes"] }) };
+    const atCriteo: LinkedinFinder = {
+      ...finder([]),
+      async forGithub(_f, opts) {
+        return opts?.url ? { profile: { ...CAMILLE, roles: [{ title: "Data", company: "Criteo", start: "2023-01", end: null, description: "" }] }, proven: false } : null;
+      },
+    };
+    const yes = setup({ over: { collectGithub: async () => OCTO }, linkedin: atCriteo, propose: verify });
+    expect((await yes.run({ login: "camille-ardent", match: {} })).row!.facts).toMatchObject({ linkedinProof: "match" });
+    const read: string[] = [];
+    const no = setup({ over: { collectGithub: async () => OCTO }, linkedin: finder(read), propose: verify });
+    const { row } = await no.run({ login: "camille-ardent", propose: true });
+    expect(read).toEqual([CAMILLE_URL]);
+    expect(row).toMatchObject({ kind: "card", source: "github" });
+  });
+
+  it("le LinkedIn donné avec le pseudo, trouvé en lien fort par le serveur : prouvé « match » ; sans ce drapeau, à confirmer", async () => {
+    const { run } = setup({ over: { collectGithub: async () => OCTO }, linkedin: finder([]), propose: {} });
+    const proven = await run({ login: "camille-ardent", linkedinUrl: CAMILLE_URL, linkedinMatch: true });
+    expect(proven.row!.facts).toMatchObject({ linkedinUrl: CAMILLE_URL, linkedinProven: true, linkedinProof: "match" });
+    const plain = await run({ login: "camille-ardent", linkedinUrl: CAMILLE_URL });
+    expect(plain.row!.facts).toMatchObject({ linkedinUrl: CAMILLE_URL, linkedinProven: false });
+  });
 });
