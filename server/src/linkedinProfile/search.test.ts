@@ -3,11 +3,12 @@
 
 import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
-import { parsePersonName, samePublicFullName } from "../names";
+import { parsePersonName, samePublicFullName, splitTyped } from "../names";
 import { CrustdataClient, CrustdataPeople } from "./crustdata";
 import {
   LinkedinSearch,
   linkedinSearchFromEnv,
+  rankByContext,
   rankCandidates,
   type LinkedinCandidate,
   type PeopleSearchProvider,
@@ -21,11 +22,11 @@ const CAMILLE: LinkedinCandidate = { url: "https://www.linkedin.com/in/camille-a
 const HOMONYM: LinkedinCandidate = { url: "https://www.linkedin.com/in/camille-ardent-2", name: "Camille Ardent", headline: "Cheffe de projet" };
 
 function fakeProvider(reply: () => LinkedinCandidate[] | Error) {
-  const calls: { full: string; strict: boolean; company?: string | null }[] = [];
+  const calls: { full: string; strict: boolean; company?: string | null; context?: string | null }[] = [];
   const provider: PeopleSearchProvider = {
     name: "brave",
     async searchByName(name, opts) {
-      calls.push({ full: name.full, strict: opts.strict, ...(opts.company ? { company: opts.company } : {}) });
+      calls.push({ full: name.full, strict: opts.strict, ...(opts.company ? { company: opts.company } : {}), ...(opts.context ? { context: opts.context } : {}) });
       const r = reply();
       if (r instanceof Error) throw r;
       return r;
@@ -59,6 +60,64 @@ describe("le nom tapé", () => {
     expect(samePublicFullName("Camille", "Camille Ardent")).toBe(false);
     expect(samePublicFullName("Camille Ardent", "Camille Durand")).toBe(false);
     expect(samePublicFullName("Camille Ardent", "")).toBe(false);
+  });
+});
+
+describe("le nom, puis un mot-clé (§18.112)", () => {
+  it("deux mots font le nom, trois avec une particule ; le reste est le mot-clé", () => {
+    expect(splitTyped("  camille   ardent  criteo ")).toEqual({ name: "camille ardent", context: "criteo" });
+    expect(splitTyped("Camille Ardent")).toEqual({ name: "Camille Ardent", context: "" });
+    expect(splitTyped("Camille Ard")).toEqual({ name: "Camille Ard", context: "" });
+    expect(splitTyped("camille ardent école 42")).toEqual({ name: "camille ardent", context: "école 42" });
+    expect(splitTyped("Léa de Vigny Datadog")).toEqual({ name: "Léa de Vigny", context: "Datadog" });
+    expect(splitTyped("Anna van der Berg ing")).toEqual({ name: "Anna van der Berg", context: "ing" });
+    expect(splitTyped("Jean de La Fontaine")).toEqual({ name: "Jean de La Fontaine", context: "" });
+    expect(splitTyped("Yann Le Gall Qonto")).toEqual({ name: "Yann Le Gall", context: "Qonto" });
+    expect(splitTyped("Léa de")).toEqual({ name: "Léa de", context: "" });
+    expect(splitTyped("Camille")).toEqual({ name: "Camille", context: "" });
+  });
+
+  it("ceux qui portent le mot-clé (titre, nom ou adresse) passent d'abord, les autres restent dans leur ordre", () => {
+    const a: LinkedinCandidate = { url: "https://www.linkedin.com/in/camille-ardent-1", name: "Camille Ardent", headline: "Boulangerie Ardent" };
+    const b: LinkedinCandidate = { url: "https://www.linkedin.com/in/camille-ardent-2", name: "Camille Ardent", headline: "ml @ Criteo AI Lab" };
+    const c: LinkedinCandidate = { url: "https://www.linkedin.com/in/camille-ardent-criteo", name: "Camille Ardent", headline: "" };
+    const d: LinkedinCandidate = { url: "https://www.linkedin.com/in/camille-ardent-4", name: "Camille Ardent", headline: "Lyon" };
+    expect(rankByContext([a, b, c, d], "Criteo")).toEqual([b, c, a, d]);
+    // Un mot-clé en cours de frappe classe déjà ; le plus de mots concordants d'abord.
+    expect(rankByContext([a, b, d], "cri")).toEqual([b, a, d]);
+    expect(rankByContext([a, d, b], "lyon criteo")).toEqual([d, b, a]);
+    expect(rankByContext([a, b], "")).toEqual([a, b]);
+  });
+
+  const DELORME = (n: number, headline: string): LinkedinCandidate => ({ url: `https://www.linkedin.com/in/camille-ardent-${n}`, name: "Camille Ardent", headline });
+
+  it("une requête au nom et au mot-clé, suivie des homonymes déjà en cache, sans payer davantage", async () => {
+    const criteo = DELORME(9, "ml @ Criteo AI Lab");
+    const others = [1, 2, 3, 4, 5, 6].map((n) => DELORME(n, `Poste ${n}`));
+    const { provider, calls } = fakeProvider(() => (calls.at(-1)?.context ? [criteo] : [...others, criteo]));
+    const { search, cache } = service(provider);
+    await search.byName("Camille Ardent");
+    const r = await search.byName("Camille Ardent", { context: "criteo" });
+    expect(calls).toEqual([
+      { full: "Camille Ardent", strict: false },
+      { full: "Camille Ardent", strict: false, context: "criteo" },
+    ]);
+    expect(r.status === "ok" && r.results.map((c) => c.url)).toEqual([criteo, ...others].map((c) => c.url));
+    expect(cache.searchesToday(NOW)).toBe(2);
+    // Un mot-clé de moins de trois lettres ne part pas : le nom seul, du cache, classé.
+    const short = await search.byName("Camille Ardent", { context: "Po" });
+    expect(short.status === "ok" && short.results[0]!.url).toBe(others[0]!.url);
+    expect(calls).toHaveLength(2);
+  });
+
+  it("rien au mot-clé : le nom seul, classé par le mot-clé ; la connexion n'en a jamais", async () => {
+    const { provider, calls } = fakeProvider(() => (calls.at(-1)?.context ? [] : [DELORME(1, "Boiron"), DELORME(2, "Criteo")]));
+    const { search } = service(provider);
+    const r = await search.byName("Camille Ardent", { context: "criteo paris" });
+    expect(r.status === "ok" && r.results.map((c) => c.headline)).toEqual(["Criteo", "Boiron"]);
+    expect(calls.map((c) => c.context ?? null)).toEqual(["criteo paris", null]);
+    await search.byName("Camille Ardent", { strict: true, context: "ignoré" });
+    expect(calls.at(-1)).toEqual({ full: "Camille Ardent", strict: true });
   });
 });
 

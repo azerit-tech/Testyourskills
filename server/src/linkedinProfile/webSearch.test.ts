@@ -262,4 +262,12 @@ describe("la recherche de personnes", () => {
     expect(new WebPeopleSearch({ providers: [net.providers[2]!] }).typing).toBe(false);
     expect(people.name).toBe("brave, serper, apify-google");
   });
+
+  it("saisie avec un mot-clé (§18.112) : le nom entre guillemets, le mot-clé sans ; seul le nom filtre", async () => {
+    const net = network();
+    const found = await new WebPeopleSearch({ providers: net.providers }).searchByName(CAMILLE, { strict: false, context: "@Paysolde" });
+    expect(net.calls.map((c) => c.url.searchParams.get("q"))).toEqual(['site:linkedin.com/in "Camille Ardent" Paysolde']);
+    expect(found.length).toBeGreaterThan(0);
+    expect(found.every((c) => typedMatches("Camille Ardent", c))).toBe(true);
+  });
 });

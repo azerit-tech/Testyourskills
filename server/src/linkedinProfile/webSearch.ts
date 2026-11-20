@@ -183,8 +183,15 @@ export function buildQueries(who: Wanted): string[] {
   return [...new Set(out)].slice(0, 2);
 }
 
-/** La requête d'une saisie en cours : sans guillemets, l'index complète le dernier mot. */
-export const typedQuery = (name: string): string => `site:linkedin.com/in ${quoted(name)}`;
+/**
+ * La requête d'une saisie en cours : sans guillemets, l'index complète le dernier
+ * mot. Avec un mot-clé (§18.112), le nom est complet : entre guillemets, et le
+ * mot-clé sans.
+ */
+export const typedQuery = (name: string, context?: string | null): string => {
+  const k = companyTerm(context);
+  return k ? `site:linkedin.com/in "${quoted(name)}" ${k}` : `site:linkedin.com/in ${quoted(name)}`;
+};
 
 const slugOf = (url: string): string => {
   try {
@@ -309,6 +316,8 @@ export interface PeopleQuery {
   /** Ce qui départage les homonymes : l'employeur (le domaine de l'email vérifié, le champ de GitHub). */
   company?: string | null;
   location?: string | null;
+  /** Une saisie en cours : le mot-clé tapé après le nom (§18.112). */
+  context?: string | null;
   signal?: AbortSignal;
 }
 
@@ -360,7 +369,7 @@ export class WebPeopleSearch implements PeopleSearchProvider {
 
   async searchByName(name: PersonName, q: PeopleQuery): Promise<LinkedinCandidate[]> {
     if (!q.strict) {
-      const hits = await this.hits(typedQuery(name.full), false, q.signal);
+      const hits = await this.hits(typedQuery(name.full, q.context), false, q.signal);
       return unique(hits.flatMap((h) => candidateFromHit(h) ?? []).filter((c) => typedMatches(name.full, c)));
     }
     const who: Wanted = { name: name.full, company: q.company, location: q.location };

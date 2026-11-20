@@ -18,7 +18,7 @@
 import { createHash } from "node:crypto";
 import type Database from "better-sqlite3";
 import { linkedinSlug } from "../../../shared/entry";
-import { parsePersonName, samePublicFullName, type PersonName } from "../names";
+import { nameWords, parsePersonName, samePublicFullName, type PersonName } from "../names";
 import { CrustdataClient, CrustdataPeople } from "./crustdata";
 import { LinkedinCache } from "./store";
 import { ApifyGoogleSearch, BraveSearch, SerperSearch, WebPeopleSearch, type PeopleQuery, type WebSearchProvider } from "./webSearch";
@@ -68,6 +68,8 @@ export interface SearchOptions {
   strict?: boolean;
   /** Avec un nom exact : l'employeur, qui départage les homonymes. */
   company?: string | null;
+  /** Une saisie en cours : le mot-clé tapé après le nom (« criteo », §18.112). */
+  context?: string;
   signal?: AbortSignal;
 }
 
@@ -101,6 +103,27 @@ export function rankCandidates(name: string, list: LinkedinCandidate[]): Linkedi
   const seen = new Set<string>();
   const unique = list.filter((c) => !seen.has(c.url) && !!seen.add(c.url));
   return [...unique.filter((c) => samePublicFullName(name, c.name)), ...unique.filter((c) => !samePublicFullName(name, c.name))].slice(0, MAX_CANDIDATES);
+}
+
+/** Un mot-clé plus court ne part pas vers l'index : les profils du nom seul, classés par ce début de mot. */
+export const MIN_CONTEXT_CHARS = 3;
+
+/**
+ * Ceux qui portent le mot-clé d'abord (§18.112), dans leur ordre : chaque mot du
+ * mot-clé qui commence un mot de leur titre, de leur nom ou de leur adresse compte
+ * (« criteo » dans « Florent Delorme - Criteo »). Personne n'est retiré.
+ */
+export function rankByContext<T extends LinkedinCandidate>(list: T[], context: string | undefined): T[] {
+  const want = nameWords(context).filter((w) => w.length >= 2);
+  if (!want.length) return list;
+  const hits = (c: T) => {
+    const have = nameWords(`${c.headline} ${c.name} ${linkedinSlug(c.url) ?? ""}`);
+    return want.filter((w) => have.some((h) => h.startsWith(w))).length;
+  };
+  return list
+    .map((c, i) => ({ c, i, n: hits(c) }))
+    .sort((a, b) => b.n - a.n || a.i - b.i)
+    .map((x) => x.c);
 }
 
 /**
@@ -159,9 +182,33 @@ export class LinkedinSearch implements LinkedinPeople {
     if (!name) return { status: "short" };
     // Une saisie en cours ne part jamais vers un index lent.
     if (!opts.strict && this.opts.provider.typing === false) return { status: "off" };
+    const context = opts.strict ? "" : nameWords(opts.context).join(" ");
+    return context ? this.byNameAndContext(raw, name, context, opts) : this.search(name, opts);
+  }
+
+  /**
+   * Le nom et un mot-clé (§18.112) : `site:linkedin.com/in "Nom" mot-clé`, suivi des
+   * profils du nom seul déjà en cache, sans rien payer de plus ; rien au mot-clé :
+   * le nom seul. Un mot-clé de moins de trois lettres ne part pas : le nom seul.
+   * Toujours classé par le mot-clé.
+   */
+  private async byNameAndContext(raw: string, name: PersonName, context: string, opts: SearchOptions): Promise<SearchResult> {
+    const nameOnly = { ...opts, context: undefined };
+    const found = context.length < MIN_CONTEXT_CHARS ? null : await this.search(name, opts, context);
+    if (found?.status !== "ok" || !found.results.length) return ranked(await this.byName(raw, nameOnly), context);
+    const cached = this.opts.cache.getSearch<LinkedinCandidate>(this.keyOf(name, opts), this.now()) ?? [];
+    return ranked({ status: "ok", results: rankCandidates(name.full, [...found.results, ...cached]) }, context);
+  }
+
+  private keyOf(name: PersonName, opts: SearchOptions, context = ""): string {
     const company = opts.strict ? (opts.company ?? "").trim().toLowerCase() : "";
     // L'employeur vient d'un email vérifié : dans la clé, son empreinte seulement.
-    const key = `${opts.strict ? "s" : "n"}:${name.key}${company ? `:${createHash("sha256").update(company).digest("hex").slice(0, 16)}` : ""}`;
+    return `${opts.strict ? "s" : "n"}:${name.key}${company ? `:${createHash("sha256").update(company).digest("hex").slice(0, 16)}` : ""}${context ? `|${context}` : ""}`;
+  }
+
+  private async search(name: PersonName, opts: SearchOptions, context = ""): Promise<SearchResult> {
+    const company = opts.strict ? (opts.company ?? "").trim().toLowerCase() : "";
+    const key = this.keyOf(name, opts, context);
     const hit = this.opts.cache.getSearch<LinkedinCandidate>(key, this.now());
     if (hit) return { status: "ok", results: hit };
     // Deux frappes du même nom en vol : une seule recherche payée.
@@ -170,7 +217,7 @@ export class LinkedinSearch implements LinkedinPeople {
     if (!this.take(opts)) return { status: "off" };
     const flight = (async (): Promise<SearchResult> => {
       try {
-        const results = rankCandidates(name.full, await this.opts.provider.searchByName(name, { strict: !!opts.strict, company: company || null, signal: opts.signal }));
+        const results = rankCandidates(name.full, await this.opts.provider.searchByName(name, { strict: !!opts.strict, company: company || null, context: context || null, signal: opts.signal }));
         this.opts.cache.putSearch(key, results, this.now());
         return { status: "ok", results };
       } catch (err) {
@@ -193,6 +240,8 @@ export class LinkedinSearch implements LinkedinPeople {
     }
   }
 }
+
+const ranked = (r: SearchResult, context: string): SearchResult => (r.status === "ok" ? { status: "ok", results: rankByContext(r.results, context) } : r);
 
 /** Jamais la clé, le nom cherché ni le corps : le statut ou le type d'erreur seulement. */
 function warn(what: string, err: unknown) {

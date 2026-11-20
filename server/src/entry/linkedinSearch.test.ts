@@ -110,6 +110,23 @@ describe("les profils de l'App Azerit sous le champ (§18.96)", () => {
     expect((await search(down, "Camille Ardent")).json.results.map((r) => r.url)).toEqual([CAMILLE_URL, HOMONYM.url]);
   });
 
+  it("le nom, puis un mot-clé (§18.112) : l'App et le web cherchent le nom, ceux qui portent le mot-clé d'abord", async () => {
+    const asked: { typed: string; partial?: boolean }[] = [];
+    const ctx = setup({
+      people: { byName: () => ({ status: "ok", results: [HOMONYM, { ...HOMONYM, url: `${HOMONYM.url}-9`, headline: "ml @ Paysolde AI Lab" }] }) },
+      app: {
+        registry: registry(async (typed, o) => {
+          asked.push({ typed, partial: o?.partial });
+          return [{ url: appUrl(1), name: "Camille Ardent", headline: "Titre 1", hasPhoto: false }];
+        }),
+      },
+    });
+    const { json } = await search(ctx, "camille ardent paysolde");
+    expect(asked).toEqual([{ typed: "camille ardent", partial: false }]);
+    expect(ctx.calls.byName).toEqual([{ raw: "camille ardent", strict: false, spent: true, context: "paysolde" }]);
+    expect(json.results.map((r) => r.headline)).toEqual(["ml @ Paysolde AI Lab", "Titre 1", HOMONYM.headline]);
+  });
+
   it("six cents recherches dans l'App par IP et par jour, puis le web seul", async () => {
     let n = 0;
     const ctx = setup({ people: { byName: () => ({ status: "ok", results: [] }) }, app: { registry: registry(async () => (n++, [])) } });

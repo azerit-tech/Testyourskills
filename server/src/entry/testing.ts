@@ -72,7 +72,7 @@ export interface EntrySetup {
 
 export function setupEntry(o: EntrySetup = {}) {
   const store = new Store(":memory:");
-  const calls = { collect: [] as string[], byName: [] as { raw: string; strict: boolean; spent: boolean; company?: string }[], byEmail: [] as string[], forUrl: [] as string[], peek: [] as string[] };
+  const calls = { collect: [] as string[], byName: [] as { raw: string; strict: boolean; spent: boolean; company?: string; context?: string }[], byEmail: [] as string[], forUrl: [] as string[], peek: [] as string[] };
   const deps: Deps = {
     async collectGithub(login) {
       calls.collect.push(login);
@@ -132,7 +132,7 @@ export function setupEntry(o: EntrySetup = {}) {
       : {
           async byName(raw, opts) {
             const spent = opts?.spend?.() ?? true;
-            calls.byName.push({ raw, strict: !!opts?.strict, spent, ...(opts?.company ? { company: opts.company } : {}) });
+            calls.byName.push({ raw, strict: !!opts?.strict, spent, ...(opts?.company ? { company: opts.company } : {}), ...(opts?.context ? { context: opts.context } : {}) });
             if (!spent) return { status: "off" };
             return p?.byName ? p.byName(raw, !!opts?.strict) : { status: "ok", results: [CAMILLE, HOMONYM] };
           },

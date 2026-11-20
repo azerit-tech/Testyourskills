@@ -1236,7 +1236,7 @@ export function createApp(opts: AppOptions) {
   mountLinkedinSearch(app, {
     people: opts.linkedinProfiles ? opts.linkedinPeople : undefined,
     // Les profils de l'App d'abord sous le champ (§18.96), seulement là où le web en propose aussi.
-    namesakes: opts.registry && opts.linkedinProfiles && opts.linkedinPeople ? (typed) => opts.registry!.namesakes(typed, { partial: true }) : undefined,
+    namesakes: opts.registry && opts.linkedinProfiles && opts.linkedinPeople ? (name, o) => opts.registry!.namesakes(name, o) : undefined,
     limiter,
   });
   // Et celles du champ « Ton nom ou pseudo » : les comptes GitHub, cherchés avec les jetons du serveur.
