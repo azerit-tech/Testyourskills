@@ -34,7 +34,6 @@ import type { TokenPool } from "./github/tokens";
 import { weekTop, withWeekSpecial } from "./top";
 import { normalizeLinkedinUrl, PAID_CALLS_PER_IP, type LinkedinFinder } from "./linkedinProfile/index";
 import { forgetLinkedinOfCard, latestLinkedinCard, recentLinkedinCard } from "./linkedinProfile/cards";
-import { githubShowsLinkedin } from "./linkedinProfile/url";
 import type { LinkedinPeople } from "./linkedinProfile/search";
 import { mountLinkedinSearch } from "./entry/linkedinSearch";
 import { mountGithubSearch, type GithubSearchRoutesOptions } from "./entry/githubSearch";
@@ -505,17 +504,14 @@ export function createApp(opts: AppOptions) {
   };
 
   /**
-   * Ses profils publics, sous la fiche (§18.108, shared/profileLinks.ts) : son GitHub, et son LinkedIn
-   * si sa personne a fait la fiche ou l'a revendiquée, ou si son GitHub affiche déjà ce LinkedIn.
+   * Ses profils publics, sous la fiche (§18.108, shared/profileLinks.ts) : son GitHub et son LinkedIn,
+   * ceux de ses propres pièces, faite, revendiquée ou dénoncée.
    */
   const linksOf = (row: CardRow): ProfileLinks => {
     const facts = row.facts as { linkedinUrl?: unknown } | null;
     const fromFacts = typeof facts?.linkedinUrl === "string" ? facts.linkedinUrl : null;
     const linkedinUrl = fromFacts ?? (row.kind === "card" ? ((row.data as CardData).linkedinUrl ?? null) : null);
-    const anonymous = thirdParty(row);
-    const ghPiece = anonymous && linkedinUrl && row.kind === "comparison" ? store.getCard((row.data as ComparisonData).github.id) : null;
-    const linkedinOnGithub = !!ghPiece && !!linkedinUrl && githubShowsLinkedin(ghPiece.facts, linkedinUrl);
-    return profileLinks({ login: store.loginOf(row) ?? mainCard(row).login, linkedinUrl }, { anonymous, linkedinOnGithub });
+    return profileLinks({ login: store.loginOf(row) ?? mainCard(row).login, linkedinUrl });
   };
 
   // Public : jamais de montant. ai = ok | budget (plafond du jour atteint) |

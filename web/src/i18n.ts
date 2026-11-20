@@ -156,6 +156,8 @@ const fr = frTypoDeep({
       /* Jamais une unité à zéro : « 1 j », « 5 h », « 1 j 4 h ». */
       left: (d: number, h: number, m: number) => (d > 0 ? (h > 0 ? `${d} j ${h} h` : `${d} j`) : h > 0 ? (m > 0 ? `${h} h ${m} min` : `${h} h`) : `${m} min`),
       cut: "Top 5",
+      /* L'étiquette du top de la semaine : il montre jusqu'à dix lignes. */
+      tag: "Top 10",
       /* Semaine vide : un seul bloc d'invitation ; top 5 incomplet : une seule ligne pour les places libres (§18.48). */
       emptyTitle: "La place n°\u00a01 est libre",
       emptyText: "La première fiche de la semaine la prend.",
@@ -1040,6 +1042,7 @@ const en: Dict = {
       meta: (week, n, left) => [`Week ${week}`, showsTotal(n) && `${n} sheets`, `ends in ${left}`].filter(Boolean).join(", "),
       left: (d, h, m) => (d > 0 ? (h > 0 ? `${d}d ${h}h` : d === 1 ? "1 day" : `${d} days`) : h > 0 ? (m > 0 ? `${h}h ${m}min` : `${h}h`) : `${m}min`),
       cut: "Top 5",
+      tag: "Top 10",
       emptyTitle: "Spot #1 is open",
       emptyText: "This week's first sheet takes it.",
       freeRange: (from, to) => (from === to ? `Spot ${from} is open` : `Spots ${from} to ${to} are open`),

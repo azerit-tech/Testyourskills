@@ -95,9 +95,9 @@ describe("la démo suit la règle du serveur", () => {
     expect(await linksOf("m-li-abc123")).toEqual({ linkedin: "https://www.linkedin.com/in/sans-github" });
   });
 
-  it("dénoncée : pas de LinkedIn ; revendiquée : les deux", async () => {
-    expect(await linksOf("m-li-Dabc123")).toBeNull();
-    expect(await linksOf("m-licmp-Dabc123")).toEqual({ github: "https://github.com/leamd" });
+  it("dénoncée ou revendiquée : les mêmes logos", async () => {
+    expect(await linksOf("m-li-Dabc123")).toEqual({ linkedin: "https://www.linkedin.com/in/sans-github" });
+    expect(await linksOf("m-licmp-Dabc123")).toEqual({ linkedin: "https://www.linkedin.com/in/camille-ardent", github: "https://github.com/leamd" });
     expect(await linksOf("m-licmp-Cabc123")).toEqual({ linkedin: "https://www.linkedin.com/in/camille-ardent", github: "https://github.com/leamd" });
     expect(await linksOf("m-licmp-Dabc124", "leamd")).toEqual({ linkedin: "https://www.linkedin.com/in/camille-ardent", github: "https://github.com/leamd" });
   });

@@ -5,21 +5,13 @@ import { githubHref, linkedinHref, personLinks, profileLinks } from "./profileLi
 
 const LI = "https://www.linkedin.com/in/lea-martin-dubois";
 const GH = "https://github.com/leamd";
-const open = { anonymous: false };
 
 describe("les liens d'une fiche", () => {
   it("GitHub seule, LinkedIn seule, les deux", () => {
-    expect(profileLinks({ login: "leamd" }, open)).toEqual({ github: GH });
-    expect(profileLinks({ linkedinUrl: LI }, open)).toEqual({ linkedin: LI });
-    expect(profileLinks({ login: "leamd", linkedinUrl: LI }, open)).toEqual({ linkedin: LI, github: GH });
-    expect(profileLinks({}, open)).toEqual({});
-  });
-
-  it("dénoncée, pas revendiquée : son GitHub (déjà sur la fiche), pas son LinkedIn ; sauf si son GitHub l'affiche", () => {
-    const anon = { anonymous: true };
-    expect(profileLinks({ login: "leamd", linkedinUrl: LI }, anon)).toEqual({ github: GH });
-    expect(profileLinks({ linkedinUrl: LI }, anon)).toEqual({});
-    expect(profileLinks({ login: "leamd", linkedinUrl: LI }, { anonymous: true, linkedinOnGithub: true })).toEqual({ linkedin: LI, github: GH });
+    expect(profileLinks({ login: "leamd" })).toEqual({ github: GH });
+    expect(profileLinks({ linkedinUrl: LI })).toEqual({ linkedin: LI });
+    expect(profileLinks({ login: "leamd", linkedinUrl: LI })).toEqual({ linkedin: LI, github: GH });
+    expect(profileLinks({})).toEqual({});
   });
 
   it("jamais autre chose qu'un profil linkedin.com/in/… ou github.com/<pseudo>", () => {
@@ -30,7 +22,7 @@ describe("les liens d'une fiche", () => {
     expect(githubHref("lea@exemple.fr")).toBeNull();
     expect(githubHref("-bad")).toBeNull();
     expect(githubHref("Nour-RS")).toBe("https://github.com/Nour-RS");
-    expect(profileLinks({ login: "a b", linkedinUrl: "https://evil.test/in/x" }, open)).toEqual({});
+    expect(profileLinks({ login: "a b", linkedinUrl: "https://evil.test/in/x" })).toEqual({});
   });
 });
 

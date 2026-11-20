@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FIXTURES } from "../../shared/fixtures";
+import { personLinks } from "../../shared/profileLinks";
 import type { CardData, ComparisonData, JobState, WeekTop } from "../../shared/types";
 import { createApp } from "./app";
 import { RETENTION_MS, Store, type NewCardRow } from "./db";
@@ -408,7 +409,7 @@ describe("fiche née d'une dénonciation (§18.119)", () => {
     expect(withWeekSpecial(store.db, store.getCard(target.id)!.data as CardData, NOW).data.special).toBe("totw");
   });
 
-  it("une fiche LinkedIn seule dénoncée entre, nommée, sans le logo LinkedIn tant qu'elle n'est pas à sa personne", () => {
+  it("une fiche LinkedIn seule dénoncée, pas revendiquée, entre nommée, avec son LinkedIn", () => {
     const store = newStore();
     const snitch = gh("delateur4", 50, W46 + H);
     const tip = li("ines-tip", 80, W46 + H);
@@ -417,7 +418,7 @@ describe("fiche née d'une dénonciation (§18.119)", () => {
     const top = weekTop(store.db, { now: NOW });
     expect(top.entries.map((e) => e.cardId)).toEqual([tip.id, snitch.id]);
     expect(top.entries[0]).toMatchObject({ name: FIXTURES.cv.name, initials: FIXTURES.cv.initials, overall: 80 });
-    expect(top.entries[0]!.linkedinUrl).toBeUndefined();
+    expect(top.entries[0]!.linkedinUrl).toBe("https://www.linkedin.com/in/ines-tip");
     expect(weekRank(store.db, tip.id, NOW)).toMatchObject({ rank: 1 });
   });
 
@@ -479,7 +480,7 @@ describe("fiche née d'une dénonciation (§18.119)", () => {
     expect(top.entries[0]!.linkedinUrl).toBe("https://www.linkedin.com/in/duo2");
   });
 
-  it("dossier dénoncé : il entre, une ligne avec la fiche que la personne a faite, qui garde son adresse ; son LinkedIn à la revendication", () => {
+  it("dossier dénoncé : il entre, une ligne avec la fiche que la personne a faite, qui garde son adresse ; son LinkedIn et son GitHub, revendiqué ou non", () => {
     const store = newStore();
     const own = gh("duo", 60, W46);
     store.insertCards([own]);
@@ -490,7 +491,8 @@ describe("fiche née d'une dénonciation (§18.119)", () => {
     let top = weekTop(store.db, { now: NOW });
     expect(top.entries.map((e) => [e.cardId, e.overall])).toEqual([["cmpDenon1", 88]]);
     expect(top.total).toBe(1);
-    expect(top.entries[0]!.linkedinUrl).toBeUndefined();
+    expect(top.entries[0]).toMatchObject({ login: "duo", linkedinUrl: "https://www.linkedin.com/in/duo" });
+    expect(personLinks(top.entries[0]!)).toEqual({ linkedin: "https://www.linkedin.com/in/duo", github: "https://github.com/duo" });
     expect(weekRank(store.db, "cmpDenon1", NOW)).toMatchObject({ rank: 1 });
     expect(weekRank(store.db, own.id, NOW)).toMatchObject({ rank: 1, total: 1 });
     expect(store.fileRow(own.id)!.id).toBe(own.id);

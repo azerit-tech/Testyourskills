@@ -1,8 +1,7 @@
 // Top de la semaine sur l'accueil (§18.22, §18.48) : jusqu'à dix fiches de la
-// semaine, une ligne chacune. Semaine vide (le matin du lancement) : un seul bloc
-// d'invitation. Top 5 incomplet : les lignes réelles, puis une seule ligne pour
-// les places libres, qui ramène au champ. Les places 6 à 10 n'apparaissent
-// qu'occupées. Mat, sans dégradé : celui de l'écran est la fiche.
+// semaine, une ligne chacune, sous l'étiquette « Top 10 » : ce qu'on voit est ce
+// qu'elle dit (Jacques, 20 nov. 2026). Semaine vide : rien. Mat, sans dégradé :
+// celui de l'écran est la fiche.
 // Le tableau porte l'ancre « semaine » ; la ligne de la fiche en mémoire y est mise en évidence.
 import { useEffect, useRef, useState } from "react";
 import { personLabel } from "../../../shared/boardPerson";
@@ -19,7 +18,6 @@ import { Stars } from "./Stars";
 const SIZE = 10;
 /** L'échelle des notes, dite une fois en tête du tableau (§18.48 : toute note a son échelle). */
 export const SCALE = "/100";
-const TOP = 5;
 /** L'ancre du tableau : le rang de la semaine d'une fiche y mène (« /#semaine »). */
 export const WEEK_ANCHOR = "semaine";
 
@@ -68,7 +66,7 @@ function Wait() {
         {"\u00a0"}
       </p>
       <div className="board-top">
-        <p className="board-tag">{tt.cut}</p>
+        <p className="board-tag">{tt.tag}</p>
         <span className="board-scale" aria-hidden>
           {SCALE}
         </span>
@@ -118,10 +116,9 @@ export function WeekBoardView({ top, now, mine }: { top: WeekTop; now: number; o
   const d = Math.floor(left / 86_400_000);
   const h = Math.floor((left % 86_400_000) / 3_600_000);
   const m = Math.floor((left % 3_600_000) / 60_000);
-  // Le top 5, puis les places 6 à 10 occupées. Semaine sans fiche : rien, le tableau vient avec la première (Jacques, 20 nov.).
-  const first = top.entries.slice(0, TOP);
-  const rest = top.entries.slice(TOP, SIZE);
-  if (first.length === 0) return null;
+  // Les dix premières, d'un seul bloc. Semaine sans fiche : rien, le tableau vient avec la première (Jacques, 20 nov.).
+  const rows = top.entries.slice(0, SIZE);
+  if (rows.length === 0) return null;
 
   return (
     <section className="board" id={WEEK_ANCHOR} ref={section} aria-labelledby="board-title">
@@ -129,23 +126,16 @@ export function WeekBoardView({ top, now, mine }: { top: WeekTop; now: number; o
       <p className="board-meta">{tt.meta(top.week, top.total, tt.left(d, h, m))}</p>
       {(
         <div className="board-top">
-          <p className="board-tag">{tt.cut}</p>
+          <p className="board-tag">{tt.tag}</p>
           <span className="board-scale" aria-hidden>
             {SCALE}
           </span>
           <ol className="board-list is-top">
-            {first.map((e) => (
+            {rows.map((e) => (
               <Row key={e.cardId ?? `rang-${e.rank}`} e={e} me={isMine(e, mine)} />
             ))}
           </ol>
         </div>
-      )}
-      {rest.length > 0 && (
-        <ol className="board-list is-rest" start={TOP + 1}>
-          {rest.map((e) => (
-            <Row key={e.cardId ?? `rang-${e.rank}`} e={e} me={isMine(e, mine)} />
-          ))}
-        </ol>
       )}
     </section>
   );
