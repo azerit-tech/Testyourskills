@@ -57,37 +57,6 @@ function Row({ e, me }: { e: TopEntry; me: boolean }) {
   );
 }
 
-/** Les places du top 5 encore libres, en une seule ligne : « Places 3 à 5 libres », et l'invitation à en prendre une. */
-function Free({ from, onPlay }: { from: number; onPlay: () => void }) {
-  const { t } = useT();
-  const tt = t.home.top;
-  return (
-    <li>
-      <button type="button" className="board-row is-free" onClick={onPlay}>
-        <span className="board-rank" aria-hidden />
-        <span className="board-avatar" aria-hidden />
-        <span className="board-login">{tt.freeRange(from, TOP)}</span>
-        <span className="board-take">{tt.take(TOP - from + 1)}</span>
-      </button>
-    </li>
-  );
-}
-
-/** Semaine sans fiche : la première place est à prendre, un seul bloc le dit. */
-function Empty({ onPlay }: { onPlay: () => void }) {
-  const { t } = useT();
-  const tt = t.home.top;
-  return (
-    <div className="block block-info board-empty">
-      <h3 className="t-block">{tt.emptyTitle}</h3>
-      <p>{tt.emptyText}</p>
-      <button type="button" className="pill" onClick={onPlay}>
-        {t.home.submit}
-      </button>
-    </div>
-  );
-}
-
 /** Tant que le top n'a pas répondu : le titre et la place du top 5, pour que rien ne saute dessous. */
 function Wait() {
   const { t } = useT();
@@ -136,7 +105,7 @@ export function WeekBoard({ onPlay }: { onPlay: () => void }) {
 }
 
 /** Le tableau d'une semaine connue, sans appel au serveur. */
-export function WeekBoardView({ top, now, onPlay, mine }: { top: WeekTop; now: number; onPlay: () => void; mine?: MyCard | null }) {
+export function WeekBoardView({ top, now, mine }: { top: WeekTop; now: number; onPlay: () => void; mine?: MyCard | null }) {
   const { t } = useT();
   const tt = t.home.top;
   // Venu par l'ancre (« /#semaine », depuis le rang d'une fiche) : le tableau n'existait
@@ -149,17 +118,16 @@ export function WeekBoardView({ top, now, onPlay, mine }: { top: WeekTop; now: n
   const d = Math.floor(left / 86_400_000);
   const h = Math.floor((left % 86_400_000) / 3_600_000);
   const m = Math.floor((left % 3_600_000) / 60_000);
-  // Le top 5, puis une ligne pour ses places libres ; au-delà, seulement les occupées.
+  // Le top 5, puis les places 6 à 10 occupées. Semaine sans fiche : rien, le tableau vient avec la première (Jacques, 20 nov.).
   const first = top.entries.slice(0, TOP);
   const rest = top.entries.slice(TOP, SIZE);
+  if (first.length === 0) return null;
 
   return (
     <section className="board" id={WEEK_ANCHOR} ref={section} aria-labelledby="board-title">
       <h2 id="board-title">{tt.title}</h2>
       <p className="board-meta">{tt.meta(top.week, top.total, tt.left(d, h, m))}</p>
-      {first.length === 0 ? (
-        <Empty onPlay={onPlay} />
-      ) : (
+      {(
         <div className="board-top">
           <p className="board-tag">{tt.cut}</p>
           <span className="board-scale" aria-hidden>
@@ -169,7 +137,6 @@ export function WeekBoardView({ top, now, onPlay, mine }: { top: WeekTop; now: n
             {first.map((e) => (
               <Row key={e.cardId ?? `rang-${e.rank}`} e={e} me={isMine(e, mine)} />
             ))}
-            {first.length < TOP && <Free from={first.length + 1} onPlay={onPlay} />}
           </ol>
         </div>
       )}

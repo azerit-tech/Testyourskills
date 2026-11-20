@@ -131,29 +131,16 @@ function Row({ place, b, me }: { place: number; b: BandStanding; me: boolean }) 
   );
 }
 
-/** Les places encore libres, en une seule ligne, comme au top de la semaine : elle ramène au formulaire. */
-function Free({ from, onPlay }: { from: number; onPlay: () => void }) {
-  const { t } = useT();
-  const tt = t.home.top;
-  return (
-    <li>
-      <button type="button" className="board-row band-row league-row is-free" onClick={onPlay}>
-        <span className="board-rank" aria-hidden />
-        <span className="board-login">{tt.freeRange(from, TOP)}</span>
-        <span className="board-take">{tt.take(TOP - from + 1)}</span>
-      </button>
-    </li>
-  );
-}
-
 /** Une ligue ; `top` nul : le titre et la place des cinq lignes, pour que rien ne saute dessous. */
-function League({ type, top, mine, onPlay }: { type: BandType; top: Top | null; mine: Mine; onPlay: () => void }) {
+function League({ type, top, mine }: { type: BandType; top: Top | null; mine: Mine; onPlay: () => void }) {
   const { t } = useT();
   const rows = top ? top[type].slice(0, TOP) : [];
   const own = top?.mine?.[type];
   // Plus bas que les cinq lignes : sa bande, à sa place, après un filet.
   const below = own && own.place > rows.length && !rows.some((b) => b.id === own.band.id) ? own : null;
   const id = `league-${type}-title`;
+  // Une ligue sans bande classée : rien, elle vient avec la première (Jacques, 20 nov.).
+  if (top && rows.length === 0 && !below) return null;
   return (
     <section className="board league" aria-labelledby={id} aria-busy={top ? undefined : true}>
       <h2 id={id}>{t.bands.league[type]}</h2>
@@ -167,7 +154,6 @@ function League({ type, top, mine, onPlay }: { type: BandType; top: Top | null; 
             {rows.map((b, i) => (
               <Row key={b.id} place={i + 1} b={b} me={b.id === mine[type]} />
             ))}
-            {rows.length < TOP && <Free from={rows.length + 1} onPlay={onPlay} />}
           </ol>
         ) : (
           <div className="board-list is-top board-wait" />

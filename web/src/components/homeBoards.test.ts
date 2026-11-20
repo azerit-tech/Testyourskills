@@ -24,27 +24,18 @@ const count = (html: string, needle: string) => html.split(needle).length - 1;
 afterEach(() => vi.unstubAllGlobals());
 
 describe("le top de la semaine sur l'accueil", () => {
-  it("semaine vide : un seul bloc d'invitation, aucune ligne de place libre", () => {
-    const html = board(0);
-    expect(count(html, "board-empty")).toBe(1);
-    expect(html).toContain("La place n° 1 est libre");
-    expect(html).not.toContain("board-row");
-    expect(html).not.toContain("board-tag");
-    expect(board(0, "en-US")).toContain("Spot #1 is open");
+  it("semaine vide : rien, le tableau vient avec la première fiche", () => {
+    expect(board(0)).toBe("");
+    expect(board(0, "en-US")).toBe("");
   });
 
-  it("top 5 incomplet : les lignes réelles, l'étiquette, puis une seule ligne pour les places libres", () => {
+  it("top 5 incomplet : les lignes réelles et l'étiquette, aucune ligne de place libre", () => {
     const html = board(2);
     expect(count(html, 'class="board-row"')).toBe(2);
-    expect(count(html, "is-free")).toBe(1);
-    expect(html).toContain("Places 3 à 5 libres");
-    expect(html).toContain("Prends-en une");
+    expect(html).not.toContain("is-free");
+    expect(html).not.toContain("libre");
     expect(html).toContain("board-tag");
-    expect(board(1)).toContain("board-tag");
-    expect(board(4)).toContain("Place 5 libre");
-    expect(board(4)).toContain("Prends-la");
-    expect(board(4, "en-US")).toContain("Spot 5 is open");
-    expect(board(3, "en-US")).toContain("Spots 4 to 5 are open");
+    expect(board(4)).not.toContain("is-free");
   });
 
   it("top 5 complet : plus de place libre ; au-delà, les lignes sortent de l'aplat", () => {
@@ -160,25 +151,20 @@ describe("les bandes sur l'accueil : un classement par ligue (§18.92, §18.101)
     expect(league(view(prod, {}, "en-US"), "ecole")).toContain("2 sheets, forming");
   });
 
-  it("les places libres en une seule ligne, qui ramène au formulaire, comme au top de la semaine", () => {
+  it("aucune ligne de places libres ; une ligue sans bande ne s'affiche pas", () => {
     const html = view(prod);
-    expect(league(html, "ecole")).toMatch(/<button type="button" class="board-row band-row league-row is-free">.*Places 3 à 5 libres<\/span><span class="board-take">Prends-en une<\/span>/);
-    expect(league(html, "boite")).toContain("Places 2 à 5 libres");
+    expect(html).not.toContain("is-free");
+    expect(html).not.toContain("libre");
     const four = view({ ecole: [1, 2, 3, 4].map((r) => band("ecole", `e${r}`, `École ${r}`, 20 - r, 3, r)), boite: [] });
-    expect(league(four, "ecole")).toMatch(/Place 5 libre<\/span><span class="board-take">Prends-la/);
-    // une ligue sans bande : les cinq places sont libres
-    expect(league(four, "boite")).toContain("Places 1 à 5 libres");
-    expect(count(league(four, "boite"), "board-row")).toBe(1);
+    expect(count(league(four, "ecole"), "league-row")).toBe(4);
+    expect(four).not.toContain("league-boite-title");
     const full = view({ ecole: [1, 2, 3, 4, 5, 6].map((r) => band("ecole", `e${r}`, `École ${r}`, 20 - r, 3, r)), boite: [] });
-    expect(league(full, "ecole")).not.toContain("is-free");
     expect(count(league(full, "ecole"), "league-row")).toBe(5);
   });
 
-  it("la production remise à zéro : une ligne de places libres par ligue, ni zéro ni bloc vide", () => {
+  it("la production remise à zéro : aucune ligue affichée, l'ancre reste", () => {
     const html = view({ ecole: [], boite: [] });
-    expect(count(html, "Places 1 à 5 libres")).toBe(2);
-    expect(count(html, "board-row")).toBe(2);
-    expect(html).not.toMatch(/>0</);
+    expect(html).toBe('<div class="leagues" id="classement"></div>');
   });
 
   it("en attendant le serveur : les deux titres et la place des lignes, l'ancre déjà là", () => {
