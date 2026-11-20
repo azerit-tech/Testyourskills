@@ -7,6 +7,7 @@ import Database from "better-sqlite3";
 import { afterEach, describe, expect, it } from "vitest";
 import type { BandBoard, BandPage, BandRef, BandsTop, MyBands } from "../../shared/bands";
 import { FIXTURES } from "../../shared/fixtures";
+import { aliasFor } from "../../shared/punchline";
 import type { CardData } from "../../shared/types";
 import { createApp, purge } from "./app";
 import { SESSION_COOKIE, signSession } from "./auth";
@@ -437,7 +438,8 @@ describe("pages publiques", () => {
       { stars: 4, cardId: li, name: "Florence Delmas", login: undefined, avatarUrl: undefined, initials: "FD" },
       { stars: 3, cardId: cv, name: "Yann Perrot", login: undefined, avatarUrl: undefined, initials: "YP" },
     ]);
-    expect(r.json.members[0]!.profile).toEqual(FIXTURES.gold.profile!.label);
+    // Le nom du profil propre à la fiche (§18.103).
+    expect(r.json.members[0]!.profile).toEqual(aliasFor(FIXTURES.gold.profile!.id, claimed));
     // Le poste de la fiche, déjà public, distingue deux dossiers du même profil.
     expect(r.json.members.map((m) => m.position)).toEqual(Array(4).fill(FIXTURES.gold.position));
     // Rien d'autre de la fiche ne part : ni l'adresse LinkedIn, ni l'école, ni un rang.
@@ -463,7 +465,7 @@ describe("pages publiques", () => {
       [5, null, null, null, null],
       [4, null, null, null, null],
     ]);
-    expect(before.members[1]!.profile).toEqual(FIXTURES.gold.profile!.label);
+    expect(before.members[1]!.profile).toEqual(aliasFor(FIXTURES.gold.profile!.id, tip));
     expect(JSON.stringify(before)).not.toMatch(/Nom Caché|victime|Personne Dénoncée|Partie Loin|parti|avatars\.githubusercontent/);
     // « C'est moi » : la fiche revendiquée se montre ; la fiche LinkedIn seule ne se revendique pas.
     ctx.store.claimOwner("victime", 4);

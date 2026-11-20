@@ -27,7 +27,7 @@
 import type Database from "better-sqlite3";
 import { boardPerson } from "../../shared/boardPerson";
 import { fileOf } from "../../shared/caseFile";
-import { catalogProfile } from "../../shared/profileCatalog";
+import { catalogProfile, withCatalogProfiles } from "../../shared/profileCatalog";
 import type { CardData, ComparisonData, Fact, TopEntry, WeekRank, WeekTop } from "../../shared/types";
 import { starsFor } from "../../shared/types";
 import { isoWeekLabel, weekStart } from "./weekly";
@@ -162,7 +162,8 @@ export function weekTop(db: Database.Database, opts: { now?: number; limit?: num
   const get = db.prepare(`SELECT json, kind FROM cards WHERE id = ?`);
   const entries: TopEntry[] = ranked.slice(0, limit).map((r, i) => {
     const raw = get.get(r.id) as { json: string; kind: string } | undefined;
-    const data = raw ? JSON.parse(raw.json) : {};
+    // Le nom du profil propre à la fiche (§18.103), comme sur sa page.
+    const data = raw ? withCatalogProfiles(JSON.parse(raw.json)) : {};
     // La fiche telle qu'elle se montre : celle du dossier pour deux pièces (§18.36).
     const card = (raw?.kind === "comparison" ? fileOf(data as ComparisonData) : data) as Partial<CardData>;
     const profile: Fact | undefined = card.profile ? catalogProfile(card.profile).label : undefined;

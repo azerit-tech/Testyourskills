@@ -6,6 +6,7 @@ import { join } from "node:path";
 import Database from "better-sqlite3";
 import { afterEach, describe, expect, it } from "vitest";
 import { FIXTURES } from "../../shared/fixtures";
+import { aliasFor } from "../../shared/punchline";
 import type { CardData } from "../../shared/types";
 import { createApp } from "./app";
 import { SESSION_COOKIE, signSession } from "./auth";
@@ -346,6 +347,7 @@ describe("balises OG de /c/:id (§18.7)", () => {
     const ctx = setup();
     const { json } = await post(ctx, { login: "leamd" });
     const html = await (await ctx.app.request(`/c/${json.id}`)).text();
-    expect(html).toContain(`<meta property="og:title" content="@leamd est dans le viseur ★★★★★☆, ${FIXTURES.gold.profile!.label.fr}">`);
+    // Le nom du profil propre à la fiche (§18.103), tiré par son id.
+    expect(html).toContain(`<meta property="og:title" content="@leamd est dans le viseur ★★★★★☆, ${aliasFor(FIXTURES.gold.profile!.id, json.id)!.fr}">`);
   });
 });
