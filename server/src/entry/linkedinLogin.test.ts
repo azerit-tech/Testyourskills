@@ -7,6 +7,7 @@ import type { Namesake, RegistryPort } from "../registry/index";
 import { AUTHORIZE_URL, LI_STATE_COOKIE, TOKEN_URL, USERINFO_URL } from "../linkedin";
 import { ENTER_COOKIE, ENTER_STARTS_PER_DAY, KNOWN_COOKIE, PEEKS_PER_IP, WHO_COOKIE, WHO_TTL_MS, employerFromEmail } from "./linkedinLogin";
 import { CAMILLE, CAMILLE_URL, HOMONYM, PROFILE, cardState, cookiesOf, postCard, setupEntry, type EntryCtx, type EntrySetup } from "./testing";
+import { weekRank } from "../top";
 
 const BASE = "https://skills.test";
 const EMAIL = "camille@ardent.dev";
@@ -719,6 +720,34 @@ describe("son GitHub avant le jugement (§18.111)", () => {
     expect(ctx.calls.collect).toEqual(["camille-ardent"]);
     expect(ctx.store.getCard(json.id)?.email).toBe(EMAIL);
     expect(links).toContainEqual(expect.objectContaining({ login: "camille-ardent", url: CAMILLE_URL, step: "proposition_oui" }));
+  });
+
+  describe("le dossier entre au top si ce GitHub est plausiblement le sien (§18.116)", () => {
+    const linkedinProfiles = {
+      forGithub: async (_f: unknown, o?: { url?: string }) => (o?.url === CAMILLE_URL ? { profile: PROFILE, proven: false } : null),
+      forUrl: async () => ({ status: "found" as const, profile: PROFILE, githubLogin: null }),
+    };
+    const make = async (login: string) => {
+      const { ctx } = setup({ github: null, app: { githubAccounts: found(account("camille-ardent", "Camille Ardent")), linkedinProfiles } });
+      const { jar } = await signIn(ctx);
+      await asked(ctx, jar);
+      const { json } = await postCard(ctx, { linkedin: CAMILLE_URL, login }, jar);
+      return { ctx, id: json.id as string };
+    };
+
+    it("le compte trouvé, gardé : prouvé par la connexion et le nom, au classement de la semaine", async () => {
+      const { ctx, id } = await make("camille-ardent");
+      expect(await kindOf(ctx, id)).toBe("comparison");
+      expect(facts(ctx, id)).toEqual({ linkedinUrl: CAMILLE_URL, linkedinProven: true, linkedinProof: "signin+name" });
+      expect(weekRank(ctx.store.db, id)).not.toBeNull();
+    });
+
+    it("un pseudo tapé sans rapport avec son nom : le dossier sort, non prouvé, hors du top", async () => {
+      const { ctx, id } = await make("zorro-42");
+      expect(await kindOf(ctx, id)).toBe("comparison");
+      expect(facts(ctx, id)).toEqual({ linkedinUrl: CAMILLE_URL, linkedinProven: false });
+      expect(weekRank(ctx.store.db, id)).toBeNull();
+    });
   });
 
   it("rien trouvé : « Ajoute ton GitHub » ; « Je n'en ai pas » fait la fiche LinkedIn seule, sans GitHub proposé dessous", async () => {

@@ -904,6 +904,11 @@ export function createApp(opts: AppOptions) {
         // Lectures payantes de profils LinkedIn : une limite par IP en plus du budget du jour (§18.24).
         linkedinSpend: () => limiter.take("linkedin", ip, PAID_CALLS_PER_IP),
         ...(who?.github ? { identity: { githubLogin: who.github.login, how: who.github.how, sureProfile: who.sureProfile } } : {}),
+        // Son profil sûr, et le GitHub qu'elle a donné ou confirmé avant le jugement : le dossier est prouvé
+        // si ce GitHub est plausiblement le sien, et entre au top (§18.116).
+        ...(who?.sureProfile && login && linkedinUrl
+          ? { signedInGithub: { name: who.name, ...(who.github?.how === "email" && who.github.login.toLowerCase() === login.toLowerCase() ? { email: true } : {}) } }
+          : {}),
         ...(who?.picture ? { photo: who.picture } : {}),
         // Sa propre fiche, jamais une dénonciation : l'autre source se cherche pour la lui proposer (§18.100) ;
         // jamais après « Je n'en ai pas » (§18.111).
