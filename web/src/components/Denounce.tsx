@@ -1,28 +1,28 @@
-// « Dénonce un complice » (§18.6, §18.48, §18.83), le premier bloc sous le verdict. Rien
-// à coller : on tape un nom, des comptes GitHub et des profils LinkedIn sortent sous le
-// champ, on touche la personne et la dénonciation part. Un lien LinkedIn collé ou un
-// pseudo GitHub tapé en entier marchent toujours. La fiche du complice sort par le moteur
-// habituel ; « @x est dans le viseur » s'affiche aussitôt avec sa barre, dans le bloc,
-// puis de quoi l'envoyer à la personne, sans regarder la révélation de l'autre.
-// Si le serveur ne lit pas LinkedIn, le champ ne prend qu'un nom ou un pseudo GitHub.
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+// « Dénonce un complice » (§18.6, §18.48, §18.83, §18.114), le premier bloc sous le verdict.
+// Rien à coller : on tape un nom, des comptes GitHub et des profils LinkedIn sortent sous le
+// champ, on touche la personne et la dénonciation part. Un lien LinkedIn collé ou un pseudo
+// GitHub tapé en entier marchent toujours. Le champ reste là : il se vide et garde le focus,
+// prêt pour le suivant ; chaque dénonciation de la séance est une ligne sous le champ, la plus
+// récente en haut, avec sa barre d'attente, puis ses étoiles, sa note et de quoi l'envoyer.
+// Ni rechargement ni navigation. Si le serveur ne lit pas LinkedIn, le champ ne prend qu'un nom
+// ou un pseudo GitHub.
+import { useEffect, useId, useMemo, useReducer, useRef, useState } from "react";
 import type { CSSProperties, FormEvent } from "react";
 import { fileOf } from "../../../shared/caseFile";
 import { detectEntry, linkedinSlug } from "../../../shared/entry";
 import type { Entry } from "../../../shared/entry";
-import { IMAGE_QUERY } from "../../../shared/images";
 import type { CardData, Lang } from "../../../shared/types";
 import { LEVEL_LABELS, starsFor } from "../../../shared/types";
 import { pick, useT } from "../i18n";
 import { api, ApiError, type CaseInfo } from "../lib/api";
 import { errorFact } from "../lib/errors";
-import { onLinkClick } from "../lib/router";
 import { rememberDenounced } from "../lib/session";
 import { hasNativeShare } from "../lib/sharing";
 import { copyText, isTouch, shareUrl } from "../lib/util";
 import { verdict } from "../lib/versus";
 import { aimAt, ManualCopy } from "./After";
-import { IconCopy, IconLinkedIn, IconMail, IconShare, IconSms, IconWhatsApp } from "./Icons";
+import { Avatar } from "./Avatar";
+import { IconCopy, IconShare, IconWhatsApp } from "./Icons";
 import { Stars } from "./Stars";
 import { useSuggestBox, useSuggestions } from "./Suggest";
 import type { Suggestion } from "./Suggest";
@@ -40,18 +40,33 @@ export function pendingPct(elapsed: number): number {
 /** Au-delà, le serveur a déjà coupé (3 min de file, 60 s de calcul et 60 s de rallonge LinkedIn) : on s'arrête aussi. */
 const GIVE_UP_MS = 5.5 * 60_000;
 
-type State =
-  | { s: "idle"; error?: string }
-  /** `who` : « @pseudo », le nom de la personne touchée dans la liste, ou celui du lien LinkedIn. `since` : le départ de la barre. */
-  | { s: "pending"; who: string; since: number }
-  | { s: "done"; card: CardData };
-
-/** Le chef d'accusation le plus partageable : un écart ou un négatif d'abord. */
-function bestStatus(card: CardData, lang: Lang): string | null {
-  const order = ["gap", "negative", "special", "positive"];
-  const s = [...card.statuses].sort((a, b) => order.indexOf(a.tone) - order.indexOf(b.tone))[0];
-  return s ? pick(s.label, lang) : null;
+/**
+ * Une dénonciation de la séance (§18.114) : une ligne sous le champ, la plus récente en haut. `key` : la
+ * personne (« gh:pseudo », « li:adresse ») ; la même, dénoncée de nouveau, remonte sans repartir.
+ */
+export interface Shot {
+  key: string;
+  /** « @pseudo », le nom touché dans la liste, ou celui du lien LinkedIn ; la fiche prête le remplace. */
+  who: string;
+  /** Le pseudo GitHub et la photo de la ligne touchée : le visage de la ligne en attendant la fiche. */
+  login?: string;
+  photo?: string;
+  since: number;
+  status: "pending" | "done" | "error";
+  card?: CardData;
+  error?: string;
 }
+
+export type ShotAction = { type: "add"; shot: Shot } | { type: "done"; key: string; card: CardData } | { type: "fail"; key: string; error: string };
+
+/** Les lignes de la séance : la nouvelle en haut ; une personne déjà là remonte à sa place. */
+export function shotsReducer(lines: Shot[], a: ShotAction): Shot[] {
+  if (a.type === "add") return [a.shot, ...lines.filter((l) => l.key !== a.shot.key)];
+  return lines.map((l) => (l.key !== a.key ? l : a.type === "done" ? { ...l, status: "done", card: a.card } : { ...l, status: "error", error: a.error }));
+}
+
+/** La clé d'une personne : un pseudo sans casse, une adresse LinkedIn telle quelle. */
+export const shotKey = (entry: Entry) => (entry.kind === "github" ? `gh:${entry.login.toLowerCase()}` : `li:${entry.url}`);
 
 /**
  * Ce qui suit les étoiles : le nom du niveau (« Haute surveillance »), comme partout ailleurs (§18.48, un mot
@@ -98,12 +113,15 @@ export function Denounce({ cardId, selfLogin, toast, initial, mine }: Props) {
   const { t, lang } = useT();
   const d = t.denounce;
   const uid = useId().replace(/:/g, "");
-  const [state, setState] = useState<State>({ s: "idle" });
+  const [error, setError] = useState<string | null>(null);
   const [value, setValue] = useState(initial ?? "");
+  const [lines, dispatch] = useReducer(shotsReducer, []);
+  const input = useRef<HTMLInputElement>(null);
   /** Les complices connus de la fiche (ses co-auteurs sur GitHub) : un toucher les dénonce. */
   const [known, setKnown] = useState<CaseInfo["accomplices"]>([]);
   const alive = useRef(true);
-  const busy = useRef(false);
+  /** Les personnes en route : un double toucher n'envoie pas deux fois. */
+  const inFlight = useRef(new Set<string>());
   // Le serveur lit-il LinkedIn ? Sinon le champ ne prend qu'un nom ou un pseudo GitHub.
   const [liOn, setLiOn] = useState(() => api.knownConfig()?.linkedinEntry ?? true);
   // Cherche-t-il des profils LinkedIn par nom (§18.80) ? Sinon la liste ne porte que des comptes GitHub.
@@ -130,50 +148,57 @@ export function Denounce({ cardId, selfLogin, toast, initial, mine }: Props) {
     };
   }, [cardId]);
 
-  // La barre de l'interrogatoire avance pendant l'attente.
+  // Les barres des lignes en attente avancent ensemble.
   const [now, setNow] = useState(() => Date.now());
-  const pending = state.s === "pending";
+  const pending = lines.some((l) => l.status === "pending");
   useEffect(() => {
     if (!pending) return;
     const timer = setInterval(() => setNow(Date.now()), 500);
     return () => clearInterval(timer);
   }, [pending]);
 
-  /** La dénonciation part : la fiche se calcule tout de suite, « dans le viseur » s'affiche sans attendre. */
-  const send = async (entry: Entry, who: string) => {
-    if (busy.current) return;
-    if (entry.kind === "linkedin" && !liOn) return setState({ s: "idle", error: d.githubOnly });
-    if (entry.kind === "github" && selfLogin && entry.login.toLowerCase() === selfLogin.toLowerCase()) return setState({ s: "idle", error: d.self });
-    busy.current = true;
+  /**
+   * La dénonciation part : sa ligne s'ajoute en haut, le champ se vide et garde le focus (dans le geste :
+   * le clavier du téléphone reste ouvert), prêt pour le suivant. La fiche se calcule pendant ce temps.
+   */
+  const send = async (entry: Entry, who: string, photo?: string) => {
+    if (entry.kind === "linkedin" && !liOn) return setError(d.githubOnly);
+    if (entry.kind === "github" && selfLogin && entry.login.toLowerCase() === selfLogin.toLowerCase()) return setError(d.self);
+    const key = shotKey(entry);
+    setError(null);
+    setValue("");
+    input.current?.focus({ preventScroll: true });
+    const prev = lines.find((l) => l.key === key);
+    // Déjà dénoncée ou en route dans cette séance : sa ligne remonte, rien ne repart (la limite du jour est épargnée).
+    if (inFlight.current.has(key) || prev?.status === "done") {
+      if (prev) dispatch({ type: "add", shot: prev });
+      return;
+    }
+    inFlight.current.add(key);
     setNow(Date.now());
-    setState({ s: "pending", who, since: Date.now() });
+    dispatch({ type: "add", shot: { key, who, login: entry.kind === "github" ? entry.login : undefined, photo, since: Date.now(), status: "pending" } });
     try {
       const res = await api.createCard({ ...(entry.kind === "github" ? { login: entry.login } : { linkedin: entry.url }), lang, denouncedBy: cardId });
       rememberDenounced(res.id);
       const card = await waitCard(res.id);
-      if (!alive.current) return;
-      setValue("");
-      setState({ s: "done", card });
+      if (alive.current) dispatch({ type: "done", key, card });
     } catch (err) {
       if (!alive.current) return;
-      const msg =
-        err instanceof ApiError && err.code === "timeout" && !err.fact ? t.errors.timeout : errorFact(err, t.errors.closed, t.errors.generic);
-      setState({ s: "idle", error: typeof msg === "string" ? msg : pick(msg, lang) });
+      const msg = err instanceof ApiError && err.code === "timeout" && !err.fact ? t.errors.timeout : errorFact(err, t.errors.closed, t.errors.generic);
+      dispatch({ type: "fail", key, error: typeof msg === "string" ? msg : pick(msg, lang) });
     } finally {
-      busy.current = false;
+      inFlight.current.delete(key);
     }
   };
 
   // Les personnes à ce nom, sous le champ (§18.80) : comptes GitHub et profils LinkedIn mêlés.
   const mixed = liOn && liSearch;
-  const found = useSuggestions(value, { github: true, linkedin: mixed }, state.s !== "idle");
+  const found = useSuggestions(value, { github: true, linkedin: mixed }, false);
   // On ne se dénonce pas soi-même : son propre compte ne sort pas dans la liste.
   const people = useMemo(() => found.filter((p) => !(p.kind === "github" && selfLogin && p.login.toLowerCase() === selfLogin.toLowerCase())), [found, selfLogin]);
   /** Une personne touchée dans la liste : la dénonciation part, sans autre geste. */
-  const pickOne = (item: Suggestion) => {
-    setValue(item.title);
-    void send(item.kind === "github" ? { kind: "github", login: item.login } : { kind: "linkedin", url: item.url }, item.kind === "github" ? `@${item.login}` : item.title);
-  };
+  const pickOne = (item: Suggestion) =>
+    void send(item.kind === "github" ? { kind: "github", login: item.login } : { kind: "linkedin", url: item.url }, item.kind === "github" ? `@${item.login}` : item.title, item.photo);
   const label = liOn ? d.labelBoth : d.label;
   const box = useSuggestBox({ id: `${uid}-sg`, items: people, onPick: pickOne, mixed, label });
   const fieldRef = useRef<HTMLDivElement>(null);
@@ -190,7 +215,7 @@ export function Denounce({ cardId, selfLogin, toast, initial, mine }: Props) {
     // Un nom : une seule personne proposée, c'est elle ; plusieurs, la liste ; aucune, l'erreur.
     if (people.length === 1) return pickOne(people[0]!);
     if (people.length) return box.show();
-    setState({ s: "idle", error: liOn ? d.invalidBoth : d.invalid });
+    setError(liOn ? d.invalidBoth : d.invalid);
   };
 
   const submit = (e: FormEvent) => {
@@ -198,34 +223,22 @@ export function Denounce({ cardId, selfLogin, toast, initial, mine }: Props) {
     run(value);
   };
 
-  if (state.s === "done") return <Wanted card={state.card} byId={cardId} mine={mine} toast={toast} onAgain={() => setState({ s: "idle" })} />;
-
-  // « @x est dans le viseur », tout de suite : le titre de la fiche prête, avec sa barre en attendant les étoiles.
-  if (state.s === "pending")
-    return (
-      <section className="after-block denounce is-pending" aria-busy>
-        <h2 className="denounce-head">
-          <span className="denounce-who-name">{state.who}</span> {d.inSights}
-        </h2>
-        <div className="denounce-pending" role="status">
-          <p>{d.pending}</p>
-          <span className="denounce-bar" style={{ "--p": `${pendingPct(now - state.since)}%` } as CSSProperties} aria-hidden />
-        </div>
-      </section>
-    );
-
-  const shown = known.filter((a) => a.login.toLowerCase() !== selfLogin?.toLowerCase());
+  const shown = known.filter((a) => a.login.toLowerCase() !== selfLogin?.toLowerCase() && !lines.some((l) => l.key === `gh:${a.login.toLowerCase()}`));
+  // Le rose de la séance : l'envoi de la dernière fiche prête (§18.48, un seul rose par écran).
+  const lead = lines.find((l) => l.status === "done")?.key;
+  const cls = `after-block denounce${pending ? " is-pending" : ""}${lead ? " is-done" : ""}`;
 
   return (
-    <section className="after-block denounce" aria-labelledby={`${uid}-title`}>
+    <section className={cls} aria-labelledby={`${uid}-title`}>
       <h2 id={`${uid}-title`}>{d.title}</h2>
-      <p className="denounce-intro">{d.intro}</p>
+      {lines.length === 0 && <p className="denounce-intro">{d.intro}</p>}
       <form className="denounce-form" onSubmit={submit} noValidate>
         <div className="field field-who" ref={fieldRef}>
           <label htmlFor={`${uid}-gh`} className="sr-only">
             {label}
           </label>
           <input
+            ref={input}
             id={`${uid}-gh`}
             className="field-input"
             type="text"
@@ -237,17 +250,17 @@ export function Denounce({ cardId, selfLogin, toast, initial, mine }: Props) {
             spellCheck={false}
             data-1p-ignore=""
             data-lpignore="true"
-            placeholder={liOn ? d.placeholderBoth : d.placeholder}
+            placeholder={lines.length ? d.placeholderNext : liOn ? d.placeholderBoth : d.placeholder}
             value={value}
             onChange={(e) => {
               setValue(e.target.value);
-              if (state.error) setState({ s: "idle" });
+              if (error) setError(null);
             }}
             onKeyDown={(e) => void box.onKeyDown(e)}
             onFocus={box.show}
             onBlur={box.close}
-            aria-invalid={!!state.error}
-            aria-describedby={state.error ? `${uid}-err` : undefined}
+            aria-invalid={!!error}
+            aria-describedby={error ? `${uid}-err` : undefined}
             {...box.inputProps}
           />
           {box.list}
@@ -256,10 +269,17 @@ export function Denounce({ cardId, selfLogin, toast, initial, mine }: Props) {
           {d.btn}
         </button>
       </form>
-      {state.error && (
+      {error && (
         <p className="denounce-error" id={`${uid}-err`} role="alert">
-          {state.error}
+          {error}
         </p>
+      )}
+      {lines.length > 0 && (
+        <ul className="denounce-lines" aria-label={d.listLabel} aria-live="polite">
+          {lines.map((l) => (
+            <ShotLine key={l.key} shot={l} lead={l.key === lead} now={now} byId={cardId} mine={mine} toast={toast} />
+          ))}
+        </ul>
       )}
       {shown.length > 0 && (
         <div className="denounce-suggest">
@@ -281,61 +301,72 @@ export function Denounce({ cardId, selfLogin, toast, initial, mine }: Props) {
 }
 
 /**
- * Ce que le dénonciateur reçoit : la fiche du complice résumée, prête à envoyer. Dénoncer s'adresse à une
- * personne (§18.48) : aucun partage public, la fiche d'un tiers ne part pas dans un post. Au-dessus des
- * boutons, l'aperçu de ce qui part : l'image du duel (§18.94), celle que la messagerie montrera. Sur
- * téléphone, « Envoyer à @x » ouvre la feuille du système (texte et lien, sans fichier : WhatsApp,
- * iMessage et Messenger bâtissent eux-mêmes l'aperçu), WhatsApp et SMS en raccourcis dessous ; sur
- * ordinateur, une rangée de canaux : WhatsApp, e-mail, LinkedIn (message copié avant l'ouverture), Copier.
+ * Une ligne de la séance : le visage, le nom, puis la barre de l'interrogatoire, les étoiles et la note, ou
+ * l'erreur ; au bout, de quoi l'envoyer à la personne. Dénoncer s'adresse à une personne (§18.48) : aucun
+ * partage public. Sur téléphone, « Envoyer » ouvre la feuille du système (texte et lien, sans fichier :
+ * la messagerie bâtit elle-même l'aperçu, le duel du §18.94) ; ailleurs, WhatsApp et Copier (le message
+ * et le lien). `lead` : la dernière fiche prête, son premier bouton est le rose de l'écran.
  */
-export function Wanted({ card, byId, mine, toast, onAgain }: { card: CardData; byId: string; mine?: number | null; toast: (m: string) => void; onAgain: () => void }) {
+export function ShotLine({ shot, lead, now, byId, mine, toast }: { shot: Shot; lead: boolean; now: number; byId: string; mine?: number | null; toast: (m: string) => void }) {
   const { t, lang } = useT();
   const d = t.denounce;
-  // La fiche prête prend plus de place que son attente : si son titre est passé au-dessus de l'écran, il y revient.
-  // Seulement si le bloc est encore à l'écran : qui est parti lire plus bas n'est pas ramené de force.
-  const root = useRef<HTMLElement>(null);
-  useEffect(() => {
-    const r = root.current?.getBoundingClientRect();
-    const el = root.current;
-    if (!el || !r || r.top >= 0 || r.bottom <= 0) return;
-    const calm = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    el.scrollIntoView({ behavior: calm ? "auto" : "smooth", block: "start" });
-  }, []);
-  // Presse-papiers refusé : le message ou le texte s'affiche, sélectionné, pour un appui long.
-  const [manual, setManual] = useState<{ kind: "message" | "link"; value: string } | null>(null);
-  // L'image du duel manque (fiche déjà dénoncée par un autre, démo) : pas d'aperçu, les boutons restent.
-  const [noPreview, setNoPreview] = useState(false);
+  const card = shot.status === "done" ? shot.card : undefined;
   // « @pseudo », ou le nom d'une fiche tirée d'un LinkedIn.
-  const who = card.login ? `@${card.login}` : card.name;
+  const who = card ? (card.login ? `@${card.login}` : card.name) : shot.who;
+  const face = card ? <Avatar login={card.login} src={card.avatarUrl ?? ""} initials={card.initials} /> : <Avatar login={shot.login} src={shot.photo ?? (shot.login ? undefined : "")} initials={shot.who.replace(/^@/, "").slice(0, 1)} />;
+  return (
+    <li className={`denounce-line is-${shot.status}`}>
+      {face}
+      <div className="denounce-line-who">
+        <span className="denounce-line-name">{who}</span>
+        {shot.status === "pending" && (
+          <span className="denounce-line-wait" role="status">
+            <span className="sr-only">{d.pending}</span>
+            <span className="denounce-bar" style={{ "--p": `${pendingPct(now - shot.since)}%` } as CSSProperties} aria-hidden />
+          </span>
+        )}
+        {card && <Score card={card} lang={lang} label={t.result.wantedStars} />}
+        {shot.status === "error" && <span className="denounce-line-err">{shot.error}</span>}
+      </div>
+      {card && <Send card={card} who={who} lead={lead} byId={byId} mine={mine} toast={toast} />}
+    </li>
+  );
+}
+
+/** Les étoiles et la note ; un dossier scellé n'a ni l'une ni l'autre : son niveau ou son profil. */
+function Score({ card, lang, label }: { card: CardData; lang: Lang; label: (n: number, level: string) => string }) {
   const n = starsFor(card.overall);
-  // Dossier vide, pas encore revendiqué (shared/publicView.ts) : ni étoiles ni note, ni ici ni dans le message.
+  if (card.sealed) return <span className="denounce-line-score denounce-tag">{tagOf(card, lang)}</span>;
+  return (
+    <span className="denounce-line-score">
+      <Stars n={n} size={14} label={label(n, pick(LEVEL_LABELS[n], lang))} />
+      <b>{card.overall}</b>
+    </span>
+  );
+}
+
+function Send({ card, who, lead, byId, mine, toast }: { card: CardData; who: string; lead: boolean; byId: string; mine?: number | null; toast: (m: string) => void }) {
+  const { t } = useT();
+  const d = t.denounce;
+  // Presse-papiers refusé : le message s'affiche, sélectionné, pour un appui long.
+  const [manual, setManual] = useState<string | null>(null);
   const sealed = !!card.sealed;
-  const tag = tagOf(card, lang);
-  const status = bestStatus(card, lang);
-  const level = pick(LEVEL_LABELS[n], lang);
   // Le lien porte la fiche du dénonciateur (?r=) : son aperçu est le duel (§18.94).
   const url = shareUrl(card.id, byId);
   const canNative = isTouch() && hasNativeShare();
   const track = (channel: string) => api.track("card_shared", card.id, { channel, kind: "denounce" });
   const me = typeof mine === "number" ? mine : null;
   // Le duel en chiffres, vu par qui envoie : la règle de la page partagée (lib/versus.ts).
-  const lead = (() => {
+  const gap = (() => {
     if (me === null || sealed) return "";
     const v = verdict(me, card.overall);
     if (v.by === "tie") return d.sendTie;
-    const gap = v.by === "stars" ? d.starsAhead(v.n) : d.pointsAhead(v.n);
-    return v.ahead ? d.iLead(gap) : d.youLead(gap);
+    const g = v.by === "stars" ? d.starsAhead(v.n) : d.pointsAhead(v.n);
+    return v.ahead ? d.iLead(g) : d.youLead(g);
   })();
-  const text = d.sendText(who, me, sealed ? null : card.overall, lead);
+  const text = d.sendText(who, me, sealed ? null : card.overall, gap);
   const message = `${text} ${url}`;
 
-  /** Le message dans le presse-papiers ; refusé, il s'affiche à copier à la main. */
-  const copyMessage = async (done: string) => {
-    if (await copyText(message)) toast(done);
-    else setManual({ kind: "message", value: message });
-  };
-
-  /** Téléphone : la feuille de partage du système, texte et lien, sans fichier. */
   const onNative = async () => {
     try {
       await navigator.share({ title: "Azerit", text, url });
@@ -344,126 +375,46 @@ export function Wanted({ card, byId, mine, toast, onAgain }: { card: CardData; b
       /* partage annulé */
     }
   };
-
   const onCopy = async () => {
-    await copyMessage(d.sendCopied(who));
+    if (await copyText(message)) toast(d.sendCopied(who));
+    else setManual(message);
     track("copy");
   };
-
-  const onCopyLink = async () => {
-    if (await copyText(url)) toast(d.linkCopied);
-    else setManual({ kind: "link", value: url });
-    track("copy_link");
-  };
-
-  // Les adresses des canaux. WhatsApp et LinkedIn ne prennent la leur que le temps du clic
-  // (aimAt, comme le partage LinkedIn) : les bloqueurs de contenu masquent les liens de partage.
+  // WhatsApp ne prend son adresse que le temps du clic (aimAt) : les bloqueurs masquent les liens de partage.
   const wa = `https://wa.me/?text=${encodeURIComponent(message)}`;
-  const sms = `sms:?&body=${encodeURIComponent(message)}`;
-  const mail = `mailto:?subject=${encodeURIComponent(d.mailSubject)}&body=${encodeURIComponent(`${text}\n\n${url}`)}`;
-  const LI_COMPOSE = "https://www.linkedin.com/messaging/compose/";
   const cardHref = `/c/${card.id}`;
 
-  const whatsapp = (className: string) => (
-    <a
-      className={className}
-      href={cardHref}
-      target="_blank"
-      rel="noopener"
-      onClick={(e) => {
-        aimAt(e.currentTarget, wa, cardHref);
-        track("whatsapp");
-      }}
-    >
-      <IconWhatsApp />
-      <span>{d.viaWhatsapp}</span>
-    </a>
-  );
-  const smsLink = (
-    <a className="pill denounce-via" href={sms} onClick={() => track("sms")}>
-      <IconSms />
-      <span>{d.viaSms}</span>
-    </a>
-  );
-
   return (
-    <section ref={root} className="after-block denounce is-done" aria-live="polite">
-      {/* Le titre seul ; les étoiles et le nom du niveau sur leur ligne, jamais mêlés au texte. */}
-      <h2 className="denounce-head">
-        <span className="denounce-who-name">{who}</span> {d.inSights}
-      </h2>
-      <p className="denounce-level">
-        {!sealed && <Stars n={n} size={22} label={t.result.wantedStars(n, level)} />}
-        <span className="denounce-tag">{tag}</span>
-      </p>
-      {status && <p>{d.charge(status)}</p>}
-      {/* Ce qui part : l'aperçu du lien, le duel. Le ratio est réservé, la page ne saute pas au chargement. */}
-      {!noPreview && (
-        <img
-          className="denounce-preview"
-          src={`/og/${card.id}-vs-${byId}.png?${IMAGE_QUERY}`}
-          width={1200}
-          height={630}
-          loading="lazy"
-          decoding="async"
-          alt={d.previewAlt(who)}
-          onError={() => setNoPreview(true)}
-        />
-      )}
-      {canNative ? (
-        <div className="denounce-actions">
-          <button type="button" className="pill pill-big" onClick={() => void onNative()}>
+    <>
+      <div className="denounce-line-send">
+        {canNative ? (
+          <button type="button" className={`pill denounce-line-go${lead ? " is-lead" : ""}`} aria-label={d.send(who)} onClick={() => void onNative()}>
             <IconShare />
-            <span className="denounce-send">{d.send(who)}</span>
+            <span>{d.sendShort}</span>
           </button>
-          <div className="denounce-via-row">
-            {whatsapp("pill denounce-via")}
-            {smsLink}
-          </div>
-        </div>
-      ) : (
-        <div className="denounce-actions denounce-via-row is-desk">
-          {whatsapp("pill pill-big denounce-via")}
-          <a className="pill denounce-via" href={mail} onClick={() => track("email")}>
-            <IconMail />
-            <span>{d.viaEmail}</span>
-          </a>
-          <a
-            className="pill denounce-via"
-            href={cardHref}
-            target="_blank"
-            rel="noopener"
-            onClick={(e) => {
-              aimAt(e.currentTarget, LI_COMPOSE, cardHref);
-              // Le texte part dans le presse-papiers dans le geste, avant que l'onglet s'ouvre.
-              void copyMessage(d.linkedinCopied);
-              track("linkedin");
-            }}
-          >
-            <IconLinkedIn />
-            <span>{d.viaLinkedin}</span>
-          </a>
-          <button type="button" className="pill denounce-via" onClick={() => void onCopy()}>
-            <IconCopy />
-            <span>{d.viaCopy}</span>
-          </button>
-        </div>
-      )}
-      {manual && <ManualCopy m={manual} />}
-      <div className="denounce-links">
-        {canNative && (
-          <button type="button" className="link-alt" onClick={() => void onCopyLink()}>
-            {d.copyLink}
-          </button>
+        ) : (
+          <>
+            <a
+              className={`pill denounce-line-icon${lead ? " is-lead" : ""}`}
+              href={cardHref}
+              target="_blank"
+              rel="noopener"
+              aria-label={d.waTo(who)}
+              onClick={(e) => {
+                aimAt(e.currentTarget, wa, cardHref);
+                track("whatsapp");
+              }}
+            >
+              <IconWhatsApp />
+            </a>
+            <button type="button" className="pill denounce-line-icon" aria-label={d.copyFor(who)} onClick={() => void onCopy()}>
+              <IconCopy />
+            </button>
+          </>
         )}
-        <a className="link-alt" href={cardHref} onClick={(e) => onLinkClick(e, cardHref)}>
-          {d.see}
-        </a>
-        <button type="button" className="link-alt" onClick={onAgain}>
-          {d.again}
-        </button>
       </div>
-    </section>
+      {manual && <ManualCopy m={{ kind: "message", value: manual }} />}
+    </>
   );
 }
 
