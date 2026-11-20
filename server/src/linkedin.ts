@@ -388,8 +388,11 @@ export function mountLinkedin(app: Hono, o: LinkedinRoutesOptions) {
     const code = c.req.query("code");
     // Annulation côté LinkedIn : ?error=user_cancelled_login, pas de code.
     if (!code || c.req.query("error")) return c.redirect(back(id, "error"), 302);
-    const row = o.store.getCard(id);
+    // La fiche qui se montre à cette adresse (§18.98) : le dossier qui a remplacé la fiche, ou celui
+    // d'une pièce. La photo posée sur la fiche remplacée ne se verrait pas.
+    const row = o.store.fileRow(id);
     if (!row) return c.redirect(back(null, "error"), 302);
+    const fileId = row.id;
 
     try {
       const profile = await fetchProfile(code, o.config, redirectUri, o.fetchImpl);
@@ -397,13 +400,13 @@ export function mountLinkedin(app: Hono, o: LinkedinRoutesOptions) {
       const { bytes, ext } = await downloadPhoto(profile.picture, o.fetchImpl);
 
       await mkdir(o.avatarDir, { recursive: true });
-      await removeAvatars(o.avatarDir, [id]);
-      const path = join(o.avatarDir, `${id}.${ext}`);
+      await removeAvatars(o.avatarDir, [fileId]);
+      const path = join(o.avatarDir, `${fileId}.${ext}`);
       const tmp = `${path}.${process.pid}.tmp`;
       await writeFile(tmp, bytes);
       await rename(tmp, path);
 
-      const avatarUrl = `${o.baseUrl}/avatar/${id}.${ext}?v=${Date.now().toString(36)}`;
+      const avatarUrl = `${o.baseUrl}/avatar/${fileId}.${ext}?v=${Date.now().toString(36)}`;
       const ids = applyPhoto(o.store, row, avatarUrl, profile.name);
       await o.removeImages(ids);
       return c.redirect(back(id, "linkedin"), 302);

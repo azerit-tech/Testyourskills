@@ -585,8 +585,10 @@ function ImagePanel({ src, onClose }: { src: string; onClose: () => void }) {
  * Visible seulement si le serveur a LinkedIn, et à qui peut poser la photo :
  * le propriétaire connecté pour une fiche à pseudo GitHub quand la
  * revendication est active, sinon qui a créé la fiche (son jeton).
+ * La fiche montre déjà une photo LinkedIn (§18.98) : plus rien à proposer, le pli part.
+ * `photo` : ce que la fiche montre, « linkedin », « other » (l'avatar GitHub), ou null.
  */
-export function LinkedInPhoto({ cardId, hasAvatar }: { cardId: string; hasAvatar: boolean }) {
+export function LinkedInPhoto({ cardId, photo }: { cardId: string; photo: "linkedin" | "other" | null }) {
   const { t } = useT();
   const l = t.result.linkedin;
   const token = tokens.get(cardId);
@@ -598,11 +600,11 @@ export function LinkedInPhoto({ cardId, hasAvatar }: { cardId: string; hasAvatar
       alive = false;
     };
   }, []);
-  if (!cfg?.linkedin) return null;
+  if (photo === "linkedin" || !cfg?.linkedin) return null;
   if (cfg.claim && hasGithub(cardId) ? !isMine(cardId) : !token && !isMine(cardId)) return null;
   return (
     <Fold name="personalize" title={t.result.rest.photo}>
-      {!hasAvatar && <p>{l.noPhoto}</p>}
+      {!photo && <p>{l.noPhoto}</p>}
       <button type="button" className="pill pill-peach" onClick={() => api.startLinkedInPhoto(cardId, token)}>
         <IconLinkedIn />
         <span>{l.btn}</span>

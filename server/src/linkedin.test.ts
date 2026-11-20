@@ -278,25 +278,41 @@ describe("callback", () => {
     expect((ctx.store.getCard("CardAAAA01")!.data as CardData).name).toBe("Léa Martin-Dubois");
   });
 
-  it("carte d'une comparaison : la comparaison parente est mise à jour aussi", async () => {
+  it("carte d'une comparaison : la photo va sur le dossier qui se montre, ses deux pièces (§18.98)", async () => {
     const ctx = setup();
     const cmp = insertComparison(ctx.store);
     writeFileSync(join(ctx.ogDir, `${cmp.id}.png`), "old");
     await callback(ctx, `code=abc&state=${await stateOf(ctx, cmp.github.id)}`);
     const parent = ctx.store.getCard(cmp.id)!.data as ComparisonData;
     expect(parent.github.photoSource).toBe("linkedin");
-    expect(parent.cv.photoSource).toBeUndefined();
+    expect(parent.cv.photoSource).toBe("linkedin");
     expect((ctx.store.getCard(cmp.github.id)!.data as CardData).photoSource).toBe("linkedin");
+    expect(existsSync(join(ctx.avatarDir, `${cmp.id}.jpg`))).toBe(true);
     expect(existsSync(join(ctx.ogDir, `${cmp.id}.png`))).toBe(false);
 
     await ctx.app.request(`/og/${cmp.id}.png`);
-    // L'image du dossier : sa fiche, avec la photo de la pièce GitHub.
+    // L'image du dossier : sa fiche, avec la photo LinkedIn.
     expect(ctx.renders[0]!.card!.id).toBe(cmp.id);
     expect(ctx.renders[0]!.card!.avatarUrl).toMatch(/^data:image\/jpeg/);
 
     // La suppression du groupe efface aussi la photo.
     expect((await ctx.app.request(`/api/card/${cmp.id}?token=tok`, { method: "DELETE" })).status).toBe(200);
-    expect(existsSync(join(ctx.avatarDir, `${cmp.github.id}.jpg`))).toBe(false);
+    expect(existsSync(join(ctx.avatarDir, `${cmp.id}.jpg`))).toBe(false);
+  });
+
+  it("fiche remplacée par son dossier : la photo va sur le dossier, celui que l'adresse montre (§18.98)", async () => {
+    const ctx = setup();
+    insertCard(ctx.store);
+    const cmp = insertComparison(ctx.store);
+    ctx.store.completedBy(ctx.store.getCard("CardAAAA01")!, ctx.store.getCard(cmp.id)!);
+    expect(await callback(ctx, `code=abc&state=${await stateOf(ctx, "CardAAAA01")}`)).toBe(`${BASE}/c/CardAAAA01?photo=linkedin`);
+    const parent = ctx.store.getCard(cmp.id)!.data as ComparisonData;
+    expect(parent.cv.photoSource).toBe("linkedin");
+    expect(parent.github.avatarUrl?.startsWith(`${BASE}/avatar/${cmp.id}.jpg?v=`)).toBe(true);
+    // Ce que l'adresse sert : le dossier, avec la photo.
+    const job = (await (await ctx.app.request("/api/card/CardAAAA01")).json()) as { comparison?: ComparisonData };
+    expect(job.comparison?.id).toBe(cmp.id);
+    expect(job.comparison?.github.photoSource).toBe("linkedin");
   });
 
   it.each([

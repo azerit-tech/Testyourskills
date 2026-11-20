@@ -253,7 +253,8 @@ function buildCard(key: FixtureKey, id: string, job: MockJob | null, mg: MockGri
     card.initials = initialsOf(login);
     card.avatarUrl = `https://github.com/${login}.png?size=256`;
   }
-  if (photos.has(id)) card.avatarUrl = MOCK_PHOTO;
+  // Comme le serveur (server/src/linkedin.ts) : la photo posée est dite LinkedIn.
+  if (photos.has(id)) card = { ...card, avatarUrl: MOCK_PHOTO, photoSource: "linkedin" };
   if (card.source === "github") card.findings = strongest3(mockFindings(card.login ?? "dev"));
   card = graded(card, card.source === "github" ? mg.githubGridMock(key, card.login ?? "dev") : mg.declaredGridMock("CV"));
   return card;
@@ -263,7 +264,8 @@ function buildCard(key: FixtureKey, id: string, job: MockJob | null, mg: MockGri
 function buildLinkedinCard(id: string, job: MockJob | null, mg: MockGrids): CardData {
   const base = withFacts(FIXTURES.cv);
   const url = job?.linkedin ?? "https://www.linkedin.com/in/sans-github";
-  return graded(asLinkedinCard({ ...base, id, lang: job?.lang ?? base.lang, linkedinUrl: url, findings: [mockLinkedinFinding(url)] }), mg.declaredGridMock("LinkedIn", url));
+  const card = graded(asLinkedinCard({ ...base, id, lang: job?.lang ?? base.lang, linkedinUrl: url, findings: [mockLinkedinFinding(url)] }), mg.declaredGridMock("LinkedIn", url));
+  return photos.has(id) ? { ...card, avatarUrl: MOCK_PHOTO, photoSource: "linkedin" } : card;
 }
 
 function buildComparison(id: string, job: MockJob | null, mg: MockGrids, linkedin = false, emptyGithub = false): ComparisonData {
@@ -290,8 +292,8 @@ function buildComparison(id: string, job: MockJob | null, mg: MockGrids, linkedi
   // Un login tapé en démo, inconnu des fixtures : rien ne relie ce GitHub au LinkedIn (§18.24), comme le serveur le dirait.
   if (linkedin && login && !BY_LOGIN[login.toLowerCase()]) cmp = { ...cmp, linkUnproven: true };
   if (photos.has(id)) {
-    cmp.cv = { ...cmp.cv, avatarUrl: MOCK_PHOTO };
-    cmp.github = { ...cmp.github, avatarUrl: MOCK_PHOTO };
+    cmp.cv = { ...cmp.cv, avatarUrl: MOCK_PHOTO, photoSource: "linkedin" };
+    cmp.github = { ...cmp.github, avatarUrl: MOCK_PHOTO, photoSource: "linkedin" };
   }
   // Comme le serveur (SPEC §18.84) : les pièces rendues ne portent que la note du dossier, sans grille à elles.
   return oneNote(cmp);

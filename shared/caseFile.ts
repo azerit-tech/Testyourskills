@@ -130,5 +130,9 @@ export function caseCard(cmp: ComparisonData): CardData {
   };
 }
 
+/** La photo qu'une fiche montre (§18.98) : « linkedin », « other » (l'avatar GitHub), ou null (les initiales). */
+export const shownPhoto = (card: Pick<CardData, "avatarUrl" | "photoSource">): "linkedin" | "other" | null =>
+  !card.avatarUrl ? null : card.photoSource === "linkedin" ? "linkedin" : "other";
+
 /** La fiche d'un dossier : celle que le serveur a attachée (vue publique), sinon calculée. */
 export const fileOf = (cmp: ComparisonData): CardData => cmp.file ?? caseCard(cmp);

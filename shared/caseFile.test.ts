@@ -1,7 +1,7 @@
 // Un dossier, une fiche, une note (SPEC §18.36) : la fiche du dossier se fait à la
 // lecture, à partir des deux pièces rangées ; elle a la forme d'une fiche seule.
 import { describe, expect, it } from "vitest";
-import { caseCard, declaredLabel, fileOf, piecesOf } from "./caseFile";
+import { caseCard, declaredLabel, fileOf, piecesOf, shownPhoto } from "./caseFile";
 import { FIXTURE_COMPARISON, FIXTURES } from "./fixtures";
 import { publicView } from "./publicView";
 import type { CardData, ComparisonData, CriterionCode, Grid, GridCriterion, GridSource } from "./types";
@@ -142,6 +142,13 @@ describe("la fiche du dossier", () => {
     expect(caseCard({ ...both, cv: { ...both.cv, avatarUrl: undefined, photoSource: undefined }, github: { ...both.github, avatarUrl: li, photoSource: "linkedin" } }).avatarUrl).toBe(li);
     // Ni l'une ni l'autre : aucune photo, les initiales.
     expect(caseCard({ ...both, cv: { ...both.cv, avatarUrl: undefined, photoSource: undefined }, github: { ...both.github, avatarUrl: undefined } }).avatarUrl).toBeUndefined();
+  });
+
+  it("la photo montrée : LinkedIn, une autre, ou aucune (le pli « Mets ta photo LinkedIn » part sur LinkedIn)", () => {
+    expect(shownPhoto({ avatarUrl: "https://x.example/avatar/a.jpg", photoSource: "linkedin" })).toBe("linkedin");
+    expect(shownPhoto({ avatarUrl: "https://avatars.githubusercontent.com/u/1" })).toBe("other");
+    expect(shownPhoto({ avatarUrl: undefined, photoSource: "linkedin" })).toBeNull();
+    expect(shownPhoto({})).toBeNull();
   });
 
   it("les pièces et leur libellé", () => {
