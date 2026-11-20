@@ -446,11 +446,11 @@ describe("pages publiques", () => {
     expect(JSON.stringify(r.json)).not.toMatch(/linkedin\.com|rang [SABC]|tier|"school"|"club"/);
   });
 
-  it("une fiche née d'une dénonciation se montre comme les autres, sans LinkedIn avant d'être revendiquée ; un pseudo masqué n'y est pas", async () => {
+  it("une fiche née d'une dénonciation se montre comme les autres, ses logos compris, revendiquée ou non ; un pseudo masqué n'y est pas", async () => {
     const ctx = setup();
     const by = insert(ctx.store, { login: "balance", stars: 6, name: "Bal Ance" });
     const tip = insert(ctx.store, { login: "victime", stars: 5, name: "Nom Caché", avatarUrl: "https://avatars.githubusercontent.com/u/2?v=4" });
-    const tipLi = insert(ctx.store, { login: null, stars: 4, linkedinUrl: "https://www.linkedin.com/in/y", name: "Personne Dénoncée" });
+    const tipLi = insert(ctx.store, { login: null, stars: 4, linkedinUrl: "https://www.linkedin.com/in/personne-denoncee", name: "Personne Dénoncée" });
     const hidden = insert(ctx.store, { login: "parti", stars: 3, name: "Partie Loin" });
     ctx.store.markDenounced(tip, by, "balance");
     ctx.store.markDenounced(tipLi, by, "balance");
@@ -467,9 +467,10 @@ describe("pages publiques", () => {
     ]);
     expect(before.members[1]!.profile).toEqual(aliasFor(FIXTURES.gold.profile!.id, tip));
     expect(before.members[1]!.avatarUrl).toBe("https://avatars.githubusercontent.com/u/2?v=4");
-    // Son LinkedIn attend sa personne (§18.108).
-    expect(before.members[2]!.linkedinUrl).toBeUndefined();
-    expect(JSON.stringify(before)).not.toMatch(/Partie Loin|"parti"|linkedin\.com\/in\/y/);
+    // Ses logos (§18.108) : dénoncée, pas revendiquée, son LinkedIn et son GitHub quand même.
+    expect(before.members[2]!.linkedinUrl).toBe("https://www.linkedin.com/in/personne-denoncee");
+    expect(before.members[1]!.login).toBe("victime");
+    expect(JSON.stringify(before)).not.toMatch(/Partie Loin|"parti"/);
   });
 
   it("une école de la liste sans membre existe, en formation ; une boîte inconnue non", async () => {

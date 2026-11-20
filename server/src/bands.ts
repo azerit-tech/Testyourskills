@@ -74,7 +74,6 @@ import { starsFor } from "../../shared/types";
 import { frTypo } from "../../shared/typo";
 import type { CardRow, Store } from "./db";
 import { clientIp, type RateLimiter } from "./ratelimit";
-import { boardLinkedin } from "./top";
 
 /** Id d'une fiche (pipeline.ts, ID_RE), recopié : db.ts importe ce module, qui ne doit pas importer le pipeline. */
 const ID_RE = /^[A-Za-z0-9]{6,32}$/;
@@ -321,16 +320,8 @@ function bandMembers(store: Store, type: BandType, id: string, now: number): Ban
     const position = card?.position;
     const root = row ? rootOf(store, row) : null;
     const login = r.login ?? (root ? store.loginOf(root) : null);
-    // Son LinkedIn (§18.108) : pas pour une fiche née d'une dénonciation et pas encore revendiquée.
-    const linkedinUrl = root
-      ? boardLinkedin(store.db, {
-          login,
-          linkedinUrl: linkedinOf(root),
-          denounceBorn: root.denounceBorn,
-          kind: root.kind,
-          githubPieceId: root.kind === "comparison" ? (root.data as ComparisonData).github?.id : null,
-        })
-      : null;
+    // Son LinkedIn (§18.108), revendiquée ou non : ce ne sont que des données publiques.
+    const linkedinUrl = root ? linkedinOf(root) : null;
     return { stars: r.stars, profile, ...(position ? { position } : {}), ...(card && root ? boardPerson(card, r.cardId, login, linkedinUrl) : {}) };
   });
 }

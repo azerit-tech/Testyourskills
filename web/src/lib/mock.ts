@@ -385,9 +385,9 @@ export const mockApi = {
     const marker = /^m-[a-zA-Z]+-([DNC])/.exec(id)?.[1];
     const denounced = !!job?.denouncedBy || !!marker;
     const claimed = marker === "C" || (!!me && me === main.login?.toLowerCase());
-    // Ses profils publics (§18.108), selon la règle du serveur : en démo, aucun GitHub n'affiche son LinkedIn.
+    // Ses profils publics (§18.108), comme le serveur : faite, revendiquée ou dénoncée.
     const linkedinUrl = engine.kind === "card" ? engine.card.linkedinUrl : engine.comparison.declaredSource === "linkedin" ? (job?.linkedin ?? MOCK_LINKEDIN) : null;
-    const links = profileLinks({ login: main.login, linkedinUrl }, { anonymous: denounced && !claimed });
+    const links = profileLinks({ login: main.login, linkedinUrl });
     const state: JobState = hasLinks(links) ? { ...engine, links } : engine;
     // Sa propre fiche à une source (§18.100) : l'autre lui est proposée, comme le serveur le fait.
     if (state.state === "done" && state.kind === "card" && job && !job.denouncedBy && !job.noGithub && !declined.has(id)) {

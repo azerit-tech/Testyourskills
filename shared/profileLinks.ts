@@ -3,16 +3,15 @@
 // Pur, même règle au serveur (GET /api/card/:id, les classements) et en démo.
 //
 // - GitHub : le pseudo que la fiche montre déjà (« @pseudo » en tête de page).
-// - LinkedIn : l'adresse lue pour la fiche, seulement si la personne a fait sa fiche
-//   ou l'a revendiquée ; une fiche née d'une dénonciation et pas encore revendiquée
-//   ne la montre que si son GitHub l'affiche déjà lui-même (comptes sociaux, site, bio).
+// - LinkedIn : l'adresse lue pour la fiche (la fiche LinkedIn seule, le dossier), faite,
+//   revendiquée ou dénoncée : ce ne sont que des données publiques (20 nov. 2026, Jacques).
 // - Jamais un email, jamais une autre adresse que ces deux formes, refaites ici :
 //   une adresse qui ne se normalise pas ne fait pas de lien.
 // - Une fiche ou un pseudo masqué n'arrive pas jusqu'ici (410, hors des classements).
 
 import { normalizeLinkedinUrl, parseGithubLogin } from "./entry";
 
-/** Les deux liens, absents quand la fiche n'a pas la source ou que la règle la retient. */
+/** Les deux liens, absents quand la fiche n'a pas la source. */
 export interface ProfileLinks {
   github?: string;
   linkedin?: string;
@@ -29,25 +28,17 @@ export function linkedinHref(url: string | null | undefined): string | null {
   return url ? normalizeLinkedinUrl(url) : null;
 }
 
-export interface LinkRule {
-  /** Fiche née d'une dénonciation, pas encore revendiquée : la personne n'a rien demandé. */
-  anonymous: boolean;
-  /** Le GitHub de la fiche affiche lui-même ce LinkedIn : il est déjà public, relié à ce pseudo. */
-  linkedinOnGithub?: boolean;
-}
-
-/** Les liens d'une fiche, selon la règle. */
-export function profileLinks(p: { login?: string | null; linkedinUrl?: string | null }, rule: LinkRule): ProfileLinks {
+/** Les liens d'une fiche : son LinkedIn et son GitHub, ceux de ses propres pièces. */
+export function profileLinks(p: { login?: string | null; linkedinUrl?: string | null }): ProfileLinks {
   const github = githubHref(p.login);
-  const li = linkedinHref(p.linkedinUrl);
-  const linkedin = li && (!rule.anonymous || rule.linkedinOnGithub) ? li : null;
+  const linkedin = linkedinHref(p.linkedinUrl);
   return { ...(linkedin ? { linkedin } : {}), ...(github ? { github } : {}) };
 }
 
-/** Les liens d'une ligne de classement : le serveur n'y met l'adresse LinkedIn que si la règle la permet. */
+/** Les liens d'une ligne de classement. */
 export function personLinks(p: { cardId?: string; login?: string; linkedinUrl?: string }): ProfileLinks {
   if (!p.cardId) return {};
-  return profileLinks(p, { anonymous: false });
+  return profileLinks(p);
 }
 
 /** Aucun lien. */

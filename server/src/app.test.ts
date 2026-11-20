@@ -1767,25 +1767,18 @@ describe("ses profils publics, sous la fiche", () => {
     expect((await linksOf(ctx, "Dossier001Gh")).links).toEqual({ linkedin: LI, github: GH });
   });
 
-  it("dénoncée et pas revendiquée : pas de LinkedIn, sauf si son GitHub l'affiche ; revendiquée : les deux", async () => {
+  it("dénoncée, revendiquée ou non : son LinkedIn et son GitHub, ceux de ses pièces", async () => {
     const ctx = setup();
-    const shows = { login: "leamd", profile: { login: "leamd", socialAccounts: [{ provider: "LINKEDIN", url: "https://linkedin.com/in/lea-martin-dubois" }] } };
     ctx.store.insertCards([
       { id: "LiDenon001", createdAt: now, source: "linkedin", login: null, kind: "card", data: { ...FIXTURES.cv, id: "LiDenon001", linkedinUrl: LI }, facts: { linkedinUrl: LI }, deleteToken: "tokd1" },
       ...cmpRows("CmpDenon01"),
     ]);
     ctx.store.markDenounced("LiDenon001", "Delateur01", null);
     ctx.store.markDenounced("CmpDenon01", "Delateur01", null);
-    // Ni au visiteur, ni au dénonciateur qui tient le jeton.
-    expect((await linksOf(ctx, "LiDenon001")).links).toBeNull();
-    expect((await linksOf(ctx, "LiDenon001", { "x-card-token": "tokd1" })).links).toBeNull();
-    // Le pseudo est déjà sur la fiche : son GitHub reste.
-    expect((await linksOf(ctx, "CmpDenon01")).links).toEqual({ github: GH });
-
-    const ctx2 = setup();
-    ctx2.store.insertCards(cmpRows("CmpAffi001", shows));
-    ctx2.store.markDenounced("CmpAffi001", "Delateur01", null);
-    expect((await linksOf(ctx2, "CmpAffi001")).links).toEqual({ linkedin: LI, github: GH });
+    // Ce ne sont que des données publiques : le visiteur et le dénonciateur voient les mêmes logos.
+    expect((await linksOf(ctx, "LiDenon001")).links).toEqual({ linkedin: LI });
+    expect((await linksOf(ctx, "LiDenon001", { "x-card-token": "tokd1" })).links).toEqual({ linkedin: LI });
+    expect((await linksOf(ctx, "CmpDenon01")).links).toEqual({ linkedin: LI, github: GH });
 
     ctx.store.claimOwner("leamd", 42);
     expect((await linksOf(ctx, "CmpDenon01")).links).toEqual({ linkedin: LI, github: GH });
