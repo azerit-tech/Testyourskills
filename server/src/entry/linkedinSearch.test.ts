@@ -2,7 +2,8 @@
 
 import { afterEach, describe, expect, it } from "vitest";
 import { SEARCHES_PER_IP } from "../linkedinProfile/search";
-import { licdnPhoto } from "./linkedinSearch";
+import type { RegistryPort } from "../registry/index";
+import { APP_SEARCHES_PER_IP, licdnPhoto } from "./linkedinSearch";
 import { CAMILLE, CAMILLE_URL, HOMONYM, setupEntry, type EntryCtx } from "./testing";
 
 const ctxs: EntryCtx[] = [];
@@ -70,5 +71,49 @@ describe("GET /api/search/linkedin", () => {
     expect(licdnPhoto("https://licdn.com.evil.example/x")).toBeUndefined();
     expect(licdnPhoto("pas une adresse")).toBeUndefined();
     expect(licdnPhoto(undefined)).toBeUndefined();
+  });
+});
+
+describe("les profils de l'App Azerit sous le champ (§18.96)", () => {
+  const appUrl = (n: number) => `https://www.linkedin.com/in/camille-ardent-${n}`;
+  /** Un registre factice qui ne sait que chercher par le nom. */
+  const registry = (namesakes: RegistryPort["namesakes"]) => ({ namesakes }) as unknown as RegistryPort;
+
+  it("d'abord, puis le web, un profil une seule fois ; ni photo ni rien d'autre que le nom et le titre", async () => {
+    const asked: { typed: string; partial?: boolean }[] = [];
+    const ctx = setup({
+      app: {
+        registry: registry(async (typed, o) => {
+          asked.push({ typed, partial: o?.partial });
+          return [
+            { url: appUrl(1), name: "Camille Ardent", headline: "Titre 1", hasPhoto: true },
+            { url: CAMILLE_URL, name: "Camille Ardent", headline: "Titre de l'App", hasPhoto: false },
+            { url: appUrl(3), name: null, headline: "", hasPhoto: true },
+          ];
+        }),
+      },
+    });
+    const { json } = await search(ctx, "Camille Ard");
+    expect(asked).toEqual([{ typed: "Camille Ard", partial: true }]);
+    expect(json.results).toEqual([
+      { url: appUrl(1), name: "Camille Ardent", headline: "Titre 1" },
+      { url: CAMILLE_URL, name: "Camille Ardent", headline: "Titre de l'App", photo: CAMILLE.photoUrl },
+      { url: HOMONYM.url, name: HOMONYM.name, headline: HOMONYM.headline },
+    ]);
+  });
+
+  it("le web en panne : les profils de l'App seuls ; l'App en panne : le web seul", async () => {
+    const one = [{ url: appUrl(1), name: "Camille Ardent", headline: "Titre 1", hasPhoto: false }];
+    const off = setup({ people: { byName: () => ({ status: "off" }) }, app: { registry: registry(async () => one) } });
+    expect((await search(off, "Camille Ardent")).json).toEqual({ results: [{ url: appUrl(1), name: "Camille Ardent", headline: "Titre 1" }] });
+    const down = setup({ app: { registry: registry(async () => []) } });
+    expect((await search(down, "Camille Ardent")).json.results.map((r) => r.url)).toEqual([CAMILLE_URL, HOMONYM.url]);
+  });
+
+  it("six cents recherches dans l'App par IP et par jour, puis le web seul", async () => {
+    let n = 0;
+    const ctx = setup({ people: { byName: () => ({ status: "ok", results: [] }) }, app: { registry: registry(async () => (n++, [])) } });
+    for (let i = 0; i < APP_SEARCHES_PER_IP + 2; i++) await search(ctx, "Camille Ardent");
+    expect(n).toBe(APP_SEARCHES_PER_IP);
   });
 });

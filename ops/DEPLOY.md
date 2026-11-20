@@ -145,6 +145,18 @@ ssh azerit "docker exec azerit-postgres psql -U postgres -d azerit -c \"SELECT u
 ssh azerit 'docker logs --tail 200 testyourskills | grep registre'   # une panne : « [registre] … indisponible »
 ```
 
+Le profil d'un email vérifié (§18.96), en plus, une fois : la fonction
+`testyourskills_linkedin_by_email`, qui lit `people` pour le jeu sans que le rôle
+la lise. Sans elle, le journal le dit une fois par dix minutes, rien d'autre ne
+change.
+
+```bash
+scp ops/registre-email.sql azerit:/tmp/registre-email.sql
+ssh azerit "docker exec -i azerit-postgres psql -U postgres -d azerit -v ON_ERROR_STOP=1 < /tmp/registre-email.sql && rm /tmp/registre-email.sql"
+```
+
+La dernière requête affiche `t | f` (appeler la fonction : oui ; lire `people` : non).
+
 Couper : retirer `AZERIT_DB_URL` du `.env` et recréer le conteneur. Retirer le
 rôle (il ne possède aucun objet : `DROP OWNED` ne fait que lui reprendre ses
 droits) : `DROP OWNED BY testyourskills; DROP ROLE testyourskills;`. Les lignes

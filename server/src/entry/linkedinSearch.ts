@@ -5,11 +5,17 @@
 
 import type { Hono } from "hono";
 import { SUGGEST_MIN_CHARS, type LinkedinSuggestion } from "../../../shared/entry";
-import { SEARCHES_PER_IP, type LinkedinCandidate, type LinkedinPeople } from "../linkedinProfile/search";
+import { mergeCandidates, SEARCHES_PER_IP, type LinkedinCandidate, type LinkedinPeople } from "../linkedinProfile/search";
+import type { Namesake } from "../registry/index";
 import { clientIp, type RateLimiter } from "../ratelimit";
 
 /** Lignes proposées sous le champ. */
 export const SUGGESTIONS = 5;
+/** Recherches dans la base de l'App par IP et par jour (§18.96) : gratuites, mais on n'énumère pas ses profils. */
+export const APP_SEARCHES_PER_IP = 600;
+
+/** Un profil de l'App qui a un nom → une ligne proposée (ni photo, ni rien d'autre). */
+export const namesakeCandidates = (list: Namesake[]): LinkedinCandidate[] => list.flatMap((n) => (n.name ? [{ url: n.url, name: n.name, headline: n.headline }] : []));
 
 /** Les photos ne sont montrées que servies par LinkedIn, en HTTPS. */
 export function licdnPhoto(url: string | undefined): string | undefined {
@@ -29,8 +35,10 @@ export function toSuggestion(c: LinkedinCandidate): LinkedinSuggestion {
 }
 
 export interface LinkedinSearchRoutesOptions {
-  /** Absent : pas de fournisseur de recherche, la route répond `off`. */
+  /** Absent : pas de fournisseur de recherche web. */
   people?: LinkedinPeople;
+  /** Les profils de l'App Azerit dont le nom commence par ce qui est tapé (§18.96), en tête ; 300 ms au plus. */
+  namesakes?: (typed: string) => Promise<Namesake[]>;
   limiter: RateLimiter;
 }
 
@@ -38,15 +46,18 @@ export function mountLinkedinSearch(app: Hono, o: LinkedinSearchRoutesOptions) {
   app.get("/api/search/linkedin", async (c) => {
     c.header("Cache-Control", "private, max-age=300");
     const q = (c.req.query("q") ?? "").trim();
-    if (!o.people) return c.json({ results: [], off: true });
+    if (!o.people && !o.namesakes) return c.json({ results: [], off: true });
     if (q.length < SUGGEST_MIN_CHARS || q.length > 80) return c.json({ results: [] });
     const ip = clientIp(c);
-    const found = await o.people.byName(q, { spend: () => o.limiter.take("li-search", ip, SEARCHES_PER_IP) });
-    if (found.status === "off") {
+    // L'App et le web en même temps : la base répond en quelques millisecondes, le web en une seconde.
+    const baseP = o.namesakes && o.limiter.take("li-app", ip, APP_SEARCHES_PER_IP) ? o.namesakes(q).catch(() => []) : Promise.resolve([]);
+    const found = o.people ? await o.people.byName(q, { spend: () => o.limiter.take("li-search", ip, SEARCHES_PER_IP) }) : ({ status: "off" } as const);
+    const base = namesakeCandidates(await baseP);
+    if (found.status === "off" && !base.length) {
       c.header("Cache-Control", "no-store");
       return c.json({ results: [], off: true });
     }
-    if (found.status === "short") return c.json({ results: [] });
-    return c.json({ results: found.results.slice(0, SUGGESTIONS).map(toSuggestion) });
+    const web = found.status === "ok" ? found.results : [];
+    return c.json({ results: mergeCandidates(base, web).slice(0, SUGGESTIONS).map(toSuggestion) });
   });
 }

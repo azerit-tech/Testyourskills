@@ -391,6 +391,10 @@ export function createApp(opts: AppOptions) {
           samePhoto: opts.samePhoto,
           samePhotoBytes: opts.samePhotoBytes,
           storedPhoto: opts.registry ? (url) => opts.registry!.photoOf(url) : undefined,
+          // La base de l'App avant le web (§18.96) : ses profils à ce nom, l'email qu'elle connaît, le GitHub qu'elle relie.
+          namesakes: opts.registry ? (name) => opts.registry!.namesakes(name) : undefined,
+          profileOfEmail: opts.registry ? (email) => opts.registry!.linkedinOfEmail(email) : undefined,
+          linkedinOfGithub: opts.registry ? (login) => opts.registry!.linkedinOf(login) : undefined,
         })
       : null;
 
@@ -1102,7 +1106,12 @@ export function createApp(opts: AppOptions) {
   mountPrimePages(app, { store, season, baseUrl, ogDir, render: (input) => deps.renderImage(input), indexHtml: opts.indexHtml });
 
   // Les deux portes sans rien coller (§18.80) : les suggestions du champ « Ton nom ».
-  mountLinkedinSearch(app, { people: opts.linkedinProfiles ? opts.linkedinPeople : undefined, limiter });
+  mountLinkedinSearch(app, {
+    people: opts.linkedinProfiles ? opts.linkedinPeople : undefined,
+    // Les profils de l'App d'abord sous le champ (§18.96), seulement là où le web en propose aussi.
+    namesakes: opts.registry && opts.linkedinProfiles && opts.linkedinPeople ? (typed) => opts.registry!.namesakes(typed, { partial: true }) : undefined,
+    limiter,
+  });
   // Et celles du champ « Ton nom ou pseudo » : les comptes GitHub, cherchés avec les jetons du serveur.
   mountGithubSearch(app, { auth: opts.githubPool ?? opts.githubToken, limiter, search: opts.githubUserSearch });
 

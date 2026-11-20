@@ -17,6 +17,7 @@
 
 import { createHash } from "node:crypto";
 import type Database from "better-sqlite3";
+import { linkedinSlug } from "../../../shared/entry";
 import { parsePersonName, samePublicFullName, type PersonName } from "../names";
 import { CrustdataClient, CrustdataPeople } from "./crustdata";
 import { LinkedinCache } from "./store";
@@ -100,6 +101,35 @@ export function rankCandidates(name: string, list: LinkedinCandidate[]): Linkedi
   const seen = new Set<string>();
   const unique = list.filter((c) => !seen.has(c.url) && !!seen.add(c.url));
   return [...unique.filter((c) => samePublicFullName(name, c.name)), ...unique.filter((c) => !samePublicFullName(name, c.name))].slice(0, MAX_CANDIDATES);
+}
+
+/**
+ * Les profils de l'App Azerit d'abord, ceux du web ensuite (§18.96), un profil une
+ * seule fois (même adresse, casse comprise). Un profil des deux garde sa ligne de
+ * l'App, complétée de la photo et de la concordance que le web donne.
+ */
+export function mergeCandidates(first: LinkedinCandidate[], then: LinkedinCandidate[]): LinkedinCandidate[] {
+  const key = (c: LinkedinCandidate) => (linkedinSlug(c.url) ?? c.url).toLowerCase();
+  const web = new Map<string, LinkedinCandidate>();
+  for (const c of then) if (!web.has(key(c))) web.set(key(c), c);
+  const out: LinkedinCandidate[] = [];
+  const seen = new Set<string>();
+  for (const c of first) {
+    const k = key(c);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    const w = web.get(k);
+    const photoUrl = c.photoUrl ?? w?.photoUrl;
+    const score = c.score ?? w?.score;
+    out.push({ ...c, headline: c.headline || w?.headline || "", ...(photoUrl ? { photoUrl } : {}), ...(score !== undefined ? { score } : {}) });
+  }
+  for (const c of then) {
+    const k = key(c);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(c);
+  }
+  return out;
 }
 
 export class LinkedinSearch implements LinkedinPeople {
