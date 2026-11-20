@@ -35,6 +35,17 @@ describe("le raisonnement", () => {
     expect(calls[0]!.body.temperature).toBeUndefined();
   });
 
+  it("DeepSeek V4.1 Flash : coupé, et au minimum si un fournisseur refuse la coupure (§18.98)", async () => {
+    const { client, calls } = fakeClient([{}, { error: new ChatHttpError(400, "Reasoning is mandatory for this endpoint and cannot be disabled.") }, {}]);
+    const model = "deepseek/deepseek-v4.1-flash";
+    await callStructured(call(model, client));
+    expect(calls[0]!.body.reasoning).toEqual({ effort: "none" });
+    expect(calls[0]!.body.temperature).toBe(0);
+    expect(calls[0]!.body.response_format?.type).toBe("json_schema");
+    expect(await callStructured(call(model, client))).toEqual({ ok: true });
+    expect(calls.slice(1).map((c) => c.body.reasoning?.effort)).toEqual(["none", "minimal"]);
+  });
+
   it("GLM 5.3 Flash : au minimum, il refuse qu'on le coupe", async () => {
     const { client, calls } = fakeClient([{}]);
     await callStructured(call("z-ai/glm-5.3-flash", client));

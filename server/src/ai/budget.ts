@@ -39,6 +39,8 @@ const PRICES: { match: RegExp; price: Price }[] = [
   { match: /opus-5[.-]5/, price: { input: 4, output: 20 } },
   { match: /opus/, price: { input: 5, output: 25 } },
   { match: /glm-5\.3-flash(?!x)/, price: { input: 0.04, output: 0.078 } },
+  // Prix de Together, haut de la fourchette : Wafer, le fournisseur choisi, est six fois moins cher (SPEC §18.98).
+  { match: /deepseek-v4\.1-flash/, price: { input: 0.3, output: 1.2 } },
 ];
 // Modèle inconnu : on compte au prix le plus cher pour rester prudent.
 const FALLBACK_PRICE: Price = { input: 10, output: 50 };
