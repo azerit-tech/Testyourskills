@@ -37,8 +37,9 @@ function stub(lang: string) {
   vi.stubGlobal("document", { documentElement: { dataset: {}, classList: { add: () => undefined, remove: () => undefined } }, querySelector: () => null, getElementById: () => null });
 }
 
-function renderResult(item: Shareable, opts: { owner: boolean; lang?: string; token?: string; plea?: number; me?: ResultProps["me"]; claimedAs?: string; fresh?: boolean }): string {
+function renderResult(item: Shareable, opts: { owner: boolean; lang?: string; token?: string; plea?: number; me?: ResultProps["me"]; claimedAs?: string; fresh?: boolean; kase?: ResultProps["kase"]; mine?: { id: string; login: string | null; overall: number } }): string {
   stub(opts.lang ?? "fr-FR");
+  if (opts.mine) localStorage.setItem("tys_mine", JSON.stringify(opts.mine));
   const id = item.kind === "card" ? item.card.id : item.comparison.id;
   if (opts.token) tokens.set(id, opts.token);
   if (opts.plea) setPlea(id, opts.plea);
@@ -50,7 +51,7 @@ function renderResult(item: Shareable, opts: { owner: boolean; lang?: string; to
     onScene: () => undefined,
     owner: opts.owner,
     fresh: opts.fresh ?? false,
-    kase: null,
+    kase: opts.kase ?? null,
     caseLate: false,
     claimedAs: opts.claimedAs ?? null,
     notice: null,
@@ -141,7 +142,8 @@ describe("page partagée, vue par un visiteur", () => {
 
   it("au bureau, « À ton tour » vient avant la colonne dans le document : le clavier suit l'écran (exécution 11)", () => {
     expect(page).toContain('const desk = useMediaQuery("(min-width: 900px)");');
-    expect(page).toContain("const turnFirst = desk && !wantedYou;");
+    // Le duel reste en bas de la colonne, hors du premier écran (§18.104).
+    expect(page).toContain("const turnFirst = desk && !wantedYou && !other;");
     const first = page.indexOf("{turnFirst && turn}");
     expect(first).toBeGreaterThan(0);
     expect(first).toBeLessThan(page.indexOf('<div className="visitor-col">'));
@@ -542,5 +544,36 @@ describe("ligne repliée", () => {
 
   it("un état qui demande l'attention l'ouvre", () => {
     expect(fold(true)).toMatch(/^<details class="fold email" open="">/);
+  });
+});
+
+describe("qui reçoit sa fiche : sa note d'abord, puis la vérifier soi-même (§18.104)", () => {
+  // Dénoncée par son lien LinkedIn : « Vérifie-la toi-même » la refait depuis ce lien.
+  const denounced = () => card({ id: "DenCard0001", login: undefined, name: "Maxime Bernard", linkedinUrl: "https://www.linkedin.com/in/maxime-bernard" });
+  const kase = { denounced: true, by: "leamd", jury: null } as unknown as ResultProps["kase"];
+  const mine = { id: "MyCard00001", login: "nour-rs", overall: 83 };
+  // Le rose avant « À ton tour » (son formulaire, en fin de page sur téléphone, a le sien).
+  const pinks = (html: string) => [...html.slice(0, html.indexOf('id="you"') >>> 0).matchAll(/<(?:button|a)[^>]*class="(?:pill pill-big|btn-primary)[^"]*"[^>]*>([^<]*)</g)].map((m) => m[1]);
+
+  it("sans fiche dans ce navigateur : la fiche, puis « Vérifie-la toi-même », seul rose ; rien à envoyer", () => {
+    const html = renderResult(denounced(), { owner: false, kase }).replace(/&#x27;/g, "'");
+    expect(ascending(at(html, ['class="result-stage"', 'class="denounced"', ">Vérifie-la toi-même<"]))).toBe(true);
+    expect(pinks(html)).toEqual(["Vérifie-la toi-même"]);
+    expect(html).not.toContain("Lui envoyer ma note");
+  });
+
+  it("avec une autre fiche dans ce navigateur : le même rose ; le duel plus bas, l'écart seul, sans envoi", () => {
+    const html = renderResult(denounced(), { owner: false, kase, mine }).replace(/&#x27;/g, "'").replace(/\u00a0/g, " ");
+    expect(pinks(html)).toEqual(["Vérifie-la toi-même"]);
+    expect(html).not.toContain("Lui envoyer ma note");
+    expect(ascending(at(html, ['class="denounced"', 'class="you duel"']))).toBe(true);
+    expect(html).toMatch(/class="you duel"[^]*83\/100 contre/);
+  });
+
+  it("qui a sa fiche, sur celle d'un autre : aucun rose, l'envoi en contour sous la fiche et le jury", () => {
+    const html = renderResult(card({ id: "OtherCard01" }), { owner: false, mine }).replace(/&#x27;/g, "'");
+    expect(pinks(html)).toEqual([]);
+    expect(html).toContain('<button type="button" class="pill">Lui envoyer ma note</button>');
+    expect(ascending(at(html, ['class="result-stage"', 'class="jury"', 'class="you duel"']))).toBe(true);
   });
 });

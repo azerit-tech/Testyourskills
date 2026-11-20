@@ -821,13 +821,11 @@ const fr = frTypoDeep({
     /* à l'arrivée de la cible */
     /* un titre qui vaut pour la personne visée comme pour un tiers ; qui a dénoncé est dit une fois, au-dessus (§18.52) */
     isYou: "C'est toi ?",
-    lawyer: "C'est moi, je reprends ma fiche",
-    /** Le même geste, dans la barre fixe du téléphone. */
-    lawyerShort: "C'est moi",
-    lawyerHint: "Connexion GitHub : on lit ton pseudo public, rien d'autre.",
-    /** Fiche dénoncée par un lien LinkedIn (pas de GitHub à prouver) : la personne la refait elle-même, la nouvelle est la sienne. */
-    lawyerLinkedin: "C'est moi : faire ma fiche moi-même",
-    lawyerLinkedinHint: "Reprends-la : refais-la depuis ton LinkedIn, en une minute. La nouvelle fiche est à toi, tu la partages ou tu la supprimes.",
+    /**
+     * Le seul rose de qui reçoit sa fiche (§18.104), au bloc comme dans la barre du téléphone : la reprendre
+     * par GitHub, ou la refaire depuis son lien LinkedIn ; la nouvelle est la sienne. Aucune ligne dessous.
+     */
+    verify: "Vérifie-la toi-même",
     notMe: "Ce n'est pas moi : faire la mienne",
     andYou: "À ton tour",
     mine: "Ma fiche",
@@ -837,7 +835,7 @@ const fr = frTypoDeep({
     pointsAhead: (n: number) => (n === 1 ? "1 point d'avance" : `${n} points d'avance`),
     pointsBehind: (n: number) => (n === 1 ? "1 point de retard" : `${n} points de retard`),
     tie: "à égalité",
-    /* le duel s'envoie : le score, puis le lien de sa propre fiche */
+    /* le duel s'envoie, en contour, plus bas que la fiche (§18.104) : le score, puis le lien de sa propre fiche */
     sendScore: "Lui envoyer ma note",
     /** Sur sa fiche toute neuve : la fiche par laquelle on est arrivé (le duel, une fois). */
     duelFrom: (who: string) => `Tu viens de la fiche de ${who}`,
@@ -1580,11 +1578,7 @@ const en: Dict = {
     linkCopied: "Link copied.",
     again: "Turn in someone else",
     isYou: "Is this you?",
-    lawyer: "That's me, claim my sheet",
-    lawyerShort: "That's me",
-    lawyerHint: "GitHub sign-in: we read your public username, nothing else.",
-    lawyerLinkedin: "That's me: make it myself",
-    lawyerLinkedinHint: "Take it back: redo it from your LinkedIn in one minute. The new sheet is yours to share or delete.",
+    verify: "Check it yourself",
     notMe: "Not me: get mine",
     andYou: "Your turn",
     mine: "My sheet",

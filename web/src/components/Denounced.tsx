@@ -1,10 +1,10 @@
-// La fiche d'une personne dénoncée (§18.6, §18.48, §18.52), vue par tout visiteur sauf qui
-// l'a dénoncée : « C'est toi ? », qui vaut pour la personne visée comme pour un tiers, puis
-// les sorties. « C'est moi » d'abord : par GitHub, la personne reprend cette fiche ; par un
-// lien LinkedIn (rien à prouver), elle la refait elle-même et la nouvelle est la sienne.
+// La fiche d'une personne dénoncée (§18.6, §18.48, §18.52, §18.104), vue par tout visiteur sauf
+// qui l'a dénoncée : « C'est toi ? », qui vaut pour la personne visée comme pour un tiers, puis
+// les sorties. « Vérifie-la toi-même » d'abord, seul rose, qu'on ait ou non une autre fiche ici :
+// par GitHub, la personne reprend cette fiche ; par un lien LinkedIn (rien à prouver), elle la
+// refait elle-même et la nouvelle est la sienne. Aucune ligne d'explication dessous.
 // Puis « Ce n'est pas moi : faire la mienne », en lien (le formulaire est dans « À ton tour »).
-// Sans pseudo GitHub, la demande de retrait est dans le bloc. Qui a déjà sa propre fiche
-// voit tout en contour : le rose va au duel.
+// Sans pseudo GitHub, la demande de retrait est dans le bloc.
 import { useCallback, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { pick, useT } from "../i18n";
@@ -67,20 +67,17 @@ interface Props {
   onRemake: Remake | null;
   /** Le visiteur n'a pas encore sa fiche : « Ce n'est pas moi : faire la mienne ». */
   notMe: boolean;
-  /** Le visiteur a sa propre fiche : rien en rose ici, le duel le prend. */
-  quiet?: boolean;
   /** La demande de retrait d'une fiche sans pseudo GitHub. */
   children?: ReactNode;
 }
 
-export function Denounced({ who, by, onLawyer, onRemake, notMe, quiet = false, children }: Props) {
+export function Denounced({ who, by, onLawyer, onRemake, notMe, children }: Props) {
   const { t } = useT();
   const d = t.denounce;
   const reduced = useReducedMotion();
   const mine = onLawyer ?? onRemake?.go ?? null;
   const going = !onLawyer && !!onRemake?.busy;
-  // Un seul rose : « C'est moi » s'il existe, sinon « Ce n'est pas moi » ; aucun pour qui a sa fiche.
-  const strong = (first: boolean) => (!quiet && first ? "pill pill-big" : "pill");
+  // Un seul rose : « Vérifie-la toi-même » s'il existe, sinon « Ce n'est pas moi ».
   // Un bouton par intention (§18.52) : avec « C'est moi », « Ce n'est pas moi » n'est qu'un lien, « À ton tour » a le formulaire.
   return (
     <section className="denounced" aria-labelledby="denounced-title">
@@ -90,20 +87,12 @@ export function Denounced({ who, by, onLawyer, onRemake, notMe, quiet = false, c
         {d.isYou}
       </h2>
       {mine && (
-        <>
-          <button
-            type="button"
-            className={strong(true)}
-            aria-busy={going || undefined}
-            onClick={mine}
-          >
-            {going ? t.home.submitting : onLawyer ? d.lawyer : d.lawyerLinkedin}
-          </button>
-          <p className="denounced-hint">{onLawyer ? d.lawyerHint : d.lawyerLinkedinHint}</p>
-        </>
+        <button type="button" className="pill pill-big" aria-busy={going || undefined} onClick={mine}>
+          {going ? t.home.submitting : d.verify}
+        </button>
       )}
       {notMe && (
-        <button type="button" className={mine ? "link-alt denounced-notme" : strong(true)} onClick={() => toYourTurn(reduced)}>
+        <button type="button" className={mine ? "link-alt denounced-notme" : "pill pill-big"} onClick={() => toYourTurn(reduced)}>
           {d.notMe}
         </button>
       )}

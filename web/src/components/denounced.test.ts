@@ -10,7 +10,7 @@ import { RemovalRequest } from "./Removal";
 
 const page = readFileSync(join(__dirname, "../pages/CardPage.tsx"), "utf8");
 
-function render(props: { by?: string | null; lawyer?: boolean; remake?: boolean; notMe?: boolean; quiet?: boolean; removal?: boolean; who?: string }, lang = "fr-FR"): string {
+function render(props: { by?: string | null; lawyer?: boolean; remake?: boolean; notMe?: boolean; removal?: boolean; who?: string }, lang = "fr-FR"): string {
   vi.stubGlobal("window", {
     location: { origin: "https://skills.test", pathname: "/c/x", search: "" },
     matchMedia: () => ({ matches: false, addEventListener: () => undefined, removeEventListener: () => undefined }),
@@ -25,7 +25,6 @@ function render(props: { by?: string | null; lawyer?: boolean; remake?: boolean;
       onLawyer: props.lawyer === false || props.remake ? null : () => undefined,
       onRemake: props.remake ? { go: () => undefined, busy: false } : null,
       notMe: props.notMe !== false,
-      quiet: props.quiet,
     },
     props.removal ? createElement(RemovalRequest, { cardId: "DenCard0001", short: true }) : null,
   );
@@ -35,7 +34,7 @@ function render(props: { by?: string | null; lawyer?: boolean; remake?: boolean;
 afterEach(() => vi.unstubAllGlobals());
 
 describe("le bloc d'une fiche dénoncée", () => {
-  it("« C'est toi ? » pour tout visiteur, qui a dénoncé dit une fois, « C'est moi » en rose et « Ce n'est pas moi » en lien (§18.52)", () => {
+  it("« C'est toi ? » pour tout visiteur, qui a dénoncé dit une fois, « Vérifie-la toi-même » en rose et « Ce n'est pas moi » en lien (§18.52, §18.104)", () => {
     const html = render({ by: "leamd" }).replace(/\u00a0/g, " ");
     expect(html).toContain('<h2 class="denounced-title" id="denounced-title">C\'est toi ?</h2>');
     expect(html).not.toContain("à ton nom");
@@ -45,19 +44,20 @@ describe("le bloc d'une fiche dénoncée", () => {
     const buttons = [...html.matchAll(/<button type="button" class="([^"]+)">([^<]+)<\/button>/g)].map((m) => [m[1], m[2]]);
     // Un bouton par intention : le formulaire de « Ce n'est pas moi » est celui de « À ton tour ».
     expect(buttons).toEqual([
-      ["pill pill-big", "C'est moi, je reprends ma fiche"],
+      ["pill pill-big", "Vérifie-la toi-même"],
       ["link-alt denounced-notme", "Ce n'est pas moi : faire la mienne"],
     ]);
-    // Ce que fait le premier bouton, dit dessous.
-    expect(html).toMatch(/<\/button><p class="denounced-hint">Connexion GitHub : [^<]+rien d.{1,6}autre\.<\/p>/);
+    // Aucune ligne de justification sous le bouton (§18.104).
+    expect(html).not.toContain("denounced-hint");
+    expect(html).not.toContain("Connexion GitHub");
     const css = readFileSync(join(__dirname, "denounce.css"), "utf8");
     expect(css).toMatch(/@media \(max-width: 899px\) \{\s*\.denounced-by \{\s*display: none;/);
   });
 
-  it("en anglais : “That's me” d'abord", () => {
+  it("en anglais : “Check it yourself” d'abord", () => {
     const html = render({}, "en-US");
     expect(html).toContain(">Is this you?</h2>");
-    expect(html).toMatch(/class="pill pill-big">That's me, claim my sheet<\/button>/);
+    expect(html).toMatch(/class="pill pill-big">Check it yourself<\/button>/);
     expect(html).toContain(">Not me: get mine</button>");
   });
 
@@ -69,25 +69,26 @@ describe("le bloc d'une fiche dénoncée", () => {
     expect(html).toMatch(/<p class="removal"><button type="button" class="link-alt">C'est toi \? Demander le retrait de cette fiche<\/button><\/p><\/section>$/);
   });
 
-  it("qui a déjà sa fiche n'a pas « faire la mienne », et rien en rose : le duel prend le rose", () => {
-    const html = render({ notMe: false, quiet: true });
+  it("qui a déjà une autre fiche ici n'a pas « faire la mienne », et « Vérifie-la toi-même » reste le rose (§18.104)", () => {
+    const html = render({ notMe: false });
     expect(html).not.toContain("faire la mienne");
-    expect(html).not.toContain("pill-big");
-    expect(html).toContain('<button type="button" class="pill">C\'est moi, je reprends ma fiche</button>');
+    expect(html.match(/pill-big/g)).toHaveLength(1);
+    expect(html).toContain('<button type="button" class="pill pill-big">Vérifie-la toi-même</button>');
   });
 
-  it("dénoncée par son lien LinkedIn : « C'est moi : faire ma fiche moi-même » en rose, et ce qu'il fait, dit comme dans le message reçu", () => {
+  it("dénoncée par son lien LinkedIn : « Vérifie-la toi-même » en rose, la refaire depuis ce lien, sans ligne dessous", () => {
     const html = render({ lawyer: false, remake: true, removal: true, who: "Maxime Bernard" }).replace(/\u00a0/g, " ");
     const buttons = [...html.matchAll(/<button type="button" class="((?:pill|link-alt denounced)[^"]*)">([^<]+)<\/button>/g)].map((m) => [m[1], m[2]]);
     expect(buttons).toEqual([
-      ["pill pill-big", "C'est moi : faire ma fiche moi-même"],
+      ["pill pill-big", "Vérifie-la toi-même"],
       ["link-alt denounced-notme", "Ce n'est pas moi : faire la mienne"],
     ]);
-    expect(html).toContain('<p class="denounced-hint">Reprends-la : refais-la depuis ton LinkedIn');
-    expect(render({ lawyer: false, remake: true }, "en-US")).toContain(">That's me: make it myself</button>");
+    expect(html).not.toContain("denounced-hint");
+    expect(render({ lawyer: false, remake: true }, "en-US")).toContain(">Check it yourself</button>");
     // Dans la page : la nouvelle fiche part de ce lien, et la barre fixe porte le même geste.
     expect(page).toMatch(/useRemake\(wantedYou && !cardLogin && main\.linkedinUrl \? main\.linkedinUrl : null/);
-    expect(page).toMatch(/const lawyer = other \? null : \(claimHere \?\? remake\?\.go \?\? null\);/);
+    // Qu'on ait ou non une autre fiche dans ce navigateur (§18.104).
+    expect(page).toMatch(/const lawyer = claimHere \?\? remake\?\.go \?\? null;/);
   });
 
   it("dans la page : la demande de retrait ne se répète pas en pied de colonne", () => {

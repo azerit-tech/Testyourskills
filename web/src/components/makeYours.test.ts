@@ -6,7 +6,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { LangProvider } from "../i18n";
-import { MakeYours } from "./MakeYours";
+import { MakeYours, visitorBar } from "./MakeYours";
 
 const css = readFileSync(join(__dirname, "../styles.css"), "utf8");
 const page = readFileSync(join(__dirname, "../pages/CardPage.tsx"), "utf8");
@@ -33,11 +33,13 @@ describe("la barre « Faire ma fiche » du visiteur", () => {
     expect(render(true, "en-US")).toContain(">Get my rap sheet</button>");
   });
 
-  it("fiche dénoncée qu'on peut reprendre : « C'est moi » en rose, « Faire ma fiche » en contour", () => {
+  it("fiche dénoncée qu'on peut reprendre : « Vérifie-la toi-même », seul bouton, rose (§18.104)", () => {
     const html = render(true, "fr-FR", { watch: true, onLawyer: () => undefined });
-    expect(html.match(/<button/g)).toHaveLength(2);
-    expect(html).toContain('<button type="button" class="pill pill-big dock-main">C&#x27;est moi</button>');
-    expect(html).toContain('<button type="button" class="pill pill-big pill-ghost">Faire ma fiche</button>');
+    expect(html.match(/<button/g)).toHaveLength(1);
+    expect(html).toMatch(/^<div class="dock make-yours" role="region" aria-label="Vérifie-la toi-même" inert="">/);
+    expect(html).toContain('<button type="button" class="pill pill-big dock-main">Vérifie-la toi-même</button>');
+    expect(html).not.toContain("Faire ma fiche");
+    expect(render(true, "en-US", { onLawyer: () => undefined })).toContain(">Check it yourself</button>");
   });
 
   it("pas sur ordinateur : « À ton tour » ouvre la colonne de droite, sous la tête", () => {
@@ -101,10 +103,22 @@ describe("la barre « Faire ma fiche » du visiteur", () => {
     expect(page).toMatch(/\{chase && <div className="stage-chase">\{chase\}<\/div>\}/);
   });
 
-  it("qui a déjà sa fiche : « Lui envoyer ma note » dans la barre, le geste du duel ; rien face à un dossier scellé", () => {
-    expect(page).toMatch(/visitor && settled && \(!other \|\| duel\.send\) && <MakeYours watch=\{wantedYou\} onLawyer=\{lawyer\} onSend=\{other \? duel\.send : null\} \/>/);
-    const html = render(true, "fr-FR", { onSend: () => undefined });
-    expect(html.match(/<button/g)).toHaveLength(1);
-    expect(html).toContain('<button type="button" class="pill pill-big dock-main">Lui envoyer ma note</button>');
+  it("le bouton de la barre, cas par cas : vérifier sa fiche reçue, faire la sienne, ou rien (§18.104)", () => {
+    // Fiche dénoncée reçue, sans fiche ici, puis avec une autre fiche ici : « Vérifie-la toi-même » les deux fois.
+    expect(visitorBar({ verify: true, hasOwn: false })).toBe("verify");
+    expect(visitorBar({ verify: true, hasOwn: true })).toBe("verify");
+    // Sans fiche à soi : « Faire ma fiche », inchangé.
+    expect(visitorBar({ verify: false, hasOwn: false })).toBe("make");
+    // Avec sa fiche, sur celle d'un autre : pas de barre, rien à envoyer à l'arrivée.
+    expect(visitorBar({ verify: false, hasOwn: true })).toBeNull();
+    expect(page).toContain("const bar = visitor && settled && !(self && !another) ? visitorBar({ verify: !!lawyer, hasOwn: !!other }) : null;");
+    expect(page).toContain('{bar && <MakeYours watch={wantedYou} onLawyer={bar === "verify" ? lawyer : null} />}');
+  });
+
+  it("« Lui envoyer ma note » ne vient plus jamais dans la barre", () => {
+    const src = readFileSync(join(__dirname, "MakeYours.tsx"), "utf8");
+    expect(src).not.toContain("sendScore");
+    expect(src).not.toContain("onSend");
+    expect(page).not.toMatch(/onSend=/);
   });
 });
