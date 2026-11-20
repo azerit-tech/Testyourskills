@@ -15,8 +15,8 @@ export type Suggestion =
 export const fromLinkedin = (p: LinkedinSuggestion): Suggestion => ({ kind: "linkedin", key: `li:${p.url}`, title: p.name, sub: p.headline, photo: p.photo, url: p.url });
 export const fromGithub = (a: GithubSuggestion): Suggestion => ({ kind: "github", key: `gh:${a.login}`, title: a.name ?? a.login, sub: `@${a.login}`, photo: a.avatarUrl || undefined, login: a.login });
 
-/** Ce qui se cherche : pas une adresse (elle se lit telle quelle), et assez de frappes. */
-function searchable(raw: string): string | null {
+/** Ce qui se cherche : pas une adresse (elle se lit telle quelle), et assez de frappes ; sinon null. */
+export function suggestQuery(raw: string): string | null {
   const q = raw.trim().replace(/\s+/g, " ");
   if (q.length < SUGGEST_MIN_CHARS || q.length > 60 || /[/:]|\.com\b/i.test(q)) return null;
   return q;
@@ -33,21 +33,37 @@ export interface SuggestSources {
   github?: boolean;
 }
 
+/** Les lignes trouvées, et la frappe à laquelle elles répondent (null : rien de cherché). */
+export interface Found {
+  items: Suggestion[];
+  query: string | null;
+}
+const NONE: Found = { items: [], query: null };
+
 /**
  * Les suggestions du champ, 400 ms après la dernière frappe. `pause` : rien ne se
  * cherche (formulaire occupé). La réponse d'une frappe dépassée est jetée.
  */
 export function useSuggestions(value: string, sources: SuggestSources, pause = false): Suggestion[] {
-  const [items, setItems] = useState<Suggestion[]>([]);
+  return useFound(value, sources, pause).items;
+}
+
+/**
+ * Les mêmes suggestions, avec la frappe qu'elles servent : tant que `query` n'est pas
+ * `suggestQuery(value)`, la réponse à ce qui est tapé n'est pas encore là (un nom
+ * dénoncé avant sa liste attend la liste, au lieu de dire « choisis dans la liste »).
+ */
+export function useFound(value: string, sources: SuggestSources, pause = false): Found {
+  const [found, setFound] = useState<Found>(NONE);
   /** La recherche LinkedIn s'est dite éteinte (plafond, panne) : on ne la redemande plus sur cette page. */
   const liOff = useRef(false);
-  const q = pause ? null : searchable(value);
+  const q = pause ? null : suggestQuery(value);
   const li = !!sources.linkedin;
   const gh = !!sources.github;
   useEffect(() => {
     // Rien à chercher : la liste part. Sinon les lignes d'avant restent jusqu'aux suivantes, sans clignoter.
     if (!q) {
-      setItems((prev) => (prev.length ? [] : prev));
+      setFound((prev) => (prev.items.length || prev.query !== null ? NONE : prev));
       return;
     }
     const ctrl = new AbortController();
@@ -60,7 +76,7 @@ export function useSuggestions(value: string, sources: SuggestSources, pause = f
         if (ctrl.signal.aborted) return;
         if (people.off) liOff.current = true;
         const both = li && gh;
-        setItems([...accounts.slice(0, both ? MAX_EACH : MAX_ONE).map(fromGithub), ...people.results.slice(0, both ? MAX_EACH : MAX_ONE).map(fromLinkedin)]);
+        setFound({ items: [...accounts.slice(0, both ? MAX_EACH : MAX_ONE).map(fromGithub), ...people.results.slice(0, both ? MAX_EACH : MAX_ONE).map(fromLinkedin)], query: q });
       });
     }, SUGGEST_DEBOUNCE_MS);
     return () => {
@@ -68,7 +84,7 @@ export function useSuggestions(value: string, sources: SuggestSources, pause = f
       ctrl.abort();
     };
   }, [q, li, gh]);
-  return items;
+  return found;
 }
 
 /** La photo d'une ligne, sinon son initiale sur un rond d'encre (photo absente, refusée ou expirée). */

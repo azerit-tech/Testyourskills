@@ -680,20 +680,27 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
   // avec la phrase qui dit ce qu'on regarde (sous le bloc d'une fiche dénoncée, qui a son propre bouton rose).
   // Qui a déjà sa fiche : le duel à la place ; sur une fiche dénoncée, l'écart seul, rien à envoyer. Sur la fiche
   // d'un autre, « Dénonce un complice » suit, en grand, au nom de sa propre fiche (§18.118).
+  // Le duel et « Dénonce un complice » vont ensemble, dans une seule pile (`you-col`) : 16 px entre eux sur
+  // téléphone, la même place dans la grille du bureau (sinon le bloc de dénonciation, sans place, tombait
+  // dans la marge de droite, coupé). Le duel en bas de la colonne au bureau (§18.104), sa fiche en tête.
   const turn = !visitor ? null : other && !loginBack ? (
-    <>
-      <Duel mine={other} card={main} duel={duel} info={wantedYou} />
-      {!wantedYou && <Denounce cardId={other.id} selfLogin={other.login ?? undefined} mine={other.overall} toast={toast.show} />}
-    </>
+    wantedYou ? (
+      <Duel mine={other} card={main} duel={duel} info />
+    ) : (
+      <div className="you-col is-duel">
+        <Duel mine={other} card={main} duel={duel} info={false} />
+        <Denounce cardId={other.id} selfLogin={other.login ?? undefined} mine={other.overall} toast={toast.show} />
+      </div>
+    )
   ) : self && !another && !loginBack ? (
-    <>
+    <div className="you-col">
       {self.id !== id && (
         <section className="you you-mine" id="you" aria-label={t.home.back.see}>
           <ReturnCall mine={self} onAnother={() => setAnother(true)} onSignOut={acct ? () => void signOut() : undefined} />
         </section>
       )}
       <Denounce cardId={self.id} selfLogin={self.login ?? undefined} mine={self.overall} toast={toast.show} />
-    </>
+    </div>
   ) : (
     <section className="you" id="you" aria-labelledby="you-title">
       <h2 id="you-title">{t.denounce.andYou}</h2>

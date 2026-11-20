@@ -22,6 +22,7 @@ import { markChaseWatched } from "../lib/session";
 import { Result, type ResultProps } from "./CardPage";
 
 const page = readFileSync(join(__dirname, "CardPage.tsx"), "utf8");
+const css = readFileSync(join(__dirname, "../styles.css"), "utf8");
 
 const IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1";
 
@@ -148,6 +149,23 @@ describe("page partagée, vue par un visiteur", () => {
     expect(first).toBeGreaterThan(0);
     expect(first).toBeLessThan(page.indexOf('<div className="visitor-col">'));
     expect(page.indexOf("{!turnFirst && turn}")).toBeGreaterThan(page.indexOf('<div className="visitor-col">'));
+  });
+
+  it("qui a sa fiche, sur celle d'un autre (ouverte du classement) : le duel puis « Dénonce un complice », une seule pile, ni collés ni hors de la grille", () => {
+    const html = renderResult(card(), { owner: false, mine: { id: "MyOwnCard1", login: "jmougeot", overall: 71 } });
+    // Une pile : le duel, puis le bloc de dénonciation, au nom de sa propre fiche.
+    expect(html).toMatch(/<div class="you-col is-duel"><section class="you duel" id="you"[^>]*>[\s\S]*?<\/section><section class="after-block denounce"/);
+    expect(html.match(/class="after-block denounce/g)).toHaveLength(1);
+    expect(page).toMatch(/<div className="you-col is-duel">\s*<Duel mine=\{other\}[^>]*\/>\s*<Denounce cardId=\{other\.id\}/);
+    // Sur la fiche de sa personne aussi : « Voir ma fiche » et la dénonciation dans la même pile.
+    expect(page).toMatch(/<div className="you-col">\s*\{self\.id !== id && \([\s\S]*?<\/section>\s*\)\}\s*<Denounce cardId=\{self\.id\}/);
+    // Téléphone : 16 px entre le duel et la dénonciation (ils étaient collés).
+    expect(css).toMatch(/\.result-top > \.you-col \{\s*display: grid;\s*grid-template-columns: minmax\(0, 1fr\);\s*gap: 16px;\s*margin-top: 16px;/);
+    // Bureau : la pile a sa place dans la colonne de droite (le bloc tombait dans la marge, coupé), en bas, sous le jury (§18.104).
+    const desktop = css.slice(css.indexOf("/* ============ ordinateur ============ */"));
+    expect(desktop).toMatch(/\.page-result\.is-visitor > \.result-top > \.you,\s*\.page-result\.is-visitor > \.result-top > \.you-col \{\s*grid-column: 4;\s*grid-row: 2;/);
+    expect(desktop).toMatch(/\.page-result\.is-visitor > \.result-top > \.you-col\.is-duel \{\s*grid-row: 3;/);
+    expect(desktop).toMatch(/\.page-result\.is-visitor:has\(> \.result-top > \.you-col\.is-duel\) \.visitor-col \{\s*grid-row: 2;/);
   });
 
   it("une fiche supprimée ou introuvable : le navigateur l'oublie, plus de « Ma fiche » qui mène nulle part (parcours 4)", () => {

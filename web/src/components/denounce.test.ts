@@ -9,8 +9,9 @@ import type { CardData } from "../../../shared/types";
 import { starsFor } from "../../../shared/types";
 import { starsLine } from "../../../shared/stars";
 import { DICTS, LangProvider } from "../i18n";
-import { Denounce, ShotLine, pendingPct, shotKey, shotsReducer } from "./Denounce";
+import { Denounce, ShotLine, pendingPct, shotKey, shotsReducer, stepFor } from "./Denounce";
 import type { Shot } from "./Denounce";
+import type { Suggestion } from "./Suggest";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -166,12 +167,33 @@ describe("Dénoncer : le champ et le message", () => {
     const html = renderToStaticMarkup(createElement(LangProvider, null, createElement(Denounce, { cardId: "AbCdEf1234", selfLogin: "leamd", toast: () => undefined })));
     expect(html).toMatch(/<div class="field field-who"><label[^>]*>Nom, pseudo GitHub ou lien LinkedIn du complice<\/label><input[^>]*placeholder="Son nom, son pseudo ou un lien"[^>]*role="combobox"/);
     expect(html).toContain('<button type="submit" class="pill pill-big denounce-go">Dénoncer</button>');
-    expect(SRC).toContain("useSuggestions(value, { github: true, linkedin: mixed }, false)");
+    expect(SRC).toContain("useFound(value, { github: true, linkedin: mixed }, false)");
     expect(SRC).toContain("useSuggestBox({ id: `${uid}-sg`, items: people, onPick: pickOne, mixed, label })");
     expect(SRC).toContain("p.login.toLowerCase() === selfLogin.toLowerCase()");
     expect(SRC).toMatch(/const pickOne = \(item: Suggestion\) =>\s*void send\(item\.kind === "github" \? \{ kind: "github", login: item\.login \} : \{ kind: "linkedin", url: item\.url \}/);
-    expect(SRC).toContain("if (people.length === 1) return pickOne(people[0]!);");
-    expect(SRC).toContain("if (people.length) return box.show();");
+    expect(SRC).toContain('if (step.do === "pick") return pickOne(step.item);');
+    // Plusieurs personnes : la liste s'ouvre et le champ reprend le focus pris par « Dénoncer » (clavier, fermeture au départ du champ).
+    expect(SRC).toMatch(/if \(step\.do === "list"\) \{\s*(\/\/[^\n]*\n\s*)*input\.current\?\.focus\(\{ preventScroll: true \}\);\s*return box\.show\(\);/);
+  });
+
+  it("un nom, « Dénoncer » touché avant sa liste : on attend la liste, jamais « choisis dans la liste » ni la ligne d'une frappe d'avant", () => {
+    const lea: Suggestion = { kind: "github", key: "gh:leamd", title: "Léa Martin", sub: "@leamd", login: "leamd" };
+    const marie: Suggestion = { kind: "linkedin", key: "li:x", title: "Marie Dupont", sub: "Dev", url: "https://www.linkedin.com/in/marie-dupont" };
+    // La liste de « Marie Dupont » n'est pas encore là (rien, ou celle de « Marie Dup ») : on attend.
+    expect(stepFor("Marie Dupont", [], null)).toEqual({ do: "wait" });
+    expect(stepFor("Marie Dupont", [lea], "Marie Dup")).toEqual({ do: "wait" });
+    // Elle est là : une personne, c'est elle ; plusieurs, la liste ; aucune, l'erreur.
+    expect(stepFor("Marie  Dupont ", [marie], "Marie Dupont")).toEqual({ do: "pick", item: marie });
+    expect(stepFor("Marie Dupont", [marie, lea], "Marie Dupont")).toEqual({ do: "list" });
+    expect(stepFor("Marie Dupont", [], "Marie Dupont")).toEqual({ do: "error" });
+    // Un pseudo ou un lien part tel quel, sans liste ; trop court pour chercher : l'erreur tout de suite.
+    expect(stepFor("leamd", [], null)).toEqual({ do: "send", entry: { kind: "github", login: "leamd" } });
+    expect(stepFor("https://www.linkedin.com/in/marie-dupont", [], null)).toMatchObject({ do: "send", entry: { kind: "linkedin" } });
+    expect(stepFor("é", [], null)).toEqual({ do: "error" });
+    // Dans le composant : l'attente se résout quand la liste arrive, et une nouvelle frappe l'annule.
+    expect(SRC).toContain('if (step.do === "wait") return setWaiting(true);');
+    expect(SRC).toMatch(/useEffect\(\(\) => \{\s*if \(!waiting\) return;\s*const step = stepFor\(value, people, found\.query\);\s*if \(step\.do === "wait"\) return;\s*setWaiting\(false\);\s*act\(step\);/);
+    expect(SRC).toMatch(/onChange=\{\(e\) => \{\s*setValue\(e\.target\.value\);[^}]*setWaiting\(false\);/);
   });
 
   it("la barre de l'interrogatoire avance sur la durée attendue, ralentit ensuite, et ne touche jamais le bout", () => {

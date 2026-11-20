@@ -25,7 +25,7 @@ import { aimAt, ManualCopy } from "./After";
 import { Avatar } from "./Avatar";
 import { IconCopy, IconShare, IconWhatsApp } from "./Icons";
 import { Stars } from "./Stars";
-import { useSuggestBox, useSuggestions } from "./Suggest";
+import { suggestQuery, useFound, useSuggestBox } from "./Suggest";
 import type { Suggestion } from "./Suggest";
 import "./denounce.css";
 
@@ -76,6 +76,25 @@ export const shotKey = (entry: Entry) => (entry.kind === "github" ? `gh:${entry.
 export function tagOf(card: CardData, lang: Lang): string {
   if (card.sealed && card.profile) return pick(card.profile.label, lang);
   return pick(LEVEL_LABELS[starsFor(card.overall)], lang);
+}
+
+/** Ce que « Dénoncer » fait de ce qui est tapé. */
+export type Step = { do: "send"; entry: Entry } | { do: "pick"; item: Suggestion } | { do: "list" } | { do: "wait" } | { do: "error" };
+
+/**
+ * Un lien LinkedIn ou un pseudo GitHub part tel quel (le même analyseur que le formulaire d'entrée). Un nom
+ * passe par sa liste : tant que la liste de ce nom n'est pas arrivée (`query`, la frappe que servent les
+ * lignes `people`), on l'attend, au lieu de dire « choisis dans la liste » ou de prendre la ligne d'une
+ * frappe d'avant. Puis une seule personne, c'est elle ; plusieurs, la liste ; aucune, l'erreur.
+ */
+export function stepFor(raw: string, people: Suggestion[], query: string | null): Step {
+  const entry = detectEntry(raw);
+  if (entry) return { do: "send", entry };
+  const q = suggestQuery(raw);
+  if (q && query !== q) return { do: "wait" };
+  if (people.length === 1) return { do: "pick", item: people[0]! };
+  if (people.length) return { do: "list" };
+  return { do: "error" };
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -195,9 +214,9 @@ export function Denounce({ cardId, selfLogin, toast, initial, mine }: Props) {
 
   // Les personnes à ce nom, sous le champ (§18.80) : comptes GitHub et profils LinkedIn mêlés.
   const mixed = liOn && liSearch;
-  const found = useSuggestions(value, { github: true, linkedin: mixed }, false);
+  const found = useFound(value, { github: true, linkedin: mixed }, false);
   // On ne se dénonce pas soi-même : son propre compte ne sort pas dans la liste.
-  const people = useMemo(() => found.filter((p) => !(p.kind === "github" && selfLogin && p.login.toLowerCase() === selfLogin.toLowerCase())), [found, selfLogin]);
+  const people = useMemo(() => found.items.filter((p) => !(p.kind === "github" && selfLogin && p.login.toLowerCase() === selfLogin.toLowerCase())), [found.items, selfLogin]);
   /** Une personne touchée dans la liste : la dénonciation part, sans autre geste. */
   const pickOne = (item: Suggestion) =>
     void send(item.kind === "github" ? { kind: "github", login: item.login } : { kind: "linkedin", url: item.url }, item.kind === "github" ? `@${item.login}` : item.title, item.photo, item.kind === "linkedin" ? item.title : undefined);
@@ -209,16 +228,34 @@ export function Denounce({ cardId, selfLogin, toast, initial, mine }: Props) {
     if (box.shown && touch) fieldRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
   }, [box.shown, touch]);
 
+  /** « Dénoncer » touché avant que la liste de ce nom ne soit arrivée : il attend la liste, puis agit. */
+  const [waiting, setWaiting] = useState(false);
+  const act = (step: Step) => {
+    if (step.do === "send") return void send(step.entry, step.entry.kind === "github" ? `@${step.entry.login}` : (linkedinSlug(step.entry.url) ?? "LinkedIn"));
+    if (step.do === "pick") return pickOne(step.item);
+    // Plusieurs personnes : la liste s'ouvre sous le champ, qui reprend le focus (« Dénoncer » touché l'avait pris) :
+    // les flèches et Entrée la mènent, et elle se ferme quand on quitte le champ, au lieu de rester ouverte.
+    if (step.do === "list") {
+      input.current?.focus({ preventScroll: true });
+      return box.show();
+    }
+    if (step.do === "error") setError(liOn ? d.invalidBoth : d.invalid);
+  };
   /** Ce que le champ contient : un lien de profil LinkedIn ou un pseudo GitHub part tel quel ; un nom passe par la liste. */
   const run = (raw: string) => {
-    // Le même analyseur que le formulaire d'entrée.
-    const entry = detectEntry(raw);
-    if (entry) return void send(entry, entry.kind === "github" ? `@${entry.login}` : (linkedinSlug(entry.url) ?? "LinkedIn"));
-    // Un nom : une seule personne proposée, c'est elle ; plusieurs, la liste ; aucune, l'erreur.
-    if (people.length === 1) return pickOne(people[0]!);
-    if (people.length) return box.show();
-    setError(liOn ? d.invalidBoth : d.invalid);
+    const step = stepFor(raw, people, found.query);
+    if (step.do === "wait") return setWaiting(true);
+    act(step);
   };
+  // La liste du nom tapé est là : la dénonciation demandée part (une personne), la liste s'ouvre (plusieurs), ou l'erreur.
+  useEffect(() => {
+    if (!waiting) return;
+    const step = stepFor(value, people, found.query);
+    if (step.do === "wait") return;
+    setWaiting(false);
+    act(step);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waiting, value, people, found.query]);
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -256,6 +293,8 @@ export function Denounce({ cardId, selfLogin, toast, initial, mine }: Props) {
             value={value}
             onChange={(e) => {
               setValue(e.target.value);
+              // Une nouvelle frappe annule l'envoi qui attendait la liste : on n'agit que sur ce qui a été envoyé.
+              setWaiting(false);
               if (error) setError(null);
             }}
             onKeyDown={(e) => void box.onKeyDown(e)}
@@ -268,7 +307,7 @@ export function Denounce({ cardId, selfLogin, toast, initial, mine }: Props) {
           {box.list}
         </div>
         {/* Le rose du bloc (§18.118) tant qu'aucune fiche n'est prête ; ensuite, l'envoi de la dernière le prend. */}
-        <button type="submit" className="pill pill-big denounce-go">
+        <button type="submit" className="pill pill-big denounce-go" aria-busy={waiting || undefined}>
           {d.btn}
         </button>
       </form>
