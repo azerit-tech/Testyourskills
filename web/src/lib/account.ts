@@ -22,6 +22,7 @@ function readHint(): Account | null {
     return {
       cardId: typeof a.cardId === "string" ? a.cardId : null,
       cardLogin: typeof a.cardLogin === "string" ? a.cardLogin : null,
+      ...(a.cardLinkedin === true ? { cardLinkedin: true } : {}),
       overall: typeof a.overall === "number" ? a.overall : null,
       sources: a.sources.filter((s): s is AccountSource => s === "linkedin" || s === "github"),
       avatarUrl: typeof a.avatarUrl === "string" ? a.avatarUrl : null,

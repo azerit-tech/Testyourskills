@@ -226,16 +226,25 @@ export function EntryForm({ inputRef, variant = "full", secondary = false, anoth
   const simple = inline || (mode === "single" && tab === "github");
   /** L'attente du retour de LinkedIn, ou la question de son GitHub, est à l'écran : ni boutons, ni champ. */
   const hold = (!!finding || !!asking) && simple;
-  /** Les deux boutons de connexion à l'écran, le champ fermé. */
-  const buttonsOn = simple && open === null && !hold;
-  const fieldOn = showGithub && !buttonsOn && !hold;
   // Le compte léger (§18.91), ou le repli de `tys_who` (§18.90) : connecté avec une fiche, l'entrée y
   // ramène d'abord. Pas tant qu'un retour de connexion est en cours : ce parcours-là va jusqu'au bout.
   const acct = useAccount();
+  /**
+   * Une source déjà à lui n'est jamais reproposée (§18.105, §18.110) : connecté par elle, ou déjà sur sa
+   * fiche. « Se connecter avec LinkedIn » ou « avec GitHub » ne s'affiche plus pour elle.
+   */
+  const liMine = !!acct?.sources.includes("linkedin") || !!acct?.cardLinkedin;
+  const ghMine = !!acct?.sources.includes("github") || !!acct?.cardLogin;
+  /** « Faire une autre fiche » quand ses deux sources sont à lui : aucun bouton, le champ d'emblée. */
+  const noDoors = another && liMine && ghMine;
+  const opened: Open | null = open ?? (noDoors ? "link" : null);
+  /** Les deux boutons de connexion à l'écran, le champ fermé. */
+  const buttonsOn = simple && opened === null && !hold;
+  const fieldOn = showGithub && !buttonsOn && !hold;
   /** Ce que le champ lit d'abord : LinkedIn s'il s'est ouvert sur LinkedIn, GitHub sinon. */
-  const fieldDoor: Door = doorsOn && simple && open === "linkedin" ? "linkedin" : "github";
+  const fieldDoor: Door = doorsOn && simple && opened === "linkedin" ? "linkedin" : "github";
   /** « colle un lien » : le champ prend tout, ses suggestions mêlent les deux sources. */
-  const anyField = simple && open === "link";
+  const anyField = simple && opened === "link";
 
   // Les écouteurs posés sur le document lisent toujours l'état courant.
   const state = useRef({ mode, tab, login, file, doorsOn });
@@ -727,8 +736,6 @@ export function EntryForm({ inputRef, variant = "full", secondary = false, anoth
     );
   };
   /** Les deux boutons empilés, LinkedIn d'abord (le rose) ; sans LinkedIn lisible, GitHub seul, en rose. */
-  /** Le compte a déjà son LinkedIn (§18.105) : « Se connecter avec LinkedIn » ne s'affiche plus, le serveur n'y renvoie plus. */
-  const liMine = !!acct?.sources.includes("linkedin");
   /**
    * Connecté, une fiche au compte : « Voir ma fiche », et dessous « Refaire ma fiche · Se déconnecter ».
    * Connecté par LinkedIn, sa fiche partie : « Refaire ma fiche » en rose, refaite d'après son compte (§18.105).
@@ -777,7 +784,7 @@ export function EntryForm({ inputRef, variant = "full", secondary = false, anoth
   const loginBtns = buttonsOn && !connected && (
     <>
       {liOn && !liMine && loginBtn("linkedin", true)}
-      {loginBtn("github", !liOn || liMine)}
+      {!ghMine && loginBtn("github", !liOn || liMine)}
     </>
   );
   /** Le CV : sur l'accueil, le dépôt s'ouvre sur place ; depuis une fiche, on y va. */
@@ -889,7 +896,7 @@ export function EntryForm({ inputRef, variant = "full", secondary = false, anoth
         {meanwhile}
         {submitBtn(h.submit)}
         {orLine}
-        {!buttonsOn && !hold && (
+        {!buttonsOn && !hold && !noDoors && (
           <div className="entry-foot" id={`${uid}-hint`}>
             {backLink}
           </div>
@@ -961,7 +968,7 @@ export function EntryForm({ inputRef, variant = "full", secondary = false, anoth
       {orLine}
       <div className="entry-foot" id={buttonsOn ? undefined : `${uid}-hint`}>
         {showCv && <span className="entry-reassure">{h.reassure}</span>}
-        {simple && !buttonsOn && !hold && backLink}
+        {simple && !buttonsOn && !hold && !noDoors && backLink}
         {mode === "single" && tab === "cv" && (
           <>
             <button type="button" className="link-alt" onClick={() => switchTab("github")}>

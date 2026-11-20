@@ -261,6 +261,7 @@ interface MeBody {
   avatarUrl?: unknown;
   initial?: unknown;
   cardLogin?: unknown;
+  cardLinkedin?: unknown;
   overall?: unknown;
   known?: unknown;
 }
@@ -292,6 +293,8 @@ export interface Account {
   cardId: string | null;
   /** Le pseudo et la note de cette fiche ; null quand le serveur ne les dit pas (démo). */
   cardLogin: string | null;
+  /** Sa fiche porte un LinkedIn (§18.110) : « Se connecter avec LinkedIn » ne lui est plus proposé, comme GitHub avec `cardLogin`. */
+  cardLinkedin?: boolean;
   overall: number | null;
   sources: AccountSource[];
   avatarUrl: string | null;
@@ -305,6 +308,8 @@ let mockAccountMem: Account | null = null;
 let mockAccountUrlRead = false;
 const MOCK_ACCOUNTS: Record<string, Account> = {
   li: { cardId: "m-licmp-compte01", cardLogin: null, overall: null, sources: ["linkedin"], avatarUrl: "/mock-linkedin.svg", initial: "L", known: false },
+  /** Connecté par LinkedIn, son dossier porte déjà son GitHub (§18.110). */
+  ligh: { cardId: "m-licmp-compte02", cardLogin: "camroux", cardLinkedin: true, overall: null, sources: ["linkedin"], avatarUrl: "/mock-linkedin.svg", initial: "L", known: false },
   gh: { cardId: "m-gold-compte01", cardLogin: null, overall: null, sources: ["github"], avatarUrl: null, initial: "L", known: false },
   /** Connecté par LinkedIn, sa fiche partie (§18.105). */
   li0: { cardId: null, cardLogin: null, overall: null, sources: ["linkedin"], avatarUrl: "/mock-linkedin.svg", initial: "L", known: false },
@@ -320,6 +325,7 @@ function parseAccount(raw: unknown): Account | null {
   return {
     cardId,
     cardLogin: typeof b.cardLogin === "string" ? b.cardLogin : null,
+    ...(b.cardLinkedin === true ? { cardLinkedin: true } : {}),
     overall: typeof b.overall === "number" && Number.isFinite(b.overall) ? b.overall : null,
     sources,
     avatarUrl: typeof b.avatarUrl === "string" && b.avatarUrl ? b.avatarUrl : null,
