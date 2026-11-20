@@ -256,19 +256,17 @@ describe("ce que l'entrée d'office ne fait pas", () => {
     expect(ctx.store.listEvents("band_join")).toHaveLength(1);
   });
 
-  it("une fiche née d'une dénonciation n'entre pas tant qu'elle n'est pas revendiquée", async () => {
+  it("une fiche née d'une dénonciation entre dès sa sortie, comme les autres (§18.119)", async () => {
     const ctx = setup();
     const by = await make(ctx, { login: "sans-boite" });
     const tip = await make(ctx, { login: "leamd", denouncedBy: by.id });
     expect(tip.status).toBe(202);
     expect(ctx.store.getCard(tip.id)!.denounceBorn).toBe(true);
-    expect(members(ctx.store)).toEqual([]);
-    // Même appelée à la main, l'entrée d'office la refuse.
-    expect(autoJoinBands(ctx.store, ctx.store.getCard(tip.id)!)).toEqual([]);
-    // Revendiquée par sa personne : elle entre.
-    ctx.store.claimOwner("leamd", 42);
-    expect(autoJoinBands(ctx.store, ctx.store.getCard(tip.id)!)).toEqual(["boite"]);
     expect(members(ctx.store)).toMatchObject([{ person: "gh:leamd", kind: "boite", band: "qonto", card: tip.id }]);
+    // Revendiquée par sa personne : rien de plus, elle y est déjà.
+    ctx.store.claimOwner("leamd", 42);
+    expect(autoJoinBands(ctx.store, ctx.store.getCard(tip.id)!)).toEqual([]);
+    expect(members(ctx.store)).toHaveLength(1);
   });
 
   it("une fiche sans lecture IA, expirée ou masquée n'entre jamais", () => {

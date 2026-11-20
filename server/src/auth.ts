@@ -410,8 +410,8 @@ export function mountAuth(app: Hono, o: AuthRoutesOptions) {
     await o.removeDuels?.(o.store.idsForLogin(user.login));
     // La cible d'une dénonciation a appelé son avocat (§18.6).
     if (row?.denouncedBy) o.store.recordEvent("denounce_claimed", row.id);
-    // La fiche revendiquée entre d'office dans la bande de son école et de sa boîte (§18.82) : une
-    // fiche née d'une dénonciation attendait sa personne. Rien pour une fiche masquée ou sans lecture IA.
+    // La fiche revendiquée entre d'office dans la bande de son école et de sa boîte (§18.82), si elle
+    // n'y est pas déjà (une dénonciation y entre dès sa sortie, §18.119). Rien pour une fiche masquée ou sans lecture IA.
     if (row) autoJoinBands(o.store, row);
     if (row) o.onClaimed?.(row, user.login);
     setCookie(c, SESSION_COOKIE, signSession(cfg.sessionSecret, owner), { ...cookieBase, path: "/", maxAge: SESSION_TTL_MS / 1000 });

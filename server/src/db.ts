@@ -529,7 +529,7 @@ export class Store {
     this.db
       .prepare(`UPDATE cards SET denounced_by = ?, denouncer_login = ?, denounce_born = ? WHERE id = ? AND denounced_by IS NULL`)
       .run(byCardId, byLogin ? byLogin.toLowerCase() : null, born ? 1 : 0, id);
-    // Une fiche née d'une dénonciation sort du top tant que son login n'est pas revendiqué (top.ts).
+    // Son statut change la ligne de classement (son LinkedIn, top.ts) : le classement gardé est oublié.
     forgetWeekRanks(this.db);
   }
 

@@ -938,10 +938,15 @@ export function createApp(opts: AppOptions) {
         });
       }
       linkGithub(id);
-      // L'entrée d'office dans les bandes (§18.82), dès que la fiche est posée : seulement pour une
-      // fiche que sa personne fait elle-même (elle reçoit le jeton), jamais pour une dénonciation,
-      // et sans rien prendre à la limite par IP des entrées à la main.
-      if (!denounce) {
+      // L'entrée d'office dans les bandes (§18.82), dès que la fiche est posée, sans rien prendre à
+      // la limite par IP des entrées à la main. Une dénonciation y entre aussi (§18.119), sans le reste :
+      // ni proposition, ni fiche complétée, ni photo.
+      if (denounce) {
+        void pipeline.wait(id).then(() => {
+          const row = store.getCard(id);
+          if (row) autoJoinBands(store, row);
+        });
+      } else {
         // « Oui » à la proposition de sa fiche (§18.100) : le lien qu'elle confirme va au registre de l'App (§18.95).
         const offered = completed ? openProposal(store.db, completed.id) : null;
         const said =

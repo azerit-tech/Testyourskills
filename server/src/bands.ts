@@ -9,15 +9,15 @@
 // personne entre dans la bande de l'école lue sur son profil (LinkedIn, CV) et
 // dans celle de son employeur actuel (LinkedIn, sinon CV, sinon le champ
 // « company » du profil GitHub), si le nom passe les mêmes contrôles qu'un nom
-// tapé. Elle ne vaut que pour une fiche faite par sa personne (le navigateur qui
-// l'a créée tient son jeton) ; une fiche née d'une dénonciation n'entre qu'à la
-// revendication (auth.ts). Elle ne remplace jamais une bande déjà tenue, ne
+// tapé. Une fiche née d'une dénonciation y entre aussi, dès qu'elle sort, comme
+// toute autre fiche (§18.119) ; la revendication la relance (auth.ts). Elle ne remplace jamais une bande déjà tenue, ne
 // rouvre pas une ligue quittée (band_optouts), et ne prend rien à la limite par
 // IP. Un dossier à deux pièces est une seule personne : la nouvelle fiche reprend
 // l'entrée de la pièce qu'elle complète, avec les étoiles du dossier.
 //
 // À la main : seul le navigateur qui a créé la fiche (son jeton) ou la personne
-// connectée comme propriétaire change de bande ou en sort ; trois entrées par
+// connectée comme propriétaire change de bande ou en sort (une fiche née d'une
+// dénonciation : sa personne, une fois revendiquée) ; trois entrées par
 // jour et par IP, l'entrée d'office non comptée.
 //
 // Le score d'une bande : la somme des étoiles de ses vingt meilleurs dossiers. À
@@ -29,8 +29,9 @@
 // Le rang d'école du barème n'apparaît nulle part ici. Sur la page d'une bande,
 // chaque membre est la vraie personne (§18.88) : le nom de sa fiche (le @pseudo
 // d'une fiche GitHub sans nom), sa photo ou ses initiales, son profil criminel,
-// ses étoiles, et le lien vers sa fiche. Reste anonyme une fiche née d'une
-// dénonciation tant qu'elle n'est pas revendiquée ; un pseudo masqué n'y est pas.
+// ses étoiles, et le lien vers sa fiche, une fiche née d'une dénonciation comprise
+// (§18.119 ; son LinkedIn attend qu'elle soit revendiquée, §18.108) ; un pseudo
+// masqué n'y est pas.
 //
 // Le nom d'une boîte hors alias vient de son premier membre (tapé, ou lu sur son
 // profil) : refusé s'il porte une insulte, une adresse, un @ ou un numéro,
@@ -73,6 +74,7 @@ import { starsFor } from "../../shared/types";
 import { frTypo } from "../../shared/typo";
 import type { CardRow, Store } from "./db";
 import { clientIp, type RateLimiter } from "./ratelimit";
+import { boardLinkedin } from "./top";
 
 /** Id d'une fiche (pipeline.ts, ID_RE), recopié : db.ts importe ce module, qui ne doit pas importer le pipeline. */
 const ID_RE = /^[A-Za-z0-9]{6,32}$/;
@@ -91,7 +93,7 @@ const f = (fr: string, en: string): Fact => ({ fr: frTypo(fr), en });
 
 export const BAND_MESSAGES = {
   forbidden: f("Seule la personne fichée fait entrer sa fiche dans une bande.", "Only the person on file can put their sheet in a crew."),
-  denounced: f("Une fiche née d'une dénonciation entre dans une bande une fois revendiquée.", "A sheet born from a tip-off joins a crew once it's claimed."),
+  denounced: f("Une fiche faite par quelqu'un d'autre change de bande une fois revendiquée.", "A sheet someone else made changes crew once it's claimed."),
   degraded: f("Cette fiche est sortie sans que le code soit lu. Refais-la pour rejoindre une bande.", "This sheet came out without the code being read. Make it again to join a crew."),
   notBand: f("Pas une bande. Donne le nom de ta boîte.", "Not a crew. Give your company's name."),
   unknownSchool: f("Choisis une école de la liste.", "Pick a school from the list."),
@@ -297,8 +299,7 @@ export function bandsTop(db: Database.Database, now = Date.now(), mine: Partial<
 
 /**
  * Les membres d'une bande, du plus étoilé au moins étoilé : la personne de chaque
- * fiche (§18.88), sauf une fiche née d'une dénonciation et pas encore revendiquée,
- * qui garde son profil et ses étoiles sans nom, sans visage et sans lien.
+ * fiche (§18.88), une fiche née d'une dénonciation comprise (§18.119).
  */
 function bandMembers(store: Store, type: BandType, id: string, now: number): BandMember[] {
   const rows = store.db
@@ -318,12 +319,19 @@ function bandMembers(store: Store, type: BandType, id: string, now: number): Ban
     const profile = card?.profile?.label ?? null;
     // Le poste, déjà sur la fiche publique : deux dossiers du même profil ne se lisent plus comme un doublon.
     const position = card?.position;
-    // Faite par un tiers pour dénoncer et pas encore revendiquée : la personne n'a rien demandé, rien ne la nomme.
     const root = row ? rootOf(store, row) : null;
     const login = r.login ?? (root ? store.loginOf(root) : null);
-    const shown = !!card && !!root && (!root.denounceBorn || (!!login && !!store.getOwner(login)));
-    // Son LinkedIn (§18.108) : la ligne montrée est celle d'une fiche faite ou revendiquée par sa personne.
-    return { stars: r.stars, profile, ...(position ? { position } : {}), ...(shown ? boardPerson(card, r.cardId, login, linkedinOf(root)) : {}) };
+    // Son LinkedIn (§18.108) : pas pour une fiche née d'une dénonciation et pas encore revendiquée.
+    const linkedinUrl = root
+      ? boardLinkedin(store.db, {
+          login,
+          linkedinUrl: linkedinOf(root),
+          denounceBorn: root.denounceBorn,
+          kind: root.kind,
+          githubPieceId: root.kind === "comparison" ? (root.data as ComparisonData).github?.id : null,
+        })
+      : null;
+    return { stars: r.stars, profile, ...(position ? { position } : {}), ...(card && root ? boardPerson(card, r.cardId, login, linkedinUrl) : {}) };
   });
 }
 
@@ -493,8 +501,8 @@ export interface AutoJoinOptions {
  * l'école lue sur son profil et dans celle de son employeur actuel. Rend les
  * ligues où elle vient d'entrer.
  *
- * - Jamais pour une fiche sans lecture IA, expirée, masquée, ni pour une fiche née
- *   d'une dénonciation tant qu'elle n'est pas revendiquée.
+ * - Jamais pour une fiche sans lecture IA, expirée ou masquée. Une fiche née d'une
+ *   dénonciation entre comme les autres (§18.119).
  * - Une ligue déjà tenue n'est pas remplacée : la fiche neuve y rapporte seulement
  *   ses étoiles (celles du dossier pour deux pièces ; une pièce seule ne prend pas
  *   la place d'un dossier qui compte encore).
@@ -507,7 +515,6 @@ export function autoJoinBands(store: Store, row: CardRow, o: AutoJoinOptions = {
   if (!counts(root, now)) return [];
   const login = store.loginOf(root);
   if (login && store.isHidden(login)) return [];
-  if (root.denounceBorn && !(login && store.getOwner(login))) return [];
 
   const key = personKey(store, root);
   const from = o.from ? rootOf(store, o.from) : null;
