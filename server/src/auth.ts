@@ -65,6 +65,10 @@ export const GH_SOCIAL_URL = "https://api.github.com/user/social_accounts";
 export interface GithubSelf {
   name: string | null;
   company: string | null;
+  /** Sa ville, son site, sa bio : ce qui départage les homonymes de son LinkedIn (§18.124). */
+  location?: string | null;
+  blog?: string | null;
+  bio?: string | null;
   /** Un LinkedIn sur son GitHub (site, bio, comptes sociaux) : la fiche le trouvera d'elle-même. */
   linkedinShown: boolean;
 }
@@ -225,7 +229,7 @@ export async function fetchGithubUser(
     signal: AbortSignal.timeout(API_TIMEOUT_MS),
   });
   if (!userRes.ok) throw new ClaimError(`GET /user : HTTP ${userRes.status}`);
-  const user = (await userRes.json()) as { login?: unknown; id?: unknown; name?: unknown; company?: unknown; blog?: unknown; bio?: unknown };
+  const user = (await userRes.json()) as { login?: unknown; id?: unknown; name?: unknown; company?: unknown; blog?: unknown; bio?: unknown; location?: unknown };
   if (typeof user.login !== "string" || !LOGIN_RE.test(user.login)) throw new ClaimError("GET /user : login invalide");
   if (typeof user.id !== "number" || !Number.isSafeInteger(user.id) || user.id <= 0) throw new ClaimError("GET /user : id invalide");
   const owner = { login: user.login.toLowerCase(), githubId: user.id };
@@ -243,7 +247,7 @@ export async function fetchGithubUser(
       .catch(() => []);
     linkedinShown = Array.isArray(social) && social.some((a) => shows((a as { url?: unknown } | null)?.url));
   }
-  return { ...owner, self: { name: str(user.name), company: str(user.company), linkedinShown } };
+  return { ...owner, self: { name: str(user.name), company: str(user.company), location: str(user.location), blog: str(user.blog), bio: str(user.bio), linkedinShown } };
 }
 
 // --- Routes -----------------------------------------------------------------

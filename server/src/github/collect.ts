@@ -57,6 +57,7 @@ interface RestUser {
   bio: string | null;
   blog?: string | null;
   company: string | null;
+  location?: string | null;
   followers: number;
   created_at: string;
   public_repos: number;
@@ -403,6 +404,8 @@ function profileOf(u: RestUser, social: unknown, defaultAvatar: boolean): Github
     blog: u.blog || null,
     socialAccounts,
     company: u.company,
+    // Sa ville : ce qui départage les homonymes de son LinkedIn (§18.124).
+    location: typeof u.location === "string" && u.location.trim() ? u.location.trim().slice(0, 120) : null,
     followers: u.followers,
     createdAt: u.created_at,
     publicRepos: u.public_repos,

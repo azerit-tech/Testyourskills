@@ -32,6 +32,12 @@ export interface LinkedinCandidate {
   photoUrl?: string;
   /** Concordance avec la personne cherchée, de 0 à 1 (webSearch.ts, `scoreHit`) ; absente d'une saisie en cours. */
   score?: number;
+  /** Le lieu que l'index en donne (« Gif-sur-Yvette, Île-de-France, France »), s'il le donne. */
+  location?: string;
+  /** Le titre de l'index ne nomme que le lieu (« Nom - Lieu | Professional Profile ») : aucun poste. */
+  placeOnly?: boolean;
+  /** L'extrait de l'index (nom exact seulement) : l'école, l'employeur, le lieu qu'il nomme. */
+  snippet?: string;
 }
 
 export const DEFAULT_DAILY_SEARCHES = 2000;
@@ -68,6 +74,8 @@ export interface SearchOptions {
   strict?: boolean;
   /** Avec un nom exact : l'employeur, qui départage les homonymes. */
   company?: string | null;
+  /** Avec un nom exact : une requête, le nom seul, dont l'appelant juge les extraits (§18.124). */
+  nameOnly?: boolean;
   /** Une saisie en cours : le mot-clé tapé après le nom (« criteo », §18.112). */
   context?: string;
   signal?: AbortSignal;
@@ -144,7 +152,8 @@ export function mergeCandidates(first: LinkedinCandidate[], then: LinkedinCandid
     const w = web.get(k);
     const photoUrl = c.photoUrl ?? w?.photoUrl;
     const score = c.score ?? w?.score;
-    out.push({ ...c, headline: c.headline || w?.headline || "", ...(photoUrl ? { photoUrl } : {}), ...(score !== undefined ? { score } : {}) });
+    const extra = { ...(w?.location && !c.location ? { location: w.location } : {}), ...(w?.snippet && !c.snippet ? { snippet: w.snippet } : {}) };
+    out.push({ ...c, headline: c.headline || w?.headline || "", ...(photoUrl ? { photoUrl } : {}), ...(score !== undefined ? { score } : {}), ...extra });
   }
   for (const c of then) {
     const k = key(c);
@@ -201,13 +210,15 @@ export class LinkedinSearch implements LinkedinPeople {
   }
 
   private keyOf(name: PersonName, opts: SearchOptions, context = ""): string {
+    if (opts.strict && opts.nameOnly) return `g:${name.key}`;
     const company = opts.strict ? (opts.company ?? "").trim().toLowerCase() : "";
     // L'employeur vient d'un email vérifié : dans la clé, son empreinte seulement.
     return `${opts.strict ? "s" : "n"}:${name.key}${company ? `:${createHash("sha256").update(company).digest("hex").slice(0, 16)}` : ""}${context ? `|${context}` : ""}`;
   }
 
   private async search(name: PersonName, opts: SearchOptions, context = ""): Promise<SearchResult> {
-    const company = opts.strict ? (opts.company ?? "").trim().toLowerCase() : "";
+    const nameOnly = !!opts.strict && !!opts.nameOnly;
+    const company = opts.strict && !nameOnly ? (opts.company ?? "").trim().toLowerCase() : "";
     const key = this.keyOf(name, opts, context);
     const hit = this.opts.cache.getSearch<LinkedinCandidate>(key, this.now());
     if (hit) return { status: "ok", results: hit };
@@ -217,7 +228,7 @@ export class LinkedinSearch implements LinkedinPeople {
     if (!this.take(opts)) return { status: "off" };
     const flight = (async (): Promise<SearchResult> => {
       try {
-        const results = rankCandidates(name.full, await this.opts.provider.searchByName(name, { strict: !!opts.strict, company: company || null, context: context || null, signal: opts.signal }));
+        const results = rankCandidates(name.full, await this.opts.provider.searchByName(name, { strict: !!opts.strict, ...(nameOnly ? { nameOnly } : {}), company: company || null, context: context || null, signal: opts.signal }));
         this.opts.cache.putSearch(key, results, this.now());
         return { status: "ok", results };
       } catch (err) {

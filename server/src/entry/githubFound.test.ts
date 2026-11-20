@@ -40,7 +40,7 @@ describe("son LinkedIn trouvé avant le jugement", () => {
     const gh = await githubIn(ctx);
     const { body, jar } = await exchange(ctx, gh.jar);
     expect(body).toEqual({ signedIn: true, login: "camille-dev", found: { url: URL_LI, name: "Camille Ardent", headline: "Dev chez Ardent" } });
-    expect(finder).toHaveBeenCalledWith({ login: "camille-dev", name: "Camille Ardent", company: null }, expect.anything());
+    expect(finder).toHaveBeenCalledWith({ login: "camille-dev", name: "Camille Ardent", company: null, location: null, blog: null, bio: null }, expect.anything());
     const card = await postCard(ctx, { login: body.login, linkedin: URL_LI }, jar);
     expect(rows(ctx)[0]!.card_id).toBe(card.json.id);
     expect(registry.recordLink).toHaveBeenCalledWith({ login: "camille-dev", url: URL_LI, strength: 1, step: "proposition_oui" });

@@ -2923,3 +2923,48 @@ Jacques : « Ce n'est pas clair ce que veut dire le score : il faut que ce soit 
 - **Textes** : le partage LinkedIn et X, la ligne « Ta fiche : ★★★★★☆ 79 %. », l'annonce de la fiche posée et la description Open Graph (« Fiche ★★★★★☆, score de 79 % ») passent au « % ».
 - **Inchangé** : le dessin de la fiche (recto « 82 », verso « = 79/100 ») et l'image de partage rendue par le serveur ; « Comment c'est noté » garde « sur 100 ». Le film ne montre pas la note ; l'ancien ascenseur (hors révélation par défaut) garde son nombre seul.
 - **Vérifié** : `cardPage.test.ts` (phrase FR et EN, à qui l'a faite et au visiteur, avant la fiche, rien sur une fiche scellée), `i18n.test.ts`, `shareText.test.ts`, `duel.test.ts`, `homeBoards.test.ts`, `profileLinks.test.ts`, `home.test.ts`, `html.test.ts`, `app.test.ts`, `tsc -b` et `vite build` verts ; capture 390 × 844 de la fiche en démo.
+
+### 18.124 Le LinkedIn d'un GitHub : trouvé par le nom, jugé comme l'App, attaché quand c'est sûr (20 novembre 2026, branche `site/linkedin-depuis-github`)
+
+Jacques : « https://github.com/Hennzau : comment ça se fait qu'on n'a pas trouvé son LinkedIn ? Normalement on a des outils pour ça, si on regarde dans App. » Son GitHub dit « Enzo Le Van », « CentraleSupélec / Linköping University », « Gif-sur-Yvette - France » ; la recherche par nom rend `linkedin.com/in/enzo-le-van`, « Gif-sur-Yvette, Île-de-France ». Deux causes. La requête collait l'école au nom, et Brave rend alors une page vide. Puis la règle du §18.121 exigeait l'entreprise dans le titre : le profil n'était que proposé, et seulement à qui avait fait la fiche. Ce paragraphe complète les §18.100, §18.113 et §18.121 ; il ne touche ni au barème, ni aux bandes.
+
+- **Une requête** (`match/linkedin.ts`) : `site:linkedin.com/in "Nom"`, le nom seul, en cache un jour (clé `g:`), sous la limite de l'IP des recherches par nom. On garde, de chaque résultat, le titre, le lieu (« Nom - Lieu | Professional Profile », ou « Location: … ») et l'extrait.
+- **Le jugement**, repris de `linkedin_discover.py` (App) :
+  - **Fort** : le nom complet est exactement le sien (accents, casse et tirets près). Parmi les profils à ce nom, c'est le seul qui remplit, dans l'ordre :
+    1. son école ou son employeur dans le titre ou l'extrait (`company` coupé aux `/`, les `@org` de la bio) ;
+    2. sinon sa ville (les pays et grandes régions ne comptent pas : « France » ne contredit pas Paris) ;
+    3. sinon son pseudo ou son site dans l'adresse (pas quand c'est son nom même) ;
+    4. sinon le seul à ce nom, si son lieu ne contredit pas celui du GitHub.
+  - **À vérifier** : plusieurs profils à ce nom que rien ne départage, et un employeur ou une école sur le GitHub. Le premier profil qui n'affiche aucun poste est lu une fois (lecture payée, en cache, sous la limite de l'IP). Ses employeurs et ses écoles tranchent : attaché ou rien.
+  - **Moyen** : le seul à ce nom dans une autre ville, ou le seul d'un nom voisin. Il est proposé sous la fiche : « C'est ton LinkedIn ? ».
+  - **Faible** : rien.
+- **Les trois portes** :
+  - **la fiche GitHub faite pour soi** (avant : une proposition seulement) ;
+  - **la dénonciation par GitHub** (§18.121) ;
+  - **l'entrée « Se connecter avec GitHub »** (§18.113). Ici, aucune lecture payée avant le jugement ; un lien fort laissé valider rend le dossier prouvé (`linkedinMatch`, posé par le serveur seul).
+
+  Fort, le dossier LinkedIn + GitHub sort prouvé (`linkedinProof: "match"`) et entre au top. La recherche tourne pendant la collecte GitHub. La ville vient maintenant de GitHub (`location`, faits et GET /user).
+- **Rattrapage** (`ops/rattrapage-linkedin-github.ts`, logique `rattrapageLinkedin.ts`). Il prend les fiches GitHub seules du top de la semaine (50 premières, `--top N`), avec une recherche par fiche. À blanc par défaut ; `--oui` fait, pour chaque lien fort, ce que fait « Ajoute ton LinkedIn » :
+  - le pipeline calcule le dossier, avec `linkedinMatch` ;
+  - le dossier remplace la fiche (`completedBy`) ;
+  - le dossier suit les bandes de la fiche.
+
+  Idempotent.
+- **Mesuré** (Brave, clés locales, cache neuf, 20 novembre) :
+
+  | Compte | Trouvé | Pourquoi | Durée |
+  |---|---|---|---|
+  | @Hennzau | `enzo-le-van`, fort | la ville | 0,76 s |
+  | @PABannier | `pierre-antoine-bannier`, fort | nom rare | 0,27 s |
+  | @Axl-Lvy | `axel-levy-212a0818b`, fort | ActiveViam | 0,28 s |
+  | @allan-simon | `allan-simon-793b766b`, fort | Paris, seul sur dix homonymes | 0,31 s |
+  | @cmnemoi | `madi-mnemoi-charles-meldhine-python`, fort | Paris | 0,31 s |
+  | @whispem | rien | pas de nom complet sur GitHub (« Em' ») | 0 s |
+- **Vérifié** : `match/linkedin.test.ts` couvre :
+  - Hennzau, fort par le nom et la ville ;
+  - un nom courant dans d'autres villes : rien ; seul mais ailleurs : moyen ;
+  - l'école dans le titre ou l'extrait ;
+  - à vérifier ;
+  - le pseudo.
+
+  `denounceMatch.test.ts` couvre la fiche pour soi (forte, moyenne, à vérifier) et `linkedinMatch` ; `rattrapageLinkedin.test.ts` couvre le rattrapage. Les suites `entry`, `proposal`, `linkedinProfile` et `github` passent aussi, avec `tsc -b` et `vite build`. **Pas vérifié** : la production, le rattrapage sur la vraie base, la lecture « à vérifier » avec un vrai profil.

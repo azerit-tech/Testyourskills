@@ -287,14 +287,21 @@ export function candidateFromHit(hit: SearchHit): LinkedinCandidate | null {
   const name = (cut < 0 ? title : title.slice(0, cut)).trim();
   if (!name || name.length > 80 || !/\p{L}/u.test(name)) return null;
   let headline = cut < 0 ? "" : title.slice(cut).replace(TITLE_SPLIT_RE, "").trim();
+  // « Nom - Gif-sur-Yvette, Île-de-France, France | Professional Profile » : ce qui suit le nom est le lieu.
+  const placeOnly = PLACE_TITLE_RE.test(headline);
+  if (placeOnly) headline = headline.replace(PLACE_TITLE_RE, "").trim();
   if (!/[\p{L}\p{N}]/u.test(headline)) headline = "";
+  const d = plain(hit.description);
   if (!headline) {
-    const d = plain(hit.description);
     const parts = [FIELD_RE("Exp[ée]rience").exec(d)?.[1], FIELD_RE("(?:Location|Lieu)").exec(d)?.[1]].flatMap((x) => (x ? [x.trim()] : []));
     headline = parts.join(" · ");
   }
-  return { url, name, headline: headline.slice(0, 220) };
+  const location = (placeOnly ? headline : "") || FIELD_RE("(?:Location|Lieu)").exec(d)?.[1]?.trim() || "";
+  return { url, name, headline: headline.slice(0, 220), ...(location ? { location: location.slice(0, 120) } : {}), ...(placeOnly ? { placeOnly: true } : {}) };
 }
+
+/** Le titre d'un profil sans poste : « Nom - Lieu | Professional Profile ». */
+const PLACE_TITLE_RE = /\s*\|\s*(?:Professional Profile|Profil professionnel|Perfil profesional|Berufsprofil)\s*$/i;
 
 /** Une saisie en cours : chaque mot tapé commence un mot du nom ou de l'adresse (« jac moug » → Jacques Mougeot). */
 export function typedMatches(typed: string, c: LinkedinCandidate): boolean {
@@ -313,6 +320,12 @@ export interface WebPeopleSearchOptions {
 export interface PeopleQuery {
   /** Prénom et nom exacts (retour d'une connexion) ; sinon une saisie en cours. */
   strict: boolean;
+  /**
+   * Avec un nom exact : une seule requête, le nom seul (`site:linkedin.com/in "Nom"`), dont
+   * l'appelant juge lui-même les extraits (le LinkedIn d'un GitHub, §18.124). Mesuré : une
+   * école de plusieurs mots ajoutée au nom vide la page de Brave.
+   */
+  nameOnly?: boolean;
   /** Ce qui départage les homonymes : l'employeur (le domaine de l'email vérifié, le champ de GitHub). */
   company?: string | null;
   location?: string | null;
@@ -372,9 +385,9 @@ export class WebPeopleSearch implements PeopleSearchProvider {
       const hits = await this.hits(typedQuery(name.full, q.context), false, q.signal);
       return unique(hits.flatMap((h) => candidateFromHit(h) ?? []).filter((c) => typedMatches(name.full, c)));
     }
-    const who: Wanted = { name: name.full, company: q.company, location: q.location };
+    const who: Wanted = { name: name.full, company: q.nameOnly ? null : q.company, location: q.nameOnly ? null : q.location };
     const best = new Map<string, LinkedinCandidate & { score: number }>();
-    for (const query of buildQueries(who)) {
+    for (const query of q.nameOnly ? [`site:linkedin.com/in "${quoted(name.full)}"`] : buildQueries(who)) {
       for (const hit of await this.hits(query, true, q.signal)) {
         const c = candidateFromHit(hit);
         const { score } = scoreHit(who, hit);
@@ -382,7 +395,9 @@ export class WebPeopleSearch implements PeopleSearchProvider {
         // Le nom doit être celui du profil (son titre ou son adresse), pas un nom cité dans l'extrait d'un autre.
         if (!samePublicFullName(name.full, c.name) && !nameInUrl(name.full, c.url)) continue;
         const prev = best.get(c.url);
-        if (!prev || score > prev.score) best.set(c.url, { ...c, score });
+        // L'extrait, pour qui juge lui-même (§18.124) : l'école, l'employeur, le lieu qu'il nomme.
+        const snippet = plain(hit.description).slice(0, 300);
+        if (!prev || score > prev.score) best.set(c.url, { ...c, score, ...(snippet ? { snippet } : {}) });
       }
       // Le nom et l'employeur concordent déjà : la requête plus large n'apprendrait rien.
       if ([...best.values()].some((c) => confidenceFor(c.score) === "high")) break;

@@ -150,7 +150,7 @@ describe("une fiche GitHub seule : « C'est ton LinkedIn ? »", () => {
   it("cherché quand rien n'a donné le LinkedIn, rendu à sa personne", async () => {
     const { ctx, asked } = setup();
     const { json } = await postCard(ctx, { login: "camille-dev" });
-    expect(asked.linkedin).toEqual([{ login: "camille-dev", name: null, company: null }]);
+    expect(asked.linkedin).toEqual([{ login: "camille-dev", name: null, company: null, location: null, blog: null, bio: null }]);
     expect(proposeOf(await state(ctx, json.id, json.deleteToken))).toEqual(LI);
     expect(proposeOf(await state(ctx, json.id))).toBeNull();
   });

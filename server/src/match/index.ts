@@ -7,7 +7,7 @@ import type { LinkedinPeople } from "../linkedinProfile/search";
 import type { PipelineOptions } from "../pipeline";
 import type { RegistryPort } from "../registry/index";
 import { fetchGithubAccounts, findGithubFor } from "./github";
-import { findLinkedinFor } from "./linkedin";
+import { matchLinkedinFor } from "./linkedin";
 
 export function realProposers(o: { github: GithubAuth; registry?: RegistryPort; linkedinProfiles?: LinkedinFinder; linkedinPeople?: LinkedinPeople }): NonNullable<PipelineOptions["propose"]> {
   const { registry, linkedinPeople } = o;
@@ -18,7 +18,7 @@ export function realProposers(o: { github: GithubAuth; registry?: RegistryPort; 
     // Sans lecture de profils, « Ajoute ton LinkedIn » n'existe pas : rien à proposer.
     linkedin: o.linkedinProfiles
       ? (gh, x) =>
-          findLinkedinFor(
+          matchLinkedinFor(
             {
               namesakes: registry ? (name) => registry.namesakes(name) : undefined,
               byName: linkedinPeople ? (name, q) => linkedinPeople.byName(name, q) : undefined,
