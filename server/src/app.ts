@@ -1102,7 +1102,12 @@ export function createApp(opts: AppOptions) {
   mountPrimePages(app, { store, season, baseUrl, ogDir, render: (input) => deps.renderImage(input), indexHtml: opts.indexHtml });
 
   // Les deux portes sans rien coller (§18.80) : les suggestions du champ « Ton nom ».
-  mountLinkedinSearch(app, { people: opts.linkedinProfiles ? opts.linkedinPeople : undefined, limiter });
+  mountLinkedinSearch(app, {
+    people: opts.linkedinProfiles ? opts.linkedinPeople : undefined,
+    // Les profils de l'App d'abord sous le champ (§18.96), seulement là où le web en propose aussi.
+    namesakes: opts.registry && opts.linkedinProfiles && opts.linkedinPeople ? (typed) => opts.registry!.namesakes(typed, { partial: true }) : undefined,
+    limiter,
+  });
   // Et celles du champ « Ton nom ou pseudo » : les comptes GitHub, cherchés avec les jetons du serveur.
   mountGithubSearch(app, { auth: opts.githubPool ?? opts.githubToken, limiter, search: opts.githubUserSearch });
 
