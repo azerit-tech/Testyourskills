@@ -32,10 +32,10 @@ export { profileToText, asLinkedinCard, asLinkedinComparison } from "./text";
 
 export const DEFAULT_DAILY_PROFILES = 300;
 /**
- * Lectures payées par IP et par jour (une fiche en fait au plus deux) : dix dénonciations (§18.114),
+ * Lectures payées par IP et par jour (une fiche en fait au plus deux) : cinquante dénonciations (§18.114),
  * sa fiche, une reprise et la lecture d'avance y tiennent. Un profil déjà au cache ne compte pas.
  */
-export const PAID_CALLS_PER_IP = 40;
+export const PAID_CALLS_PER_IP = 60;
 
 export interface LookupOptions {
   /** Prend une unité de la limite par IP juste avant une lecture payante ; false : refusé. */

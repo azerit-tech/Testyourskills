@@ -329,7 +329,7 @@ describe("POST /api/card avec denouncedBy", () => {
     const over = await post(ctx, { login: "suspect-de-trop", denouncedBy: mine.json.id }, nav);
     expect(over.status).toBe(429);
     expect(over.json.code).toBe("rate_limited");
-    expect(over.json.message?.fr).toMatch(/Dix dénonciations/);
+    expect(over.json.message?.fr).toMatch(/Cinquante dénonciations/);
     // Une autre IP peut encore dénoncer, et la même IP peut encore faire une fiche normale.
     expect((await post(ctx, { login: "suspect-autre-ip", denouncedBy: mine.json.id }, { "x-forwarded-for": "198.51.100.8", ...nav })).status).toBe(202);
     expect((await post(ctx, { login: "suspect-normal" }, nav)).status).toBe(202);
