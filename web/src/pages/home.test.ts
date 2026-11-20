@@ -117,7 +117,7 @@ describe("l'accueil de qui a déjà sa fiche (§18.89)", () => {
   it("la fiche illisible (réseau) : la ligne de sa note, et le bouton", () => {
     const html = render(createElement(MineCard, { mine, card: null }));
     expect(html).not.toContain("home-stage");
-    expect(html).toContain("68/100.");
+    expect(html).toContain("68\u00a0%.");
     expect(html).toMatch(/<a class="pill pill-big home-see" href="\/c\/Card000001">Voir ma fiche<\/a>/);
   });
 

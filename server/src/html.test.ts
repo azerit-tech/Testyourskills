@@ -142,10 +142,10 @@ describe("la langue des balises d'une page sans fiche", () => {
 });
 
 describe("l'aperçu d'une fiche : la note avec son échelle, sans chaîne de points médians", () => {
-  it("« Fiche ★★★★★☆, 79/100 » ; le titre sépare le profil par une virgule", () => {
+  it("« Fiche ★★★★★☆, score de 79 % » ; le titre sépare le profil par une virgule", () => {
     for (const lang of ["fr", "en"] as const) {
       const m = metaFor({ ...FIXTURES.gold, lang }, "https://s.test");
-      expect(m.imageAlt).toContain(`${FIXTURES.gold.overall}/100`);
+      expect(m.imageAlt).toContain(lang === "fr" ? `score de ${FIXTURES.gold.overall}\u00a0%` : `scores ${FIXTURES.gold.overall}%`);
       expect(m.title).not.toContain("·");
       expect(m.title).toContain(`, ${FIXTURES.gold.profile!.label[lang]}`);
       expect(`${m.title} ${m.description} ${m.imageAlt}`).not.toMatch(/Testyourskills|Make yours|\bgrid\b|\bproof\b/);

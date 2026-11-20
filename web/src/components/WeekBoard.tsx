@@ -16,8 +16,18 @@ import { ProfileLinks } from "./ProfileLinks";
 import { Stars } from "./Stars";
 
 const SIZE = 10;
-/** L'échelle des notes, dite une fois en tête du tableau (§18.48 : toute note a son échelle). */
-export const SCALE = "/100";
+/** L'en-tête de la colonne des notes (§18.48 : toute note a son échelle) ; chaque note porte son « % » (§18.122). */
+export const SCALE = "Score";
+
+/** Une note du tableau : « 82 % », le signe plus petit et collé, pour tenir dans la colonne à 390 px (§18.122). */
+export function BoardScore({ n }: { n: number }) {
+  return (
+    <span className="board-score">
+      {n}
+      <span className="board-pct">%</span>
+    </span>
+  );
+}
 /** L'ancre du tableau : le rang de la semaine d'une fiche y mène (« /#semaine »). */
 export const WEEK_ANCHOR = "semaine";
 
@@ -47,7 +57,7 @@ function Row({ e, me }: { e: TopEntry; me: boolean }) {
         <Avatar login={e.login} src={e.avatarUrl ?? ""} initials={e.initials} />
         <span className="board-login">{who}</span>
         <Stars n={e.stars} size={14} />
-        <span className="board-score">{e.overall}</span>
+        <BoardScore n={e.overall} />
       </a>
       {/* Ses profils LinkedIn et GitHub (§18.108), au bout de la ligne, hors du lien vers sa fiche. */}
       <ProfileLinks links={personLinks(e)} who={who} />

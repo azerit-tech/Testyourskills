@@ -19,7 +19,7 @@ export function ReturnCall({ mine, onAnother, onSignOut }: { mine: MyCard; onAno
     <div className="home-return">
       <p className="home-back">
         <span>
-          {b.mine} <Stars n={stars} label={t.plea.count(stars)} /> {mine.overall}/100.
+          {b.mine} <Stars n={stars} label={t.plea.count(stars)} /> {t.result.score.pct(mine.overall)}.
         </span>
       </p>
       <a className="pill pill-big home-see" href={href} onClick={(e) => onLinkClick(e, href)}>

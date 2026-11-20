@@ -45,11 +45,11 @@ export function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]!);
 }
 
-/** « Fiche ★★★★★☆, 78/100 » / « ★★★★★☆ rap sheet, 78/100 » ; une spéciale ajoute son nom (§17.3). */
+/** « Fiche ★★★★★☆, score de 78 % » / « ★★★★★☆ rap sheet, scores 78% » ; une spéciale ajoute son nom (§17.3, §18.122). */
 export function cardLabel(card: Pick<CardData, "tier" | "special" | "overall">, lang: Lang): string {
   const stars = starsLine(starsFor(card.overall));
   const special = card.special ? ` ${SPECIAL_NAMES[lang][card.special]}` : "";
-  return lang === "fr" ? `Fiche ${stars}${special}, ${card.overall}/100` : `${stars}${special} rap sheet, ${card.overall}/100`;
+  return lang === "fr" ? `Fiche ${stars}${special}, score de ${card.overall} %` : `${stars}${special} rap sheet, scores ${card.overall}%`;
 }
 
 function isComparison(d: CardData | ComparisonData): d is ComparisonData {

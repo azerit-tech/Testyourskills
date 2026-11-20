@@ -90,10 +90,21 @@ describe("un seul nom, un seul lexique", () => {
   });
 
   it("la note porte son échelle dans les phrases qui la disent", () => {
-    expect(DICTS.fr.home.top.rowLabel(2, "leamd", 79)).toContain("79/100");
-    expect(DICTS.en.home.top.rowLabel(2, "leamd", 79)).toContain("79/100");
-    expect(DICTS.fr.result.share.words.sheet("★★★★★☆", "Menace publique", 79).replace(/ /g, " ")).toBe("Ma fiche de dev : ★★★★★☆ Menace publique, 79/100.");
-    expect(DICTS.en.result.share.words.file("★★★★★☆", "Public menace", 79)).toBe("My dev rap sheet, scored on Azerit's hiring scorecard: ★★★★★☆ Public menace, 79/100.");
+    expect(DICTS.fr.home.top.rowLabel(2, "leamd", 79)).toBe("Place 2\u00a0: leamd, score de 79\u00a0%");
+    expect(DICTS.en.home.top.rowLabel(2, "leamd", 79)).toBe("Spot 2: leamd, scores 79%");
+    expect(DICTS.fr.result.share.words.sheet("★★★★★☆", "Menace publique", 79).replace(/ /g, " ")).toBe("Ma fiche de dev : ★★★★★☆ Menace publique, 79 %.");
+    expect(DICTS.en.result.share.words.file("★★★★★☆", "Public menace", 79)).toBe("My dev rap sheet, scored on Azerit's hiring scorecard: ★★★★★☆ Public menace, 79%.");
+  });
+
+  it("le score dit en toutes lettres, au-dessus de la fiche (§18.122)", () => {
+    const fr = DICTS.fr.result.score;
+    const en = DICTS.en.result.score;
+    expect(`${fr.own} ${fr.pct(80)}`).toBe("Ton profil a un score de 80 %");
+    expect(`${fr.their} ${fr.pct(80)}`).toBe("Son profil a un score de 80 %");
+    expect(`${en.own} ${en.pct(80)}`).toBe("Your profile scores 80%");
+    expect(`${en.their} ${en.pct(80)}`).toBe("Their profile scores 80%");
+    expect(DICTS.fr.vs.line(82, 65, null, "")).toBe("82 % contre 65 % : égalité");
+    expect(DICTS.en.vs.line(82, 65, null, "")).toBe("82% vs 65%: dead heat");
   });
 });
 

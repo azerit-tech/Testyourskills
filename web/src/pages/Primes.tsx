@@ -18,7 +18,7 @@ import { useToast } from "../components/After";
 import { IconLinkedIn, IconShare } from "../components/Icons";
 import { PrimeCard, PrimeMark, PrimeTag, usePrimeWhen, withSup } from "../components/Primes";
 import { Stars } from "../components/Stars";
-import { SCALE } from "../components/WeekBoard";
+import { BoardScore, SCALE } from "../components/WeekBoard";
 import { pick, useT } from "../i18n";
 import { api, ApiError } from "../lib/api";
 import { primesApi, type JoinBody } from "../lib/primes";
@@ -94,7 +94,7 @@ function Row({ r, me }: { r: BoardRow; me: boolean }) {
         <Avatar login={r.login} />
         <span className="board-login">@{r.login}</span>
         <Stars n={r.stars} size={14} />
-        <span className="board-score">{r.overall}</span>
+        <BoardScore n={r.overall} />
       </a>
     </li>
   );

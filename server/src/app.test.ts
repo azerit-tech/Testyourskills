@@ -1137,7 +1137,7 @@ describe("page /c/:id et images", () => {
     expect(overall).toBeGreaterThanOrEqual(75);
     // Le nom du profil propre à la fiche (§18.107), tiré par son id.
     expect(html).toContain(`<meta property="og:title" content="@leamd est dans le viseur ★★★★★☆, ${aliasFor(FIXTURES.gold.profile!.id, id)!.fr}">`);
-    expect(html).toContain(`content="Fiche ★★★★★☆, ${overall}/100, fiche de dev de`);
+    expect(html).toContain(`content="Fiche ★★★★★☆, score de ${overall}\u00a0%, fiche de dev de`);
     expect(html).toContain(`<meta property="og:image" content="https://skills.test/og/${id}.png?v=11">`);
     expect(html).toContain(`<meta property="og:url" content="https://skills.test/c/${id}">`);
     expect(html).toContain(`<meta property="og:image:width" content="1200">`);
