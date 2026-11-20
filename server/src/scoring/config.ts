@@ -197,12 +197,26 @@ export interface OwnRow {
   anyRepo?: boolean;
 }
 
+/** Une ligne déclarée de la stack : technos rattachées à un poste ou une réalisation, dont tant de récentes. */
+export interface StkDeclaredRow {
+  score: number;
+  tied: number;
+  recent: number;
+}
+/** Une ligne déclarée de l'ownership : résultats datés et chiffrés, ou une entreprise fondée tenue tant de mois avec tant de résultats. */
+export interface OwnDeclaredRow {
+  score: number;
+  outcomes: number;
+  foundedMonths: number;
+  foundedOutcomes?: number;
+}
+
 /** Barème de recrutement (data/grid.json) : tables de niveaux, coefficients, familles, traces. */
 export interface GridConfig {
   weights: Record<CriterionCode, number>;
   /** Le niveau d'expérience auquel le dossier est lu : seuils en mois comptés, du plus haut au plus bas. */
   seniority: { levels: { code: SeniorityCode; months: number }[]; default: SeniorityCode };
-  final: { neverLower: CriterionCode[]; declaredNeverLower: boolean; capUnproven: number; emptyBelowShare: number; emptyScore: number; bounds: { min: number; max: number } };
+  final: { neverLower: CriterionCode[]; proofBonus: number; capUnproven: number; emptyBelowShare: number; emptyScore: number; bounds: { min: number; max: number } };
   thinGithub: { minRepos: number; repoCommits: number; minCommits: number };
   EDU: { tiers: Record<Exclude<SchoolTier, "none">, number>; selection: Record<SelectionKind, number>; githubPattern: string; githubScore: number };
   XP: {
@@ -236,7 +250,9 @@ export interface GridConfig {
     byLevel?: Partial<Record<SeniorityCode, StkRow[]>>;
     familyRepoCommits: number;
     dumped: { maxCommits: number; minSizeKb: number };
-    declared: { score: number; described: number; recent: number; recentMonths: number }[];
+    recentMonths: number;
+    /** L'équivalent LinkedIn ou CV des lignes de la même note (0.6.0), par niveau ; `default` pour confirmé et plus. */
+    declared: Record<"student" | "junior" | "default", StkDeclaredRow[]>;
     undersellMinBytes: number;
     ignoredLanguages: string[];
     families: Record<string, string[]>;
@@ -247,7 +263,8 @@ export interface GridConfig {
     levels: OwnRow[];
     /** La table d'un niveau d'expérience, à la place de `levels` (0.5.0). */
     byLevel?: Partial<Record<SeniorityCode, OwnRow[]>>;
-    declared: { score: number; outcomes: number; founded?: boolean }[];
+    /** L'équivalent LinkedIn ou CV des lignes de la même note (0.6.0), par niveau ; `default` pour confirmé et plus. */
+    declared: Record<"student" | "junior" | "default", OwnDeclaredRow[]>;
   };
   OSS: {
     bigStars: number;

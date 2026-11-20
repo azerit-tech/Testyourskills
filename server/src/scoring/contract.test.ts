@@ -44,12 +44,12 @@ function checkShape(card: Omit<CardData, "id" | "createdAt">) {
 }
 
 describe("contrat sur faits réels figés", () => {
-  it("gaearon sans lecture IA", () => {
+  it("gaearon sans lecture IA : 80, le plafond sans code prouvé (78 sous 0.5.0 : la preuve +1, plafond 80)", () => {
     const card = scoreGithub(gaearon, null, opts);
     checkShape(card);
     // XP = critère Expérience × 10 ; la note est celle de la grille (barème 0.4.0).
     expect(values(card)).toEqual({ TEC: 54, SHIP: 80, ARCH: 72, DOC: 47, XP: 80, BUZZ: 37 });
-    expect(card.overall).toBe(78);
+    expect(card.overall).toBe(80);
     expect(card.tier).toBe("gold");
     expect(card.reliability).toBe(76);
     expect(card.position).toBe("FE");
@@ -66,7 +66,7 @@ describe("contrat sur faits réels figés", () => {
     });
   });
 
-  it("gaearon avec lecture IA niveau 4 et statut IA", () => {
+  it("gaearon avec lecture IA niveau 4 et statut IA : 88 (78 sous 0.5.0, la preuve +1 sur chaque critère montré)", () => {
     const ai: CodeReadingResult = {
       readings: gaearon.activeRepos.slice(0, 3).map((repo) => ({ repo, level: 4, evidence_file: "src/index.ts", evidence_quote: "", observed_traits: [] })),
       ai_status: "ai_clean_arch",
@@ -74,7 +74,7 @@ describe("contrat sur faits réels figés", () => {
     const card = scoreGithub(gaearon, ai, opts);
     checkShape(card);
     expect(values(card).TEC).toBe(84);
-    expect(card.overall).toBe(78);
+    expect(card.overall).toBe(88);
     expect(card.tier).toBe("gold");
     expect(card.reliability).toBe(95);
     expect(card.statuses.find((s) => s.byAI)?.id).toBe("ai_clean_arch");

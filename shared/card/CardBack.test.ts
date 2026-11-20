@@ -86,18 +86,20 @@ describe("dos de la fiche", () => {
         expect(p.lines.length).toBeLessThanOrEqual(F.maxLines);
         const text = p.lines.join(" ");
         expect(text).not.toMatch(/[+−]\s?\d/);
+        // Ni « ÷ n × 10 » ni moyenne chiffrée : la note porte un petit aléa de la fiche, jamais dit (§18.101).
+        expect(text).not.toMatch(/÷|×\s?10\b/);
         const svg = back(card, lang);
         expect(svg).toContain(lang === "fr" ? ">LA NOTE<" : ">THE RATING<");
         expect(svg).toContain(`= ${grid.overall}`);
-        if (grid === empty) expect(f.tail).toBeUndefined();
-        else expect(f.tail).toContain("÷");
+        if (grid !== capped) expect(f.tail).toBeUndefined();
+        else expect(f.tail).toContain(lang === "fr" ? "plafond" : "capped");
       }
       expect(gridFormula({ ...FIXTURES.gold, grid: full }, lang)!.terms[0]).toBe("(Code 7\u00a0×\u00a02");
       // L'école comptée : ni sa note ni les autres termes, on en tirerait la sienne ; la moyenne seule, en une phrase.
       const sf = gridFormula({ ...FIXTURES.gold, grid: school }, lang)!;
       expect(sf.sentence).toBe(true);
       expect(sf.tail).toBeUndefined();
-      expect(sf.terms.join(" ")).toContain(lang === "fr" ? "Moyenne pondérée des 8 critères notés, école comprise" : "Weighted average of the 8 scored criteria, school included");
+      expect(sf.terms.join(" ")).toContain(lang === "fr" ? "Les 8 critères notés, école comprise, chacun selon son poids" : "The 8 scored criteria, school included, each by its weight");
       expect(sf.terms.join(" ")).not.toMatch(/×\s?\d,?\d?\s?\+/);
       expect(gridFormula({ ...FIXTURES.gold, grid: capped }, lang)!.tail).toContain("85");
     }
@@ -149,7 +151,7 @@ describe("dos de la fiche : la note vient des huit critères (§18.48)", () => {
       const order = [...svg.matchAll(/data-criterion="([A-Z]+)"/g)].map((m) => m[1]);
       expect(order).toEqual(["XP", "EMP", "STK", "CODE", "OWN", "ACT", "EDU", "OSS"]);
       expect(svg.match(/>\/10</g)!.length).toBeGreaterThanOrEqual(6);
-      expect(svg).toContain(lang === "fr" ? "Moyenne pondérée des 7 critères notés" : "Weighted average of the 7 scored");
+      expect(svg).toContain(lang === "fr" ? "Les 7 critères notés" : "The 7 scored criteria");
       expect(svg).toContain("= 67");
       expect(svg).toContain(">/100<");
       // Les critères viennent avant la formule ; les codes des six traits ne reviennent pas.

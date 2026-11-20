@@ -95,12 +95,13 @@ export function gridFormula(card: Pick<CardData, "grid">, lang: Lang): { terms: 
   const s = t(lang).back;
   const m = gridMath(card.grid);
   if (m.rule === "empty_file" || !m.terms.length) return { terms: [s.empty], sentence: true };
-  const capped = m.capHit ? `, ${s.capped}` : "";
-  if (m.terms.some((x) => x.code === "EDU")) return { terms: [`${s.meanOnly(m.terms.length)}${capped}`], sentence: true };
+  // Ni moyenne ni « ÷ n × 10 » : la note porte un petit aléa de la fiche (§18.101) que la carte ne dit pas.
+  const capped = m.capHit ? s.capped(m.cap) : "";
+  if (m.terms.some((x) => x.code === "EDU")) return { terms: [`${s.meanOnly(m.terms.length)}${capped ? `, ${capped}` : ""}`], sentence: true };
   const terms = m.terms.map((x) => s.term(s.criteria[x.code], x.score, dec(x.weight, lang)));
   terms[0] = `(${terms[0]}`;
   terms[terms.length - 1] = `${terms[terms.length - 1]})`;
-  return { terms, tail: `${s.divide(dec(m.den, lang))}${capped}` };
+  return { terms, ...(capped ? { tail: capped } : {}) };
 }
 
 /** Range les termes de la formule en lignes (jamais un terme coupé), trois au plus ;
@@ -225,7 +226,9 @@ export function backCriteria(card: Pick<CardData, "grid" | "declaredSource" | "p
       }
       const score = c.private ? null : c.score;
       const state = c.private || why === "below" ? s.outOfMean : why === "missing" ? s.missing : why === "unproven" ? s.unproven : "";
-      const tag = score === null ? state : state ? `${src} · ${state}` : src;
+      // La preuve (0.6.0) : « GitHub · prouvé +1 », rien de plus.
+      const proven = score !== null && c.bonus ? ` · ${s.proven(c.bonus)}` : "";
+      const tag = score === null ? state : state ? `${src}${proven} · ${state}` : `${src}${proven}`;
       // Les accents graves du moteur (du code cité) ne se lisent pas sur une fiche.
       const proof = (pick(c.evidence?.text) || pick(c.reached) || s.readOn(src)).replace(/`/g, "");
       return { code: c.code, name: s.criteria[c.code], score, counted: !empty && c.counted && score !== null, tag, state, proof };

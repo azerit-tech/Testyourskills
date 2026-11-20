@@ -67,14 +67,14 @@ export const STRINGS = {
       weight: (w: number) => `${Math.round(w * 100)}${NBSP}%`,
       /** La grille de recrutement (§18.37) : la note est la moyenne pondérée des critères notés, × 10. */
       gridRating: "La note",
-      criteria: { EDU: "École", XP: "Expérience", EMP: "Parcours", STK: "Stack", CODE: "Code", ACT: "Activité", OWN: "Ownership", OSS: "Open source" },
+      criteria: { EDU: "École", XP: "Niveau", EMP: "Expérience", STK: "Stack", CODE: "Code", ACT: "Activité", OWN: "Ownership", OSS: "Open source" },
       /** « Code 7 × 2 » : la note sur 10 et son coefficient, jamais un « + n ». */
       term: (name: string, score: number, coef: string) => `${name} ${score}${NBSP}×${NBSP}${coef}`,
-      /** La fin de la formule, après la parenthèse : « ÷ 7,5 × 10 ». */
-      divide: (den: string) => `÷${NBSP}${den}${NBSP}×${NBSP}10`,
       /** L'école comptée : la moyenne seule, sans le détail, pour qu'on ne puisse pas en tirer sa note. */
-      meanOnly: (n: number) => `Moyenne pondérée des ${n} critères notés, école comprise, ×${NBSP}10`,
-      capped: `plafond 85, aucun code prouvé`,
+      meanOnly: (n: number) => `Les ${n} critères notés, école comprise, chacun selon son poids`,
+      capped: (cap: number) => `plafond ${cap}, aucun code prouvé`,
+      /** La preuve (0.6.0), à côté de la source : « GitHub · prouvé +1 ». */
+      proven: (n: number) => `prouvé +${n}`,
       empty: `Fiche vide${NBSP}: moins d'un quart des coefficients notés`,
     },
   },
@@ -127,11 +127,11 @@ export const STRINGS = {
       rating: "The rating",
       weight: (w: number) => `${Math.round(w * 100)}%`,
       gridRating: "The rating",
-      criteria: { EDU: "School", XP: "Experience", EMP: "Career", STK: "Stack", CODE: "Code", ACT: "Activity", OWN: "Ownership", OSS: "Open source" },
+      criteria: { EDU: "School", XP: "Level", EMP: "Experience", STK: "Stack", CODE: "Code", ACT: "Activity", OWN: "Ownership", OSS: "Open source" },
       term: (name: string, score: number, coef: string) => `${name} ${score}${NBSP}×${NBSP}${coef}`,
-      divide: (den: string) => `÷${NBSP}${den}${NBSP}×${NBSP}10`,
-      meanOnly: (n: number) => `Weighted average of the ${n} scored criteria, school included, ×${NBSP}10`,
-      capped: "capped at 85, no code proven",
+      meanOnly: (n: number) => `The ${n} scored criteria, school included, each by its weight`,
+      capped: (cap: number) => `capped at ${cap}, no code proven`,
+      proven: (n: number) => `proven +${n}`,
       empty: "Empty sheet: under a quarter of the weights scored",
     },
   },

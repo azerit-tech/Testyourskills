@@ -4,7 +4,7 @@
 // pièce où la note a été lue, et la version de la page partagée, sans nom d'école ni
 // d'ancien employeur (question 5 du barème). Pur : testé sans navigateur.
 
-import { dec, excludedWhy, gridMath, GRID_WEIGHTS, schoolState, seniorityLabel, weightsOf } from "../../../shared/gridText";
+import { dec, excludedWhy, gridMath, GRID_CAP_UNPROVEN, GRID_WEIGHTS, schoolState, seniorityLabel, weightsOf } from "../../../shared/gridText";
 import type { CriterionCode, DeclaredSource, Fact, Grid, GridCriterion, GridSource, Lang } from "../../../shared/types";
 import type { Dict } from "../i18n";
 
@@ -33,6 +33,8 @@ export function stateTags(c: GridCriterion, grid?: Pick<Grid, "rule">): Tag[] {
   if (c.private) return ["private"];
   const tags: Tag[] = [];
   if (c.state === "declared") tags.push("declared");
+  // La preuve (0.6.0) : « prouvé +1 », à côté de la note qui l'inclut.
+  if (c.bonus) tags.push("proven");
   if (c.state === "unproven" || (c.score === null && c.state !== "missing")) tags.push("unproven");
   if (c.state === "missing") tags.push("missing");
   if (c.code === "XP" && c.state === "scored" && c.source === "github") tags.push("estimated");
@@ -106,7 +108,9 @@ export const givesLevel = (c: GridCriterion, grid: Grid): boolean => c.code === 
 /** L'indice du niveau atteint dans la table : la ligne la plus haute dont la note ne dépasse pas celle du critère. -1 sans note. */
 export function reachedRow(c: GridCriterion, table: [number, string][]): number {
   if (c.score === null) return -1;
-  return table.findIndex(([n]) => n <= c.score!);
+  // La table dit la note sans la preuve : la ligne se lit avant le bonus (0.6.0).
+  const level = c.score - (c.bonus ?? 0);
+  return table.findIndex(([n]) => n <= level);
 }
 
 // --- La page partagée -------------------------------------------------------------
@@ -241,14 +245,17 @@ export function finalLines(grid: Grid, g: G, lang: Lang, unprovenCase?: { src: s
   }
   const edu = grid.criteria.find((c) => c.code === "EDU");
   if (edu && schoolState(edu) === "out") out.push(F.schoolOut(g.names.EDU));
-  let rule = m.rule === "capped_unproven" ? (m.capHit ? F.cappedHit(m.raw!) : F.capped) : null;
+  // Le plafond de la grille (85 sous 0.5.0, 80 depuis). Ni la moyenne ni le calcul ne s'impriment :
+  // la note porte un petit aléa de la fiche (§18.101) que le site ne dit pas.
+  const cap = m.capHit ? m.cap : GRID_CAP_UNPROVEN;
+  let rule = m.rule === "capped_unproven" ? F.capped(cap) : null;
   if (unprovenCase && m.rule === "capped_unproven") {
     const opens = F.opensList(m.excluded.filter((x) => x.why === "unproven").map((x) => g.names[x.code]));
-    rule = (unprovenCase.shared ? F.caseUnprovenThem : F.caseUnproven)(unprovenCase.src, opens);
+    rule = (unprovenCase.shared ? F.caseUnprovenThem : F.caseUnproven)(unprovenCase.src, opens, cap);
   }
   return {
-    formula: F.formula(terms, dec(m.den, lang)),
-    result: F.result(dec(m.mean, lang, 2)),
+    formula: F.formula(terms),
+    result: null,
     out,
     rule,
     overall: grid.overall,

@@ -1,7 +1,7 @@
 {
-  "_doc": "Barème de recrutement (docs/bareme-recrutement.md §3 et §4, SPEC §18.37 et §18.84). Depuis 0.5.0 la note dit « quel niveau pour cette expérience » : les années comptées donnent le niveau d'expérience (seniority) et sortent de la moyenne (coefficient 0), et le parcours se lit dans la table de ce niveau. Chaque critère est une note entière sur 10 lue dans sa table : le niveau le plus haut dont toute la ligne est remplie, sans base, sans ajout, sans retrait. Les lignes de chaque table vont du niveau le plus haut au plus bas. Changer un seuil ou un coefficient = une ligne ici, et la version de data/scoring.json.",
+  "_doc": "Barème de recrutement (docs/bareme-recrutement.md §3 et §4, SPEC §18.37 et §18.84). Depuis 0.5.0 la note dit « quel niveau pour cette expérience » : les années comptées donnent le niveau d'expérience (seniority) et sortent de la moyenne (coefficient 0), et le parcours se lit dans la table de ce niveau. Depuis 0.6.0 (SPEC §18.101) la note dit à quel point les recruteurs te cherchent : LinkedIn ou le CV et GitHub se lisent dans la même table, la preuve ajoute final.proofBonus, l'expérience (EMP) pèse 4. Chaque critère est une note entière sur 10 lue dans sa table : le niveau le plus haut dont toute la ligne est remplie, sans base, sans ajout, sans retrait. Les lignes de chaque table vont du niveau le plus haut au plus bas. Changer un seuil ou un coefficient = une ligne ici, et la version de data/scoring.json.",
 
-  "weights": { "EDU": 1, "XP": 0, "EMP": 2.5, "STK": 1.5, "CODE": 2, "ACT": 1, "OWN": 1.5, "OSS": 0.5 },
+  "weights": { "EDU": 1, "XP": 0, "EMP": 4, "STK": 1.5, "CODE": 2, "ACT": 1, "OWN": 1.5, "OSS": 0.5 },
 
   "seniority": {
     "_doc": "Le niveau d'expérience auquel le dossier est lu (SPEC §18.84) : les mois comptés sur les postes datés (stage et alternance pour moitié, XP.share), du plus haut au plus bas. Sans LinkedIn ni CV : les années actives de GitHub × 12, « estimé ». Inconnu (aucun poste daté, aucune année active) : les tables du niveau `default`, et aucun niveau affiché.",
@@ -16,11 +16,11 @@
   },
 
   "final": {
-    "_doc": "Quatre règles (§4) : non prouvé ou non renseigné sort de la moyenne ; neverLower n'entre que s'il est au-dessus de la moyenne des autres ; plafond sans code prouvé ; dossier vide sous emptyBelowShare des coefficients notés.",
+    "_doc": "Les règles finales (0.6.0, SPEC §18.101) : un critère sans information sort de la moyenne ; l'école et l'open source (neverLower) n'y entrent que s'ils la font monter ; plafond sans code prouvé (capUnproven) ; dossier vide sous emptyBelowShare des coefficients notés. Ce que LinkedIn ou le CV déclare compte comme le reste, lu dans la même table que GitHub.",
     "neverLower": ["EDU", "OSS"],
-    "_declaredDoc": "0.5.0 : une stack ou un ownership seulement déclarés (LinkedIn ou CV, sans preuve GitHub) suivent la même règle que l'école : ils n'entrent dans la moyenne que s'ils la font monter. Décrire ses technos ne peut plus faire baisser une note.",
-    "declaredNeverLower": true,
-    "capUnproven": 85,
+    "_proofDoc": "0.6.0 : la preuve. Un critère montré par GitHub, ou déclaré et recoupé par GitHub, prend proofBonus points de plus, plafonné à 10 ; un niveau 0 ne prouve rien et ne prend rien.",
+    "proofBonus": 1,
+    "capUnproven": 80,
     "emptyBelowShare": 0.25,
     "emptyScore": 20,
     "bounds": { "min": 1, "max": 99 }
@@ -75,7 +75,7 @@
     "_doc": "Parcours, sur LinkedIn ou le CV seulement, lu dans la table du niveau d'expérience (0.5.0) : un stage dans une équipe exigeante est en haut de la table d'un début de carrière, dix ans sans progression en bas de celle d'un expert. Mois par employeur (postes du même employeur réunis). Un « vrai poste » est un poste hors stage, alternance et association.",
     "founderPattern": "\\b(co-?)?(founder|founding|fondat(eur|rice)|cofondat(eur|rice)|createur|creatrice|cofounder)\\b",
     "productTypes": ["startup", "scaleup"],
-    "_tablesDoc": "Une table par niveau d'expérience. Chaque ligne s'ouvre par l'une de ses conditions (any) ; on obtient la plus haute ligne ouverte. role : un vrai poste (hors stage) chez un même employeur, months tenus ; at product : startup ou scale-up (lu par l'IA) ou employeur de la liste à forte barre ; at highBar : la liste seule. founded : une entreprise fondée, months tenus. internship : un stage ou une alternance chez un même employeur. internships : count stages ou alternances, ou months cumulés. riseOrTeam : deux intitulés datés qui progressent, ou une équipe encadrée avec un fait cité.",
+    "_tablesDoc": "Une table par niveau d'expérience. Chaque ligne s'ouvre par l'une de ses conditions (any) ; on obtient la plus haute ligne ouverte. role : un vrai poste (hors stage) chez un même employeur, months tenus ; at product : startup ou scale-up (lu par l'IA) ou employeur de la liste à forte barre ; at highBar : la liste seule. founded : une entreprise fondée, months tenus. internship : un stage ou une alternance chez un même employeur. internships : count stages ou alternances, ou months cumulés. Depuis 0.6.0, months se compte sur tous les postes qui remplissent la ligne (deux entreprises fondées, deux équipes produit), chaque mois une fois. riseOrTeam : deux intitulés datés qui progressent, ou une équipe encadrée avec un fait cité.",
     "tables": {
       "student": [
         { "score": 10, "any": [{ "what": "internship", "at": "highBar", "months": 4 }, { "what": "role", "at": "highBar", "months": 6 }] },
@@ -155,10 +155,25 @@
     },
     "familyRepoCommits": 10,
     "dumped": { "maxCommits": 5, "minSizeKb": 1024 },
-    "declared": [
-      { "score": 6, "described": 5, "recent": 2, "recentMonths": 24 },
-      { "score": 4, "described": 2, "recent": 0, "recentMonths": 24 }
-    ],
+    "_declaredDoc": "0.6.0 : l'équivalent LinkedIn ou CV des lignes de la même note, sans la preuve. tied : technos rattachées à un poste ou une réalisation (la lecture les cite dans un poste daté ou un projet), recent : dont tant dans un poste en cours ou fini depuis moins de recentMonths mois. Une liste de compétences seule n'a pas d'équivalent : elle sort de la moyenne. Le 10 se prouve sur GitHub.",
+    "recentMonths": 24,
+    "declared": {
+      "student": [
+        { "score": 8, "tied": 5, "recent": 2 },
+        { "score": 6, "tied": 3, "recent": 0 },
+        { "score": 4, "tied": 2, "recent": 0 }
+      ],
+      "junior": [
+        { "score": 8, "tied": 5, "recent": 2 },
+        { "score": 6, "tied": 3, "recent": 0 },
+        { "score": 4, "tied": 2, "recent": 0 }
+      ],
+      "default": [
+        { "score": 8, "tied": 6, "recent": 3 },
+        { "score": 6, "tied": 4, "recent": 1 },
+        { "score": 4, "tied": 2, "recent": 0 }
+      ]
+    },
     "undersellMinBytes": 10240,
     "_ignoredDoc": "Ne font pas une famille : balisage, styles, scripts de build.",
     "ignoredLanguages": ["HTML", "CSS", "SCSS", "Sass", "Less", "Stylus", "Makefile", "CMake", "Dockerfile", "Batchfile", "Shell", "PowerShell", "Nix", "TeX", "Roff", "Jinja", "Handlebars", "EJS", "Pug", "Mustache", "Twig", "Procfile", "Starlark", "M4", "Meson"],
@@ -228,10 +243,24 @@
         { "score": 2, "anyRepo": true }
       ]
     },
-    "declared": [
-      { "score": 6, "outcomes": 3 },
-      { "score": 4, "outcomes": 1, "founded": true }
-    ]
+    "_declaredDoc": "0.6.0 : l'équivalent LinkedIn ou CV des lignes de la même note, sans la preuve. outcomes : résultats datés et chiffrés (mise en ligne, migration, usage) ; ou une entreprise fondée et tenue foundedMonths mois, avec foundedOutcomes résultats. Le 10 se prouve sur GitHub.",
+    "declared": {
+      "student": [
+        { "score": 8, "outcomes": 3, "foundedMonths": 12, "foundedOutcomes": 1 },
+        { "score": 6, "outcomes": 2, "foundedMonths": 6 },
+        { "score": 4, "outcomes": 1, "foundedMonths": 0 }
+      ],
+      "junior": [
+        { "score": 8, "outcomes": 3, "foundedMonths": 12, "foundedOutcomes": 1 },
+        { "score": 6, "outcomes": 2, "foundedMonths": 6 },
+        { "score": 4, "outcomes": 1, "foundedMonths": 0 }
+      ],
+      "default": [
+        { "score": 8, "outcomes": 4, "foundedMonths": 24, "foundedOutcomes": 1 },
+        { "score": 6, "outcomes": 2, "foundedMonths": 12 },
+        { "score": 4, "outcomes": 1, "foundedMonths": 0 }
+      ]
+    }
   },
 
   "OSS": {

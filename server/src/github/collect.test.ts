@@ -348,12 +348,12 @@ describe("destinations des PR, nœuds bruts", () => {
 describe("de la collecte à la grille (§18.37)", () => {
   const crit = (f: GithubFacts, code: string) => scoreGithub(JSON.parse(JSON.stringify(f)) as GithubFacts, null, { lang: "fr", judgedInSeconds: 10 }).grid!.criteria.find((c) => c.code === code)!;
 
-  it("externalMergedPRList : une PR fusionnée dans un projet de 1 000 étoiles (vitejs/vite) ouvre le 8 de l'open source", async () => {
+  it("externalMergedPRList : une PR fusionnée dans un projet de 1 000 étoiles (vitejs/vite) ouvre le 8 de l'open source (9 avec la preuve, 0.6.0)", async () => {
     const { facts } = await collect();
-    expect(crit(facts, "OSS").score).toBe(8);
+    expect(crit(facts, "OSS").score).toBe(9);
     const { externalMergedPRList: _l, ...before } = facts;
-    // Sans la destination, les trois PR ne valent que leur nombre.
-    expect(crit(before, "OSS").score).toBe(2);
+    // Sans la destination, les trois PR ne valent que leur nombre (2, 3 avec la preuve).
+    expect(crit(before, "OSS").score).toBe(3);
   });
 
   it("agentFiles : « IA dans l'atelier » sur la stack, sans toucher la note", async () => {
@@ -366,14 +366,14 @@ describe("de la collecte à la grille (§18.37)", () => {
     expect(bare.score).toBe(stk.score);
   });
 
-  it("homepage : un site en ligne publie le projet et ouvre le 8 de l'ownership", async () => {
+  it("homepage : un site en ligne publie le projet et ouvre le 8 de l'ownership (9 avec la preuve, 0.6.0)", async () => {
     const { facts } = await collect();
     // Un projet porté plus d'un an, 150 commits, 120 étoiles, aucune release : seul son site le dit publié.
     const used = { ...facts, repos: facts.repos.map((r) => (r.name === "atelier" ? { ...r, commitCount: 150, stars: 120, releaseDates: [] } : r)) };
     expect(used.repos.find((r) => r.name === "atelier")!.homepage).toBe("https://atelier.example.dev/");
-    expect(crit(used, "OWN").score).toBe(8);
+    expect(crit(used, "OWN").score).toBe(9);
     const offline = { ...used, repos: used.repos.map((r) => (r.name === "atelier" ? { ...r, homepage: null } : r)) };
-    expect(crit(offline, "OWN").score).toBe(6);
+    expect(crit(offline, "OWN").score).toBe(7);
   });
 });
 

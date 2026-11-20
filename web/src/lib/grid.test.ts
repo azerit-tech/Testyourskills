@@ -28,11 +28,12 @@ describe("l'état d'un critère, en étiquettes lisibles sans la couleur", () =>
     expect(stateTags(crit("CODE", 7))).toEqual([]);
   });
 
-  it("déclaré, à confirmer", () => {
+  it("déclaré : « sur LinkedIn » ou « au CV », sans « à confirmer » (0.6.0, la même table que GitHub) ; prouvé : « prouvé »", () => {
     const tags = stateTags(crit("STK", 6, { state: "declared", source: "linkedin" }));
     expect(tags).toEqual(["declared"]);
-    expect(FR.tags.declared).toBe("déclaré, à confirmer");
-    expect(EN.tags.declared).toBe("declared, to be confirmed");
+    expect([FR.tags.declared, FR.tags.declaredCv]).toEqual(["sur LinkedIn", "au CV"]);
+    expect([EN.tags.declared, EN.tags.declaredCv]).toEqual(["on LinkedIn", "on the résumé"]);
+    expect(stateTags(crit("STK", 7, { bonus: 1 }))).toContain("proven");
   });
 
   it("non prouvé et non renseigné sortent de la moyenne", () => {
@@ -95,28 +96,28 @@ describe("l'étiquette de la pièce", () => {
 describe("la ligne de la note finale", () => {
   const all = (lines: ReturnType<typeof finalLines>) => [lines.formula, lines.result, lines.rule, ...lines.out].filter(Boolean).join(" | ");
 
-  it("moyenne pondérée : la formule, le résultat, aucun « + n » ni « − n »", () => {
+  it("les critères comptés et leur poids, sans résultat chiffré (la note porte un aléa jamais dit, §18.101), aucun « + n » ni « − n »", () => {
     const grid = githubGridMock("gold", "leamd")!;
     for (const lang of ["fr", "en"] as Lang[]) {
       const f = finalLines(grid, DICTS[lang].grid, lang);
       const g = DICTS[lang].grid;
-      expect(f.formula!.startsWith(`(${g.final.term(g.names.CODE, 8, "2")} + ${g.final.term(g.names.STK, 8, lang === "fr" ? "1,5" : "1.5")} + `)).toBe(true);
-      expect(f.formula).toContain("÷");
+      expect(f.formula!.startsWith(`${g.final.term(g.names.CODE, 8, "2")} + ${g.final.term(g.names.STK, 8, lang === "fr" ? "1,5" : "1.5")} + `)).toBe(true);
+      expect(f.formula).not.toContain("÷");
+      expect(f.result).toBeNull();
       expect(f.overall).toBe(82);
       expect(f.rule).toBeNull();
       expect(all(f)).not.toMatch(BONUS);
     }
-    expect(finalLines(grid, FR, "fr").result).toBe(FR.final.result("8,15"));
-    expect(FR.final.result("8,15")).toContain("8,15 sur 10");
   });
 
-  it("le plafond sans code prouvé est dit, avec la note avant plafond quand il a joué", () => {
+  it("le plafond sans code prouvé est dit (80 depuis 0.6.0, 85 sur une grille d'avant), sans le calcul d'avant plafond", () => {
     const f = finalLines(declaredGridMock("LinkedIn"), FR, "fr");
-    expect(f.rule).toContain("85");
+    expect(f.rule).toContain("80");
     expect(f.out.join(" ")).toContain(FR.names.CODE);
     expect(all(f)).not.toMatch(BONUS);
     const hit: Grid = { overall: 85, rule: "capped_unproven", criteria: [crit("XP", 9, { source: "linkedin" }), crit("EMP", 9, { source: "linkedin" }), crit("CODE", null)] };
-    expect(finalLines(hit, FR, "fr").rule).toContain("90");
+    expect(finalLines(hit, FR, "fr").rule).toContain("85");
+    expect(finalLines(hit, FR, "fr").rule).not.toContain("90");
   });
 
   it("dossier vide : pas de formule, la règle et la note plancher", () => {

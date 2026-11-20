@@ -210,10 +210,10 @@ describe("« recoupé » : de la sortie du moteur à l'étiquette affichée", ()
   });
 
   it("la page partagée montre le recoupement sans nommer le poste", () => {
-    const emp = textOf(rowsOf(render(item, true)).get("Parcours et employeurs")!);
+    const emp = textOf(rowsOf(render(item, true)).get("Expérience")!);
     expect(emp).toContain("LinkedIn : stage ou alternance, février 2025 – novembre 2025. GitHub : un repo public de 25 commits, actif sur les mêmes mois. Poste confirmé par le code.");
     expect(emp).not.toMatch(/McMaster|Research Intern|agda-notes/);
-    const own = textOf(rowsOf(render(item, false)).get("Parcours et employeurs")!);
+    const own = textOf(rowsOf(render(item, false)).get("Expérience")!);
     expect(own).toContain("Research Intern, McMaster University");
   });
 });
@@ -241,7 +241,7 @@ describe("face à un GitHub vide : le code n'est pas prouvé, rien ne se compare
   it("la dernière ligne de la note du dossier : code non prouvé, et ce qui changerait la note", () => {
     const html = render(item, false);
     expect(lastRule(html)).toBe(
-      "Code non prouvé\u00a0: ton GitHub public ne montre encore rien de jugeable. La note du dossier se fait sur ton LinkedIn, sans dépasser 85. Ce qui la changerait\u00a0: un vrai projet public sur GitHub, qui ouvre niveau du code, stack technique, activité et open source.",
+      "Code non prouvé\u00a0: ton GitHub public ne montre encore rien de jugeable. La note du dossier se fait sur ton LinkedIn, sans dépasser 80. Ce qui la changerait\u00a0: un vrai projet public sur GitHub, qui ouvre niveau du code, stack technique, activité et open source.",
     );
     expect(lastFinalLine(html)).toMatch(/^<p class="rg-rule is-unproven">Code non prouvé/);
     // Une seule règle : pas le plafond générique en plus.
@@ -253,7 +253,7 @@ describe("face à un GitHub vide : le code n'est pas prouvé, rien ne se compare
 
   it("une comparaison où le code est prouvé garde la ligne du plafond générique, s'il joue", () => {
     const cmp = { ...comparison, github: { ...comparison.github, unjudged: undefined } };
-    expect(lastRule(render({ kind: "comparison", comparison: cmp }, false))).toBe(DICTS.fr.grid.final.capped);
+    expect(lastRule(render({ kind: "comparison", comparison: cmp }, false))).toBe(DICTS.fr.grid.final.capped(80));
   });
 
   it("la démo a son cas : un LinkedIn face au GitHub vide de x", () => {
@@ -305,10 +305,11 @@ describe("une vraie grille du serveur, à travers le bloc : les deux profils d'e
     }
     expect(terms.length).toBe(grid.criteria.filter((c) => c.counted && c.score !== null).length);
     const den2 = terms.reduce((s, [, w]) => s + Math.round(w * 2), 0);
-    expect(num(/÷\s(\d+(?:[,.]\d+)?)/.exec(formula)![1]) * 2).toBe(den2);
     const num2 = terms.reduce((s, [x, w]) => s + x * Math.round(w * 2), 0);
-    const mean = /=\s(\d+(?:[,.]\d+)?)\s(?:sur|out of)\s10/.exec(final)![1];
-    expect(num(mean)).toBeCloseTo(num2 / den2, 2);
+    // Ni « ÷ n » ni moyenne chiffrée à l'écran : la note d'une fiche porte un petit aléa, jamais dit (§18.101).
+    expect(formula).not.toContain("÷");
+    expect(final).not.toMatch(/=\s\d+(?:[,.]\d+)?\s(?:sur|out of)\s10/);
+    // La grille du moteur, avant l'aléa : sa note se refait sur les termes affichés.
     const raw = Math.floor((20 * num2 + den2) / (2 * den2));
     expect(grid.rule === "capped_unproven" ? Math.min(raw, GRID_CAP_UNPROVEN) : raw).toBe(grid.overall);
   }
@@ -334,7 +335,8 @@ describe("une vraie grille du serveur, à travers le bloc : les deux profils d'e
             for (const c of grid!.criteria) {
               const row = rows.get(dict.names[c.code])!;
               // Jamais de bonus ni de malus en points sur un critère.
-              expect(textOf(row), c.code).not.toMatch(/(^|[\s(])[+−]\s?\d/);
+              // Un seul « + n » permis : « prouvé +1 », la preuve (décision du 20 novembre, §18.101).
+              expect(textOf(row).replace(/(prouvé|proven)\s\+1\b/g, "$1"), c.code).not.toMatch(/(^|[\s(])[+−]\s?\d/);
               if (c.state === "scored" && c.score !== null) {
                 const piece = /<p class="rg-piece">([\s\S]*?)<\/p>/.exec(row)?.[1];
                 expect(piece && textOf(piece).trim(), `${c.code} sans pièce`).toBeTruthy();

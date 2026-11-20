@@ -11,7 +11,7 @@ import type { CriterionCode, Fact, Grid, GridCriterion, GridSeniority, Lang, Sen
  * 0.5.0 (SPEC §18.84) l'expérience ne pèse plus : les années comptées donnent le
  * niveau auquel le dossier est lu, et son poids est passé au parcours et à l'ownership.
  */
-export const GRID_WEIGHTS: Record<CriterionCode, number> = { EDU: 1, XP: 0, EMP: 2.5, STK: 1.5, CODE: 2, ACT: 1, OWN: 1.5, OSS: 0.5 };
+export const GRID_WEIGHTS: Record<CriterionCode, number> = { EDU: 1, XP: 0, EMP: 4, STK: 1.5, CODE: 2, ACT: 1, OWN: 1.5, OSS: 0.5 };
 /** Les coefficients du barème 0.4.0 : ceux d'une grille rangée sans les siens. */
 export const LEGACY_GRID_WEIGHTS: Record<CriterionCode, number> = { EDU: 1, XP: 1.5, EMP: 1.5, STK: 1.5, CODE: 2, ACT: 1, OWN: 1, OSS: 0.5 };
 /** Les coefficients qui ont fait la moyenne de cette grille : les siens, ou ceux de 0.4.0 pour une grille d'avant. */
@@ -53,8 +53,8 @@ export function seniorityLabel(s: GridSeniority, lang: Lang): string {
   return `${name} · ${span}${how}`;
 }
 
-/** Plafond sans code prouvé et note du dossier vide (data/grid.json, `final`). */
-export const GRID_CAP_UNPROVEN = 85;
+/** Plafond sans code prouvé et note du dossier vide (data/grid.json, `final`). 85 sous 0.5.0, 80 depuis 0.6.0 (SPEC §18.101). */
+export const GRID_CAP_UNPROVEN = 80;
 export const GRID_EMPTY_SCORE = 20;
 
 /** Décimal court : « 1,5 » en français, « 1.5 » en anglais ; un entier reste entier. */
@@ -83,8 +83,10 @@ export interface GridMath {
   /** Les critères hors moyenne, dans l'ordre de la formule. */
   excluded: { code: CriterionCode; why: ExcludedWhy }[];
   rule?: Grid["rule"];
-  /** Le plafond de 85 a fait baisser la note. */
+  /** Le plafond sans code prouvé a fait baisser la note. */
   capHit: boolean;
+  /** Ce plafond : celui de la version de la grille (85 sous 0.5.0, 80 depuis 0.6.0). */
+  cap: number;
   /** La note affichée : toujours celle de la grille. */
   overall: number;
 }
@@ -141,7 +143,10 @@ export function gridMath(grid: Grid): GridMath {
     raw,
     excluded,
     ...(grid.rule ? { rule: grid.rule } : {}),
-    capHit: grid.rule === "capped_unproven" && raw !== null && raw > GRID_CAP_UNPROVEN,
+    // Le plafond a joué quand le calcul dépasse à la fois la note et le plafond du jour : vrai sous
+    // 0.5.0 (note = 85) comme depuis 0.6.0, où le petit aléa (jamais dit) peut écarter la note du calcul.
+    capHit: grid.rule === "capped_unproven" && raw !== null && raw > Math.max(grid.overall, GRID_CAP_UNPROVEN),
+    cap: grid.rule === "capped_unproven" ? Math.max(grid.overall, GRID_CAP_UNPROVEN) : GRID_CAP_UNPROVEN,
     overall: grid.overall,
   };
 }
