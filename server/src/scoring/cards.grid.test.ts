@@ -11,24 +11,25 @@ import { useTestSchools } from "./__fixtures__/schools";
 useTestSchools();
 
 describe("les fiches prennent la note de la grille", () => {
-  // Barème 0.4.0 : 41, 61, 57. L'expérience donne le niveau (« Junior ») et ne pèse plus (0.5.0).
-  it("Jacques : LinkedIn 60, GitHub 77, dossier 72 (à un point près)", () => {
+  // Barème 0.4.0 : 41, 61, 57. L'expérience donne le niveau (« Junior ») et ne pèse plus (0.5.0) : 60, 77, 72.
+  // 0.6.0 : la preuve +1 sur chaque critère montré par GitHub, l'expérience au coefficient 4 : 60, 87, 80.
+  it("Jacques : LinkedIn 60, GitHub 87 (77 sous 0.5.0), dossier 80 (72) (à un point près)", () => {
     const { github, linkedin, cmp } = jacques();
     expect(Math.abs(linkedin.overall - 60)).toBeLessThanOrEqual(1);
-    expect(Math.abs(github.overall - 77)).toBeLessThanOrEqual(1);
-    expect(Math.abs(cmp.grid!.overall - 72)).toBeLessThanOrEqual(1);
+    expect(Math.abs(github.overall - 87)).toBeLessThanOrEqual(1);
+    expect(Math.abs(cmp.grid!.overall - 80)).toBeLessThanOrEqual(1);
     expect(cmp.grid!.seniority?.code).toBe("junior");
     expect(linkedin.overall).toBe(linkedin.grid!.overall);
     expect(github.overall).toBe(github.grid!.overall);
   });
 
-  // Barème 0.4.0 : 45, 20, 45.
-  it("Lumine : LinkedIn 66, GitHub 20, dossier 66 (à un point près)", () => {
+  // Barème 0.4.0 : 45, 20, 45 ; 0.5.0 : 66, 20, 66. 0.6.0 : deux entreprises fondées, 21 mois cumulés, l'expérience à 8.
+  it("Lumine : LinkedIn 75 (66 sous 0.5.0), GitHub 20, dossier 75 (à un point près)", () => {
     const { github, linkedin, cmp } = lumine();
-    expect(Math.abs(linkedin.overall - 66)).toBeLessThanOrEqual(1);
+    expect(Math.abs(linkedin.overall - 75)).toBeLessThanOrEqual(1);
     expect(github.overall).toBe(20);
     expect(github.grid!.rule).toBe("empty_file");
-    expect(Math.abs(cmp.grid!.overall - 66)).toBeLessThanOrEqual(1);
+    expect(Math.abs(cmp.grid!.overall - 75)).toBeLessThanOrEqual(1);
     expect(cmp.grid!.rule).toBe("capped_unproven");
   });
 
@@ -45,13 +46,13 @@ describe("les fiches prennent la note de la grille", () => {
     expect(xp(empty).sufficient).toBe(false);
   });
 
-  it("la comparaison porte la grille du dossier, chaque critère avec ses deux côtés", () => {
+  it("la comparaison porte la grille du dossier, chaque critère avec ses deux côtés (0.6.0 : l'ownership déclaré 6, prouvé 9)", () => {
     const { cmp } = jacques();
     expect(cmp.grid!.criteria.map((c) => c.code)).toEqual(["EDU", "XP", "EMP", "STK", "CODE", "ACT", "OWN", "OSS"]);
     const own = cmp.grid!.criteria.find((c) => c.code === "OWN")!;
     expect(own.source).toBe("both");
-    expect(own.declared).toBe(4);
-    expect(own.proven).toBe(8);
+    expect(own.declared).toBe(6);
+    expect(own.proven).toBe(9);
     // Les pièces n'ont pas de grille à elles : leur note est celle du dossier (SPEC §18.84).
     expect([cmp.cv.grid, cmp.github.grid]).toEqual([undefined, undefined]);
     expect([cmp.cv.overall, cmp.github.overall]).toEqual([cmp.grid!.overall, cmp.grid!.overall]);

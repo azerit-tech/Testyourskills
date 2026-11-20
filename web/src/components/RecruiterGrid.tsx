@@ -33,10 +33,11 @@ const CrossCheck = () => (
   </svg>
 );
 
-/** Dix segments : allumés jusqu'à la note ; au-delà de 6, fermés pour un critère déclaré (« la sixième se prouve »). Lue « 7 sur 10 ». */
-function Gauge({ c, g }: { c: GridCriterion; g: G }) {
+/** Dix segments : allumés jusqu'à la note. Lue « 7 sur 10 ». Barème 0.5.0 : au-delà de 6, fermés pour un critère déclaré. */
+function Gauge({ c, g, grid }: { c: GridCriterion; g: G; grid: Grid }) {
   const n = c.score ?? 0;
-  const cap = c.state === "declared" ? 6 : 10;
+  // Depuis 0.6.0, ce qui est déclaré se lit dans la même table : rien n'est fermé.
+  const cap = c.state === "declared" && weightsOf(grid).EMP === 2.5 ? 6 : 10;
   return (
     <span className={`rg-gauge is-${c.score === null ? "none" : c.state}`} role="img" aria-label={c.score === null ? g.gaugeNone : g.gauge(c.score)}>
       {Array.from({ length: 10 }, (_, i) => (
@@ -90,7 +91,7 @@ function Row({ c, grid, declared, shared, isCase }: RowProps) {
                 {c.score ?? none}
                 {c.score !== null && <small>/10</small>}
               </span>
-              <Gauge c={c} g={g} />
+              <Gauge c={c} g={g} grid={grid} />
             </>
           )}
           <span className="rg-meta">
@@ -98,7 +99,10 @@ function Row({ c, grid, declared, shared, isCase }: RowProps) {
             {isCase && c.score !== null && !c.private && <span className="rg-kept">{keptFrom(c, g, declared)}</span>}
             {tags.map((tag) => (
               <span key={tag} className={`rg-tag tag-${tag}`}>
-                {(shared ? g.tagsThem : g.tags)[tag]}
+                {tag === "declared" && declared === "cv"
+                  ? (shared ? g.tagsThem : g.tags).declaredCv
+                  : (shared ? g.tagsThem : g.tags)[tag]}
+                {tag === "proven" && ` +${c.bonus}`}
               </span>
             ))}
           </span>

@@ -142,13 +142,15 @@ export interface GridEvidence {
 
 /**
  * Un critère : une seule note sur 10, lue dans sa table de niveaux (le niveau
- * le plus haut dont toute la ligne est remplie). Rien n'y est ajouté ni retiré.
+ * le plus haut dont toute la ligne est remplie), la même table que la source
+ * soit LinkedIn, le CV ou GitHub. Depuis 0.6.0 (SPEC §18.106), une seule chose
+ * s'y ajoute : la preuve (`bonus`), quand GitHub montre le critère ou le recoupe.
  */
 export interface GridCriterion {
   code: CriterionCode;
   /** Entier de 0 à 10 ; null si non prouvé ou non renseigné. */
   score: number | null;
-  /** scored : noté sur sa source de preuve ; declared : sur la source qui déclare (table arrêtée à 6) ; unproven : la source ne montre rien de jugeable ; missing : sans objet. */
+  /** scored : noté sur sa source de preuve ; declared : lu sur LinkedIn ou le CV, dans la même table, compté comme le reste (0.6.0 ; avant, table arrêtée à 6 et hors moyenne sous les autres) ; unproven : la source ne montre rien de jugeable ; missing : sans objet. */
   state: "scored" | "declared" | "unproven" | "missing";
   /** false : hors moyenne (état, ou école / open source sous la moyenne des autres). */
   counted: boolean;
@@ -172,14 +174,20 @@ export interface GridCriterion {
   table?: { score: number; text: Fact }[];
   /** Page partagée (shared/publicView.ts) : la note est gardée pour la personne fichée (l'école hors moyenne). */
   private?: boolean;
+  /**
+   * La preuve (0.6.0) : les points ajoutés à la note de la table parce que GitHub montre
+   * le critère, ou recoupe ce que LinkedIn ou le CV déclare (`score` les inclut, plafonné
+   * à 10). Absent : rien de prouvé, ou une grille d'avant.
+   */
+  bonus?: number;
 }
 
 /** La grille d'une fiche, ou d'une comparaison (la note du dossier). */
 export interface Grid {
   criteria: GridCriterion[];
-  /** Moyenne pondérée des critères comptés, × 10, entier de 1 à 99. */
+  /** Moyenne pondérée des critères comptés, × 10, entier de 1 à 99 ; depuis 0.6.0, avec le petit aléa de la fiche (shared/jitter.ts, jamais dit sur le site). */
   overall: number;
-  /** capped_unproven : aucun code prouvé (plafond 85) ; empty_file : moins d'un quart des coefficients noté (note 20). */
+  /** capped_unproven : aucun code prouvé (plafond 85 sous 0.5.0, 80 depuis 0.6.0) ; empty_file : moins d'un quart des coefficients noté (note 20). */
   rule?: "capped_unproven" | "empty_file";
   /** Le niveau d'expérience auquel la grille a été lue (0.5.0). Absent : inconnu, ou grille d'avant. */
   seniority?: GridSeniority;

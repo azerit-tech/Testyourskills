@@ -26,12 +26,13 @@ describe("barème GitHub sur un profil synthétique", () => {
     expect(stat(card, "XP").value).toBe(40);
     expect(stat(card, "TEC").value).toBe(50); // repli sans IA
     expect(stat(card, "BUZZ").value).toBe(10);
-    // La note globale est celle de la grille ; sans lecture IA, le code n'est pas prouvé (plafond 85).
+    // La note globale est celle de la grille ; sans lecture IA, le code n'est pas prouvé (plafond 80 depuis 0.6.0).
     expect(card.overall).toBe(card.grid?.overall);
     expect(card.grid?.rule).toBe("capped_unproven");
     // L'expérience estimée (4) ne pèse plus, et la stack et l'ownership se lisent au niveau « Junior » (barème 0.5.0) : 58 sous 0.4.0, 73.
-    expect(card.overall).toBe(73);
-    expect(card.tier).toBe("silver");
+    // 0.6.0 : la preuve +1 sur chaque critère montré par GitHub, arrêtée au plafond sans code prouvé : 80.
+    expect(card.overall).toBe(80);
+    expect(card.tier).toBe("gold");
   });
 
   it("sans IA : TEC au repli, non suffisant, fiabilité 76", () => {

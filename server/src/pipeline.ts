@@ -28,6 +28,8 @@ import { saveProposal } from "./match/store";
 import { asLinkedinCard, asLinkedinComparison, profileToText } from "./linkedinProfile/text";
 import { linkedinFindings } from "./linkedinProfile/findings";
 import { highBarEmployers, type HighBarList } from "./scoring/employers";
+import { GRID } from "./scoring/config";
+import { jitterCard, type JitterBounds } from "../../shared/jitter";
 import type { PrimeView } from "../../shared/primes";
 import type { PrimeLogo } from "./render/prime";
 import { phase, phaseSync, Trace, withTrace } from "./timing";
@@ -122,6 +124,24 @@ export function asPieces(
     return { ...rest, ...extra, overall: grid.overall, tier: tierFor(grid.overall) };
   };
   return { cv: piece(scored.cv, own.cv), github: piece(scored.github, own.github), grid };
+}
+
+// --- La note finale : le petit aléa de la fiche (§18.106) ----------------------
+
+/** Les bornes de l'aléa : celles de la note (data/grid.json, `final`). */
+export const JITTER_BOUNDS: JitterBounds = { min: GRID.final.bounds.min, max: GRID.final.bounds.max, capUnproven: GRID.final.capUnproven };
+
+/**
+ * Les lignes d'une fiche avec sa note finale : la note exacte de la grille, plus l'aléa
+ * tiré sur l'id de la fiche racine (shared/jitter.ts). Les pièces d'un dossier portent la
+ * même note que lui. Juste avant l'écriture : tout ce qui lit la fiche lit cette note-là.
+ */
+export function finalNotes(rows: NewCardRow[]): NewCardRow[] {
+  const root = rows.find((r) => !r.parentId);
+  if (!root?.data.grid) return rows;
+  const data = jitterCard(root.data, root.id, JITTER_BOUNDS);
+  const note = { overall: data.grid!.overall, tier: tierFor(data.grid!.overall) };
+  return rows.map((r) => (r === root ? { ...r, data } : r.parentId === root.id ? { ...r, data: { ...r.data, ...note } } : r));
 }
 
 // --- Identifiants -----------------------------------------------------------
@@ -751,7 +771,7 @@ export class Pipeline {
       // La course protège aussi des modules qui ignoreraient le signal.
       const workP = withTrace(trace, () => this.work(job.id, deleteToken, input, ctx));
       workP.catch(() => {}); // rejet tardif après le timeout : déjà traité
-      const rows = await Promise.race([workP, timeoutP]);
+      const rows = finalNotes(await Promise.race([workP, timeoutP]));
       if (timedOut) throw new JobError("timeout", MESSAGES.timeout);
       // Le coloris (§18.102) : tiré au hasard à la naissance, rangé sur la fiche racine (la fiche
       // seule ou le dossier), ou repris de la fiche que ce dossier complète. Il ne change plus.
@@ -893,7 +913,8 @@ export class Pipeline {
     // Pièce sortie du cache de 24 h : celles de sa fiche.
     const foundForGithub = (): Finding[] => (gh!.cached ? (gh!.cached.findings ?? []) : strongest(ctx.findings()));
     const githubCard = (cardId: string): CardData => {
-      if (gh!.cached) return { ...gh!.cached, id: cardId, createdAt };
+      // Sortie du cache : les faits et la lecture du code se renotent (sans appel), jamais la
+      // note rangée, qui porte déjà l'aléa de son ancienne fiche (§18.106).
       const found = foundForGithub();
       const body = phaseSync("barème", () => deps.scoreGithub(gh!.facts, gh!.ai, { lang, judgedInSeconds }));
       return { ...body, ...(found.length ? { findings: found } : {}), id: cardId, createdAt };

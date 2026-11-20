@@ -1,7 +1,7 @@
 // Les grilles de démo (?mock=1) : la note affichée est celle que la grille
 // calcule, les quatre états sont couverts, aucun « + n » dans les pièces.
 import { describe, expect, it } from "vitest";
-import { gridMath } from "../../../shared/gridText";
+import { GRID_CAP_UNPROVEN, gridMath } from "../../../shared/gridText";
 import type { Grid } from "../../../shared/types";
 import { comparisonGridsMock, declaredGridMock, githubGridMock } from "./mockGrid";
 
@@ -17,15 +17,16 @@ describe("les grilles de démo", () => {
   it("chaque note affichée est celle que la grille calcule", () => {
     for (const [k, g] of ALL) {
       const m = gridMath(g);
-      const expected = g.rule === "empty_file" ? 20 : Math.min(99, Math.max(1, m.capHit ? 85 : m.raw!));
+      const expected = g.rule === "empty_file" ? 20 : Math.min(99, Math.max(1, m.capHit ? GRID_CAP_UNPROVEN : m.raw!));
       expect(g.overall, k).toBe(expected);
     }
   });
 
-  it("les notes attendues (barème 0.5.0) : 45, 65, 82, 70, 62, 30, 20 ; 66 déclarée ; 76 pour le dossier", () => {
+  // 0.6.0 : l'expérience pèse 4 (2,5 sous 0.5.0) ; la déclarée 66 → 63, le dossier 76 → 74.
+  it("les notes attendues (barème 0.6.0) : 45, 65, 82, 70, 62, 30, 20 ; 63 déclarée (66 sous 0.5.0) ; 74 pour le dossier (76)", () => {
     expect(KEYS.map((k) => githubGridMock(k, "dev")!.overall)).toEqual([45, 65, 82, 70, 62, 30, 20]);
-    expect(declaredGridMock("LinkedIn").overall).toBe(66);
-    expect(comparisonGridsMock("LinkedIn", "dev").grid.overall).toBe(76);
+    expect(declaredGridMock("LinkedIn").overall).toBe(63);
+    expect(comparisonGridsMock("LinkedIn", "dev").grid.overall).toBe(74);
     // L'expérience ne pèse nulle part : elle garde sa lecture, hors moyenne ; le dossier porte le niveau de ses postes datés.
     for (const [k, g] of ALL) expect(g.criteria.find((c) => c.code === "XP")!.counted, k).toBe(false);
     expect(comparisonGridsMock("LinkedIn", "dev").grid.seniority).toEqual({ code: "senior", months: 101, source: "linkedin" });

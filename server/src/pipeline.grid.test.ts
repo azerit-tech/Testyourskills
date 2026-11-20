@@ -15,6 +15,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { FIXTURES } from "../../shared/fixtures";
+import { jitterOf } from "../../shared/jitter";
 import type { CvReading } from "../../shared/readings";
 import type { CardData, Grid, JobState } from "../../shared/types";
 import { createApp } from "./app";
@@ -303,7 +304,9 @@ describe("la page partagée : le serveur ne rend la grille entière qu'à la per
     ctx.store.claimOwner("camroux", 7);
     for (const token of [undefined, target.deleteToken]) {
       const card = await get(target.id, token);
-      expect(card.grid?.overall).toBe(66);
+      // La note de la grille, plus le petit aléa de la fiche, tiré sur son id (§18.106).
+      expect(card.grid?.overall).toBe(66 + jitterOf(target.id));
+      expect(card.overall).toBe(card.grid?.overall);
       // La version publique : jamais « ce qui manque », même avec le jeton du dénonciateur.
       expect(card.grid!.criteria.some((c) => c.next)).toBe(false);
     }

@@ -162,7 +162,7 @@ describe("CvRole.kind → Expérience, rattaché au poste du profil par l'entrep
 });
 
 describe("CvRole.employer_type → Parcours", () => {
-  it("au niveau « Junior », un an dans une startup de produit ouvre le 8 ; sans le type d'employeur, 6 (l'entreprise fondée)", () => {
+  it("au niveau « Junior », un an dans une startup de produit ouvre le 8, les mois de l'entreprise fondée s'y ajoutent (0.6.0) ; sans le type d'employeur, 6 (l'entreprise fondée)", () => {
     const item = itemDeux();
     editItem(item, "Sejo", { position: "Product Manager", endDate: { month: "Sep", year: 2025, text: "Sep 2025" } });
     const { profile, text } = collected(item);
@@ -170,7 +170,7 @@ describe("CvRole.employer_type → Parcours", () => {
     editReading(raw, "Sejo", { title: "Product Manager", end: "2025-09" });
     const emp = crit(input(profile, read(raw, text)), "EMP");
     expect(emp.score).toBe(8);
-    expect(emp.reached.fr.replace(/\u00a0/g, " ")).toBe("12 mois dans une équipe produit exigeante : Sejo.");
+    expect(emp.reached.fr.replace(/\u00a0/g, " ")).toBe("22 mois dans une équipe produit exigeante : Sejo, Azerit.");
 
     editReading(raw, "Sejo", { employer_type: undefined });
     expect(crit(input(profile, read(raw, text)), "EMP").score).toBe(6);
@@ -256,12 +256,14 @@ describe("les deux profils d'exemple, du fournisseur à la note de la fiche Link
     return scoreCv(read(raw, text), cvCounts(), { lang: "fr", judgedInSeconds: 6, linkedin: declaredLinkedin(profile), now: FOUNDERS_NOW });
   };
 
-  it("exemple un : 60 ; exemple deux : 66 (docs/bareme-recrutement.md §7 ; 41 et 45 sous 0.4.0)", () => {
+  // 0.6.0 : exemple un, deux technos rattachées à un poste lisent la stack à 4, et elle compte comme sur GitHub (60 → 56) ;
+  // exemple deux, deux entreprises fondées, 21 mois cumulés : l'expérience à 8, l'ownership à 6 (66 → 75).
+  it("exemple un : 56 ; exemple deux : 75 (60 et 66 sous 0.5.0, 41 et 45 sous 0.4.0 ; docs/bareme-recrutement.md §7)", () => {
     const un = card(itemUn(), rawUn());
     expect(un.grid!.criteria.find((c) => c.code === "XP")!.evidence!.text.fr).toBe(
       "1,1 an compté, poste par poste. 13 mois de stage ou d'alternance comptés pour moitié. 7 mois à la tête d'Azerit. Centrale Méditerranée Finance est une association : non compté.",
     );
-    expect(un.overall).toBe(60);
-    expect(card(itemDeux(), rawDeux()).overall).toBe(66);
+    expect(un.overall).toBe(56);
+    expect(card(itemDeux(), rawDeux()).overall).toBe(75);
   });
 });

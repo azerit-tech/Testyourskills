@@ -157,14 +157,14 @@ describe("le relevé dans le HUD", () => {
     }
   });
 
-  it("les noms et les états sont ceux du dos de la fiche, dans les deux langues", () => {
+  it("les noms et les états sont ceux du dos de la fiche, dans les deux langues (« Parcours » devient « Expérience », 0.6.0)", () => {
     const p = filmPlan(cardAt(6));
     const fr = hudAt(p, at(p.freeze), "fr").detail;
     const en = hudAt(p, at(p.freeze), "en").detail;
-    expect(fr.map((r) => r.label)).toEqual(["École", "Open source", "Activité", "Stack", "Ownership", "Parcours", "Code"]);
+    expect(fr.map((r) => r.label)).toEqual(["École", "Open source", "Activité", "Stack", "Ownership", "Expérience", "Code"]);
     expect(fr[0].state).toBe("comptée");
     expect(en[0]).toMatchObject({ label: "School", state: "counted" });
-    expect(en.map((r) => r.label)).toContain("Career");
+    expect(en.map((r) => r.label)).toContain("Experience");
     // une note : ni mots ni marque
     expect(fr.filter((r) => r.kind === "note").every((r) => r.state === "" && !r.unknown)).toBe(true);
   });

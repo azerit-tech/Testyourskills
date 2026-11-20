@@ -17,7 +17,7 @@ import { CRITERION_CODES, type CriterionCode, type Fact, type Grid, type GridCri
 import type { ExternalMergedPR, GithubFacts, GithubRepo } from "../github/facts";
 import type { LinkedinRole } from "../linkedinProfile/profile";
 import { df, nf } from "./common";
-import { GRID, type EmpCondition, type GridRoleKind, type OwnRow, type StkRow } from "./config";
+import { GRID, type EmpCondition, type GridRoleKind, type OwnDeclaredRow, type OwnRow, type StkDeclaredRow, type StkRow } from "./config";
 import { isTutorialRepo, type GithubMetrics } from "./derive";
 import { highBarEmployer, type HighBarList } from "./employers";
 import { normSchool, rankedSchools, schoolListNames, schoolTier, type RankedSchoolList } from "./school";
@@ -211,6 +211,24 @@ function crit(code: CriterionCode, p: Omit<Draft, "code" | "flags"> & { flags?: 
 const unproven = (code: CriterionCode, source: GridSource, reached: Fact, flags: Fact[] = []): Draft => crit(code, { score: null, state: "unproven", source, reached, flags });
 const missing = (code: CriterionCode, source: GridSource, reached: Fact, next?: Fact): Draft =>
   crit(code, { score: null, state: "missing", source, reached, ...(next ? { next } : {}) });
+
+/**
+ * La preuve (0.6.0, SPEC §18.106) : une seule règle, la même pour chaque critère. Le
+ * critère montré par GitHub, ou déclaré et recoupé par GitHub, prend `final.proofBonus`
+ * points de plus que la ligne de sa table, plafonné à 10. Un niveau 0 ne prouve rien.
+ * « Pour n » de la ligne suivante se décale d'autant : c'est la note qu'elle donnera.
+ */
+export function withProof(d: Draft): Draft {
+  if (d.score === null || d.score <= 0 || d.bonus !== undefined) return d;
+  const add = Math.min(GRID.final.proofBonus, 10 - d.score);
+  const score = d.score + add;
+  const shift = (x: Fact): Fact => ({
+    fr: x.fr.replace(/^Pour (\d+)/, (_, n) => `Pour ${Math.min(10, Number(n) + add)}`),
+    en: x.en.replace(/^For (\d+)/, (_, n) => `For ${Math.min(10, Number(n) + add)}`),
+  });
+  const { next, ...rest } = d;
+  return { ...rest, score, bonus: add, ...(next && score < 10 ? { next: shift(next) } : {}) };
+}
 
 const repoUrl = (r: Pick<GithubRepo, "fullName">) => `https://github.com/${r.fullName}`;
 const profileUrl = (login: string) => `https://github.com/${login}`;
@@ -681,6 +699,7 @@ export function empDeclared(d: DeclaredInput, seniority: GridSeniority | undefin
     founder: boolean;
     product: boolean;
     highBar: boolean;
+    roles: RoleInfo[];
   }
   const group = (rs: RoleInfo[]): Emp[] => {
     const byKey = new Map<string, RoleInfo[]>();
@@ -688,7 +707,7 @@ export function empDeclared(d: DeclaredInput, seniority: GridSeniority | undefin
     return [...byKey.values()].map((g) => {
       const type = g.find((r) => r.employerType)?.employerType ?? "";
       const hb = highBarEmployer(g[0].role.company, highBar) !== null;
-      return { name: g[0].role.company || g[0].role.title, months: unionMonths(g), founder: g.some((r) => r.founder), product: product.has(type) || hb, highBar: hb };
+      return { name: g[0].role.company || g[0].role.title, months: unionMonths(g), founder: g.some((r) => r.founder), product: product.has(type) || hb, highBar: hb, roles: g };
     });
   };
   const fullRoles = infos.filter((r) => r.kind === "full");
@@ -725,8 +744,16 @@ export function empDeclared(d: DeclaredInput, seniority: GridSeniority | undefin
           ? f(`${what.fr} dans une équipe produit exigeante : ${e.name}.`, `${what.en} in a demanding product team: ${e.name}.`)
           : f(`${what.fr} : ${e.name}.`, `${what.en}: ${e.name}.`);
     }
-    const e = top(at(c.what === "founded" ? emps.filter((x) => x.founder) : emps, c.at));
-    if (!e || e.months < need) return null;
+    // 0.6.0 : les mois se cumulent sur tous les postes qui remplissent la condition (deux
+    // entreprises fondées, deux équipes produit), chaque mois une fois : à niveau égal,
+    // plus d'expérience datée du même genre ouvre la ligne d'au-dessus.
+    const pool = at(c.what === "founded" ? emps.filter((x) => x.founder) : emps, c.at);
+    const top1 = top(pool);
+    if (!top1) return null;
+    const total = unionMonths(pool.flatMap((x) => x.roles));
+    if (total < need) return null;
+    const names = [...pool].sort((a, b) => b.months - a.months).slice(0, 2).map((x) => x.name).join(", ");
+    const e: Emp = { ...top1, name: names, months: total, founder: pool.every((x) => x.founder) };
     if (c.riseAndTeam && !(rise && team)) return null;
     if (c.riseOrTeam && !(rise || team)) return null;
     const path = c.riseAndTeam
@@ -735,6 +762,9 @@ export function empDeclared(d: DeclaredInput, seniority: GridSeniority | undefin
         ? f(`, et ${rise ? "une trajectoire qui monte" : "une équipe encadrée"}`, `, and ${rise ? "a rising path" : "a team led"}`)
         : f("", "");
     const h = held(e);
+    const many = pool.length > 1;
+    if (e.founder && !c.at && many && h) return f(`${e.name} fondées et tenues ${h.fr} en tout${path.fr}.`, `${e.name} founded and run for ${h.en} in total${path.en}.`);
+    if (need && !c.at && many) return f(`Des postes tenus ${h!.fr} en tout : ${e.name}${path.fr}.`, `Roles held for ${h!.en} in total: ${e.name}${path.en}.`);
     if (e.founder && !c.at)
       return h ? f(`${e.name} fondée et tenue ${h.fr}${path.fr}.`, `${e.name} founded and run for ${h.en}${path.en}.`) : f(`Une entreprise fondée : ${e.name}.`, `A company founded: ${e.name}.`);
     if (c.at === "highBar")
@@ -932,14 +962,30 @@ const uniqNames = (xs: string[]) => {
   return xs.map((x) => x.trim()).filter((x) => x && !seen.has(norm(x)) && seen.add(norm(x)));
 };
 
-export function stkDeclared(d: DeclaredInput, gh?: Pick<GithubInput, "facts" | "m">): Draft {
+/** La table déclarée d'un niveau (0.6.0) : celle du début de carrière, du junior, ou la commune à partir du confirmé. */
+const declaredKey = (code: SeniorityCode): "student" | "junior" | "default" => (code === "student" || code === "junior" ? code : "default");
+const stkDeclaredRows = (code: SeniorityCode): StkDeclaredRow[] => GRID.STK.declared[declaredKey(code)];
+/** La table déclarée de la stack, en clair : ce qui vaut chaque note sur LinkedIn ou le CV, la preuve en plus sur GitHub. */
+export const stkDeclaredTable = (code: SeniorityCode): { score: number; text: Fact }[] =>
+  stkDeclaredRows(code).map((l) => ({
+    score: l.score,
+    text: l.recent
+      ? f(`${l.tied} technos rattachées à un poste ou une réalisation, dont ${l.recent} dans un poste de moins de 2 ans.`, `${l.tied} technologies tied to a role or an achievement, ${l.recent} of them in a role from the last 2 years.`)
+      : f(`${l.tied} technos rattachées à un poste ou une réalisation.`, `${l.tied} technologies tied to a role or an achievement.`),
+  }));
+
+/**
+ * La stack lue sur LinkedIn ou le CV (0.6.0) : la même table que GitHub, son équivalent
+ * déclaré, sans la preuve. Une techno rattachée à un poste ou une réalisation compte ;
+ * une liste de compétences seule n'a pas d'équivalent et sort de la moyenne.
+ */
+export function stkDeclared(d: DeclaredInput, gh?: Pick<GithubInput, "facts" | "m">, seniority: GridSeniority | undefined = declaredSeniority(d)): Draft {
   const r = d.reading;
   const src = d.label;
   const described = uniqNames(r.technos_described);
   const nowIdx = nowMonth(d.now);
   // Technos d'un poste de moins de 2 ans : nommées dans un poste en cours ou fini depuis moins de 2 ans.
-  const D = GRID.STK.declared;
-  const recentMonths = D[0].recentMonths;
+  const recentMonths = GRID.STK.recentMonths;
   const recentTexts = [
     ...r.roles.map((x) => ({ end: x.end, text: [x.title, ...x.responsibilities].join(" ") })),
     ...d.roles.map((x) => ({ end: x.end, text: `${x.title} ${x.description ?? ""}` })),
@@ -948,34 +994,42 @@ export function stkDeclared(d: DeclaredInput, gh?: Pick<GithubInput, "facts" | "
     .map((x) => norm(x.text));
   const recent = described.filter((t) => recentTexts.some((txt) => wordIn(norm(t), txt))).length;
   const flags = gh ? stackFlags(d, gh) : [];
-  const lvl = D.find((l) => described.length >= l.described && recent >= l.recent);
+  const D = stkDeclaredRows(tableOf(seniority));
+  const table = stkDeclaredTable(tableOf(seniority));
+  const lvl = D.find((l) => described.length >= l.tied && recent >= l.recent);
   const shown = described.slice(0, 4).join(", ");
+  const lowest = D[D.length - 1];
   if (!lvl)
     return crit("STK", {
       score: null,
       state: "missing",
       source: "linkedin",
       reached: described.length
-        ? f(`Une seule techno rattachée à une réalisation (${shown}) : une liste de compétences seule ne compte pas.`, `A single technology tied to an achievement (${shown}): a skills list alone does not count.`)
-        : f("Aucune techno rattachée à une réalisation : une liste de compétences seule ne compte pas.", "No technology tied to an achievement: a skills list alone does not count."),
-      next: f(`Pour 4 : deux technos rattachées à une réalisation concrète, sur ${src}. Ou un GitHub pour la prouver.`, `For 4: two technologies tied to a concrete achievement, on ${src}. Or a GitHub to prove it.`),
+        ? f(`Une seule techno rattachée à un poste (${shown}) : pas encore de quoi juger la stack.`, `A single technology tied to a role (${shown}): not enough to judge the stack yet.`)
+        : f("Aucune techno rattachée à un poste : pas de quoi juger la stack.", "No technology tied to a role: nothing to judge the stack on."),
+      next: f(
+        `Pour ${lowest.score} : ${lowest.tied} technos rattachées à un poste ou une réalisation, sur ${src}. Ou un GitHub pour la prouver.`,
+        `For ${lowest.score}: ${lowest.tied} technologies tied to a role or an achievement, on ${src}. Or a GitHub to prove it.`,
+      ),
       flags,
+      table,
     });
   const nextLvl = [...D].reverse().find((l) => l.score > lvl.score);
   return crit("STK", {
     score: lvl.score,
     state: "declared",
     source: "linkedin",
-    reached: f(`${described.length} technos rattachées à une réalisation concrète${recent ? `, dont ${recent} dans un poste de moins de 2 ans` : ""}.`, `${described.length} technologies tied to a concrete achievement${recent ? `, ${recent} of them in a role from the last 2 years` : ""}.`),
+    reached: f(`${described.length} technos rattachées à un poste ou une réalisation${recent ? `, dont ${recent} dans un poste de moins de 2 ans` : ""}.`, `${described.length} technologies tied to a role or an achievement${recent ? `, ${recent} of them in a role from the last 2 years` : ""}.`),
     next: nextLvl
       ? f(
-          `Pour ${nextLvl.score} : ${nextLvl.described} technos rattachées à une réalisation, dont ${nextLvl.recent} dans un poste de moins de 2 ans (tu en as ${described.length}, dont ${recent}).`,
-          `For ${nextLvl.score}: ${nextLvl.described} technologies tied to an achievement, ${nextLvl.recent} of them in a role from the last 2 years (you have ${described.length}, ${recent} recent).`,
+          `Pour ${nextLvl.score} : ${nextLvl.tied} technos rattachées à un poste, dont ${nextLvl.recent} dans un poste de moins de 2 ans (tu en as ${described.length}, dont ${recent}).`,
+          `For ${nextLvl.score}: ${nextLvl.tied} technologies tied to a role, ${nextLvl.recent} of them in a role from the last 2 years (you have ${described.length}, ${recent} recent).`,
         )
-      : f("Au-delà de 6 : la stack se prouve sur GitHub.", "Beyond 6: the stack is proven on GitHub."),
+      : f("Pour 10 : la même stack prouvée sur GitHub.", "For 10: the same stack proven on GitHub."),
     flags,
     // Des noms de technos, pas d'employeurs : la même pièce sur la page partagée.
     evidence: { text: f(`${shown}.`, `${shown}.`), publicText: f(`${shown}.`, `${shown}.`), source: "linkedin", ...(d.url ? { proof: d.url } : {}) },
+    table,
   });
 }
 
@@ -1282,35 +1336,73 @@ export function ownGithub(g: GithubInput, seniority: GridSeniority | undefined =
   });
 }
 
-export function ownDeclared(d: DeclaredInput): Draft {
+const ownDeclaredRows = (code: SeniorityCode): OwnDeclaredRow[] => GRID.OWN.declared[declaredKey(code)];
+/** La table déclarée de l'ownership, en clair. */
+export const ownDeclaredTable = (code: SeniorityCode): { score: number; text: Fact }[] =>
+  ownDeclaredRows(code).map((l) => {
+    const outs = f(`${l.outcomes} résultat${l.outcomes > 1 ? "s" : ""} daté${l.outcomes > 1 ? "s" : ""} et chiffré${l.outcomes > 1 ? "s" : ""}`, `${l.outcomes} dated and quantified outcome${l.outcomes > 1 ? "s" : ""}`);
+    const fo = l.foundedOutcomes ?? 0;
+    const firm = l.foundedMonths
+      ? f(`une entreprise fondée tenue ${span(l.foundedMonths).fr}${fo ? `, avec ${fo} résultat` : ""}`, `a company founded and run for ${span(l.foundedMonths).en}${fo ? `, with ${fo} outcome` : ""}`)
+      : f("une entreprise fondée", "a company founded");
+    return { score: l.score, text: f(`${outs.fr}, ou ${firm.fr}.`, `${outs.en}, or ${firm.en}.`) };
+  });
+
+/**
+ * L'ownership lu sur LinkedIn ou le CV (0.6.0) : la même table que GitHub, son équivalent
+ * déclaré, sans la preuve. Des résultats datés et chiffrés, ou une entreprise fondée,
+ * tenue assez longtemps pour le niveau.
+ */
+export function ownDeclared(d: DeclaredInput, seniority: GridSeniority | undefined = declaredSeniority(d)): Draft {
   const outcomes = d.reading.projects_with_dated_outcome;
   const infos = analyzeRoles(d.roles, d.now);
-  const founded = infos.find((r) => r.founder && r.kind === "full");
-  const L = GRID.OWN.declared;
-  const lvl = L.find((l) => outcomes >= l.outcomes || (l.founded && !!founded));
+  const foundedRoles = infos.filter((r) => r.founder && r.kind === "full");
+  const founded = foundedRoles.sort((a, b) => b.months - a.months)[0];
+  const foundedMonths = unionMonths(foundedRoles);
+  const L = ownDeclaredRows(tableOf(seniority));
+  const table = ownDeclaredTable(tableOf(seniority));
+  const byFounding = (l: OwnDeclaredRow) => !!founded && foundedMonths >= l.foundedMonths && outcomes >= (l.foundedOutcomes ?? 0);
+  const lvl = L.find((l) => outcomes >= l.outcomes || byFounding(l));
+  const lowest = L[L.length - 1];
   if (!lvl)
-    return missing(
-      "OWN",
-      "linkedin",
-      f("Ni entreprise fondée, ni résultat daté et chiffré.", "No company founded, no dated and quantified outcome."),
-      f("Pour 4 : une entreprise fondée, ou un résultat daté et chiffré (mise en ligne, migration, usage).", "For 4: a company founded, or a dated and quantified outcome (launch, migration, usage)."),
-    );
-  const counts = f(`${outcomes} résultat${outcomes > 1 ? "s" : ""} daté${outcomes > 1 ? "s" : ""} et chiffré${outcomes > 1 ? "s" : ""}.`, `${outcomes} dated and quantified outcome${outcomes === 1 ? "" : "s"}.`);
-  const foundedOnly = founded && outcomes < 1 && lvl.score < 6;
-  const reached = foundedOnly
-    ? f(`Une entreprise fondée (${founded.role.company}). Aucun résultat daté et chiffré.`, `A company founded (${founded.role.company}). No dated and quantified outcome.`)
+    return {
+      ...missing(
+        "OWN",
+        "linkedin",
+        f("Ni entreprise fondée, ni résultat daté et chiffré.", "No company founded, no dated and quantified outcome."),
+        f(
+          `Pour ${lowest.score} : une entreprise fondée, ou un résultat daté et chiffré (mise en ligne, migration, usage).`,
+          `For ${lowest.score}: a company founded, or a dated and quantified outcome (launch, migration, usage).`,
+        ),
+      ),
+      table,
+    };
+  const counts = outcomes
+    ? f(`${outcomes} résultat${outcomes > 1 ? "s" : ""} daté${outcomes > 1 ? "s" : ""} et chiffré${outcomes > 1 ? "s" : ""}.`, `${outcomes} dated and quantified outcome${outcomes === 1 ? "" : "s"}.`)
+    : f("Aucun résultat daté et chiffré.", "No dated and quantified outcome.");
+  const viaFounding = byFounding(lvl) && outcomes < lvl.outcomes;
+  const held = foundedMonths ? duration(foundedMonths) : null;
+  const what = foundedRoles.length > 1 ? f("Des entreprises fondées", "Companies founded") : f("Une entreprise fondée", "A company founded");
+  const tenure = held ? f(`, tenue${foundedRoles.length > 1 ? "s" : ""} ${held.fr}${foundedRoles.length > 1 ? " en tout" : ""}`, `, run for ${held.en}${foundedRoles.length > 1 ? " in total" : ""}`) : f("", "");
+  const reached = viaFounding
+    ? f(`${what.fr} (${founded!.role.company})${tenure.fr}. ${counts.fr}`, `${what.en} (${founded!.role.company})${tenure.en}. ${counts.en}`)
     : counts;
-  const publicReached = foundedOnly ? f("Une entreprise fondée. Aucun résultat daté et chiffré.", "A company founded. No dated and quantified outcome.") : counts;
+  const publicReached = viaFounding ? f(`${what.fr}${tenure.fr}. ${counts.fr}`, `${what.en}${tenure.en}. ${counts.en}`) : counts;
+  const nextLvl = [...L].reverse().find((l) => l.score > lvl.score);
+  const next = nextLvl
+    ? f(
+        `Pour ${nextLvl.score} : ${nextLvl.outcomes} résultats datés et chiffrés (tu en as ${outcomes}), ou une entreprise fondée tenue ${duration(nextLvl.foundedMonths).fr}${nextLvl.foundedOutcomes ? ` avec ${nextLvl.foundedOutcomes} résultat` : ""}.`,
+        `For ${nextLvl.score}: ${nextLvl.outcomes} dated and quantified outcomes (you have ${outcomes}), or a company founded and run for ${duration(nextLvl.foundedMonths).en}${nextLvl.foundedOutcomes ? ` with ${nextLvl.foundedOutcomes} outcome` : ""}.`,
+      )
+    : f("Pour 10 : un projet porté et utilisé, prouvé sur GitHub.", "For 10: a project carried and used, proven on GitHub.");
   return crit("OWN", {
     score: lvl.score,
     state: "declared",
     source: "linkedin",
     reached,
-    next:
-      lvl.score < 6
-        ? f(`Pour 6 : trois résultats datés et chiffrés (tu en as ${outcomes}). Au-delà, un projet sur GitHub.`, `For 6: three dated and quantified outcomes (you have ${outcomes}). Beyond that, a project on GitHub.`)
-        : f("Au-delà de 6 : un projet porté et utilisé, sur GitHub.", "Beyond 6: a project carried and used, on GitHub."),
+    next,
     evidence: { text: reached, publicText: publicReached, source: "linkedin", ...(d.url ? { proof: d.url } : {}) },
+    table,
   });
 }
 
@@ -1500,6 +1592,8 @@ export function empCrossCheck(draft: Draft, d: DeclaredInput, gh: GithubSide): D
     return f(`${src} : ${what.fr.toLowerCase()}, ${roleWhen(r).fr}.`, `${src}: ${what.en.toLowerCase()}, ${roleWhen(r).en}.`);
   };
   const confirmed = f("Poste confirmé par le code.", "Role confirmed by the code.");
+  // Le poste confirmé par le code, ou le même employeur des deux côtés : recoupé, donc prouvé (0.6.0).
+  const proven = (x: Draft) => withProof(x);
   const prs = mergedPrs(facts) ?? [];
   for (const r of roles) {
     const words = new Set(crossTokens([r.role.company, r.role.title, r.role.description ?? ""].join(" ")));
@@ -1518,7 +1612,7 @@ export function empCrossCheck(draft: Draft, d: DeclaredInput, gh: GithubSide): D
       const [repo, k] = prHit;
       const n = `${k} PR fusionnée${k > 1 ? "s" : ""}`;
       const nEn = `${k} merged PR${k > 1 ? "s" : ""}`;
-      return {
+      return proven({
         ...draft,
         evidence: {
           text: join([head(r), f(`GitHub : ${n} dans ${repo} sur ces mois.`, `GitHub: ${nEn} into ${repo} over those months.`), confirmed]),
@@ -1526,7 +1620,7 @@ export function empCrossCheck(draft: Draft, d: DeclaredInput, gh: GithubSide): D
           source: "both",
           ...proof,
         },
-      };
+      });
     }
     // Un de ses dépôts, actif pendant le poste, qui porte un mot du poste.
     const own = facts.repos
@@ -1535,7 +1629,7 @@ export function empCrossCheck(draft: Draft, d: DeclaredInput, gh: GithubSide): D
       .sort((a, b) => (b.commitCount ?? 0) - (a.commitCount ?? 0))[0];
     if (own) {
       const c = own.commitCount ?? 0;
-      return {
+      return proven({
         ...draft,
         evidence: {
           text: join([head(r), f(`GitHub : ${own.name}, ${nf(c, "fr")} commits, actif sur les mêmes mois.`, `GitHub: ${own.name}, ${nf(c, "en")} commits, active over the same months.`), confirmed]),
@@ -1543,7 +1637,7 @@ export function empCrossCheck(draft: Draft, d: DeclaredInput, gh: GithubSide): D
           source: "both",
           ...proof,
         },
-      };
+      });
     }
   }
   // Le même employeur des deux côtés : la société ou le site du profil GitHub, face au poste en cours.
@@ -1559,7 +1653,7 @@ export function empCrossCheck(draft: Draft, d: DeclaredInput, gh: GithubSide): D
     if (!byCompany && !bySite) continue;
     const shown = byCompany ? ghCompany : site.replace(/^https?:\/\//, "").replace(/\/$/, "");
     const what = byCompany ? f("société", "company") : f("site", "website");
-    return {
+    return proven({
       ...draft,
       evidence: {
         text: join([head(r), f(`Profil GitHub, ${what.fr} : ${shown}.`, `GitHub profile, ${what.en}: ${shown}.`), f("Même employeur des deux côtés.", "Same employer on both sides.")]),
@@ -1567,7 +1661,7 @@ export function empCrossCheck(draft: Draft, d: DeclaredInput, gh: GithubSide): D
         source: "both",
         ...proof,
       },
-    };
+    });
   }
   return draft;
 }
@@ -1592,7 +1686,9 @@ export function stkCrossCheck(draft: Draft, d: DeclaredInput, gh: GithubSide): D
   else if (found.length) parts.push(f(`Retrouvées dans le code\u00a0: ${list(found)}.`, `Found in the code: ${list(found)}.`));
   // Des noms de technos, pas d'employeurs : la même pièce sur la page partagée.
   const text = join(parts);
-  return { ...draft, evidence: { text, publicText: text, source: "both", proof: profileUrl(gh.facts.login) } };
+  const checked: Draft = { ...draft, evidence: { text, publicText: text, source: "both", proof: profileUrl(gh.facts.login) } };
+  // Des technos déclarées retrouvées dans le code : la stack déclarée est recoupée, donc prouvée (0.6.0).
+  return found.length && draft.state === "declared" ? withProof(checked) : checked;
 }
 
 // --- La note générale (§4) ------------------------------------------------------------
@@ -1601,8 +1697,9 @@ export function stkCrossCheck(draft: Draft, d: DeclaredInput, gh: GithubSide): D
  * Les quatre règles, et pas une de plus : (1) un critère sans note sort de la
  * moyenne ; (2) l'école et l'open source n'y entrent que s'ils sont au-dessus de
  * la moyenne des autres ; (3) plafond à 85 sans code prouvé ; (4) moins d'un
- * quart des coefficients noté : 20. Calcul en entiers (coefficients doublés),
- * arrondi au supérieur à ,5, bornes 1 à 99.
+ * quart des coefficients noté : 20. Ce que LinkedIn ou le CV déclare compte comme
+ * le reste (0.6.0) : la preuve est déjà dans les notes (`withProof`). Calcul en
+ * entiers (coefficients doublés), arrondi au supérieur à ,5, bornes 1 à 99.
  */
 export function finalize(drafts: Draft[], seniority?: GridSeniority): Grid {
   const F = GRID.final;
@@ -1614,8 +1711,8 @@ export function finalize(drafts: Draft[], seniority?: GridSeniority): Grid {
   const scored = ordered.filter((d) => d.score !== null && w2(d.code) > 0);
   const scored2 = scored.reduce((s, d) => s + w2(d.code), 0);
   const neverCodes = new Set(F.neverLower);
-  // L'école et l'open source, et (0.5.0) ce qui n'est que déclaré : jamais vers le bas.
-  const never = (d: Draft) => neverCodes.has(d.code) || (F.declaredNeverLower && d.state === "declared" && d.source === "linkedin");
+  // L'école et l'open source : jamais vers le bas.
+  const never = (d: Draft) => neverCodes.has(d.code);
   const meta = { weights: { ...GRID.weights }, ...(seniority ? { seniority } : {}) };
 
   if (scored2 < F.emptyBelowShare * total2) {
@@ -1645,15 +1742,16 @@ export function finalize(drafts: Draft[], seniority?: GridSeniority): Grid {
 
 /** Ce que GitHub prouve, critère par critère, lu au niveau d'expérience du dossier. Aucune note. */
 function githubDrafts(g: GithubInput, seniority: GridSeniority | undefined): Draft[] {
+  // Tout ce que GitHub montre est prouvé (0.6.0), sauf l'expérience, qu'il ne fait qu'estimer.
   return [
-    eduGithub(g),
+    withProof(eduGithub(g)),
     xpGithub(g),
     missing("EMP", "github", f("Le parcours se lit sur LinkedIn ou le CV\u00a0: pas encore au dossier.", "Career path is read on LinkedIn or the résumé: not on file yet.")),
-    stkGithub(g, seniority),
-    codeGithub(g),
-    actGithub(g),
-    ownGithub(g, seniority),
-    ossGithub(g),
+    withProof(stkGithub(g, seniority)),
+    withProof(codeGithub(g)),
+    withProof(actGithub(g)),
+    withProof(ownGithub(g, seniority)),
+    withProof(ossGithub(g)),
   ];
 }
 
@@ -1669,10 +1767,10 @@ function declaredDrafts(d: DeclaredInput, gh?: Pick<GithubInput, "facts" | "m">)
     eduDeclared(d),
     check(xpDeclared(d), xpCrossCheck),
     check(empDeclared(d, declaredSeniority(d)), empCrossCheck),
-    check(stkDeclared(d, gh), stkCrossCheck),
+    check(stkDeclared(d, gh, declaredSeniority(d)), stkCrossCheck),
     unproven("CODE", "linkedin", f(`Le code ne se prouve pas sur ${src}.`, `Code cannot be proven on ${src}.`)),
     unproven("ACT", "linkedin", f(`L'activité ne se lit pas sur ${src}.`, `Activity cannot be read on ${src}.`)),
-    ownDeclared(d),
+    ownDeclared(d, declaredSeniority(d)),
     unproven("OSS", "linkedin", f(`Une mention « open source » sur ${src} ne donne rien sans trace.`, `An "open source" mention on ${src} gives nothing without a trace.`)),
   ];
 }
@@ -1744,13 +1842,15 @@ function mergeDrafts(declared: Draft[], proven: Draft[], label: "LinkedIn" | "CV
         chosen = has(d) || !has(p) ? d : p;
         source = chosen.source;
         break;
+      case "STK":
       case "OWN":
+        // La même table des deux côtés (0.6.0) : la plus haute des deux notes, la preuve comprise.
         chosen = has(p) && (!has(d) || p.score! >= d.score!) ? p : has(d) ? d : p;
         source = has(p) && has(d) ? "both" : chosen.source;
         break;
       default:
-        // STK : le prouvé, le déclaré seulement sans preuve. CODE, ACT, OSS : GitHub.
-        chosen = code === "STK" && !has(p) && has(d) ? d : p;
+        // CODE, ACT, OSS : GitHub.
+        chosen = p;
         source = chosen.source;
     }
     const flags = mergeFlags(d.flags, p.flags);

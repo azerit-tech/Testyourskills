@@ -405,7 +405,8 @@ describe("la lecture du recruteur (§18.37)", () => {
     expect(fold.match(/class="rr-tile /g)).toHaveLength(7);
     // L'expérience ne se note plus (barème 0.5.0) : une ligne courte dit le niveau.
     expect(fold).toMatch(/class="rr-pending-line rr-level">Jugé au niveau [^<]+</);
-    expect(fold.replace(/<[^>]+>/g, " ")).not.toMatch(/(^|\s)[+−]\s?\d/);
+    // Un seul « + n » permis : « prouvé +1 », la preuve (décision du 20 novembre, §18.106).
+    expect(fold.replace(/<[^>]+>/g, " ").replace(/(prouvé|proven)\s\+1\b/g, "$1")).not.toMatch(/(^|\s)[+−]\s?\d/);
     // Le détail critère par critère et le calcul : un pli dans le pli, fermé ; plus d'invitation à toucher une tuile (§18.76).
     expect(fold).toMatch(/<details class="rg rg-fold"><summary class="rg-fold-sum"><span>Le détail, critère par critère<\/span>/);
     expect(html.match(/class="rg-row /g)).toHaveLength(8);
@@ -432,7 +433,7 @@ describe("la lecture du recruteur (§18.37)", () => {
     const { scored, pending } = tileOrder(grid);
     expect(pending.length).toBeLessThanOrEqual(2);
     expect(names).toEqual([...scored, ...pending].filter((c) => c.code !== "XP").map((c) => DICTS.fr.read.short[c.code]));
-    expect(names).not.toContain("Expérience");
+    expect(names).not.toContain(DICTS.fr.read.short.XP);
     if (pending.length) expect(html).toContain('<p class="rr-pending">Pas encore au dossier</p>');
   });
 

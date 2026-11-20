@@ -55,10 +55,10 @@ const TABLE: Record<CriterionCode, number[]> = {
   EDU: [...Object.values(GRID.EDU.tiers), ...Object.values(GRID.EDU.selection), GRID.EDU.githubScore],
   XP: GRID.XP.levels.map((l) => l.score),
   EMP: Object.values(GRID.EMP.tables).flatMap((rows) => rows.map((l) => l.score)),
-  STK: [...GRID.STK.levels.map((l) => l.score), ...GRID.STK.declared.map((l) => l.score)],
+  STK: [...GRID.STK.levels.map((l) => l.score), ...Object.values(GRID.STK.declared).flatMap((rows) => rows.map((l) => l.score))],
   CODE: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
   ACT: GRID.ACT.levels.map((l) => l.score),
-  OWN: [...GRID.OWN.levels.map((l) => l.score), ...GRID.OWN.declared.map((l) => l.score)],
+  OWN: [...GRID.OWN.levels.map((l) => l.score), ...Object.values(GRID.OWN.declared).flatMap((rows) => rows.map((l) => l.score))],
   OSS: GRID.OSS.levels.map((l) => l.score),
 };
 
@@ -122,37 +122,42 @@ describe("les deux fondateurs (§7), à un point près", () => {
   // elle donne maintenant le niveau, « Junior », et le parcours, la stack et l'ownership se lisent à ce
   // niveau : Azerit fondée et tenue 7 mois, 6 au lieu de 4 ; 329 commits depuis deux ans et une autre
   // famille de langages, 8 au lieu de 6 ; un projet porté 17 mois avec de quoi mettre en production, 8 au lieu de 6.
-  it("Jacques, niveau « Junior » : LinkedIn 60, GitHub 77, dossier 72", () => {
-    expect(scores(jLinkedin)).toEqual({ EDU: 6, XP: 3, EMP: 6, STK: null, CODE: null, ACT: null, OWN: 4, OSS: null });
-    expect(scores(jGithub)).toEqual({ EDU: null, XP: 4, EMP: null, STK: 8, CODE: 7, ACT: 8, OWN: 8, OSS: 6 });
-    expect(scores(jCase)).toEqual({ EDU: 6, XP: 3, EMP: 6, STK: 8, CODE: 7, ACT: 8, OWN: 8, OSS: 6 });
+  // Barème 0.6.0 (§18.106) : la preuve +1 sur chaque critère montré par GitHub (stack 9, code 8, activité 9,
+  // ownership 9, open source 7) et sur le poste confirmé par le code (expérience 7) ; Azerit fondée et tenue
+  // 7 mois se lit dans la table LinkedIn de l'ownership (6, compté). GitHub 77 → 87, dossier 72 → 80 ;
+  // la pièce LinkedIn recoupée par le code 60 → 67 (seule, toujours 60).
+  it("Jacques, niveau « Junior » : LinkedIn 67 recoupé (60 seul), GitHub 87 (77 sous 0.5.0), dossier 80 (72) : la preuve +1", () => {
+    expect(scores(jLinkedin)).toEqual({ EDU: 6, XP: 3, EMP: 7, STK: null, CODE: null, ACT: null, OWN: 6, OSS: null });
+    expect(scores(jGithub)).toEqual({ EDU: null, XP: 4, EMP: null, STK: 9, CODE: 8, ACT: 9, OWN: 9, OSS: 7 });
+    expect(scores(jCase)).toEqual({ EDU: 6, XP: 3, EMP: 7, STK: 9, CODE: 8, ACT: 9, OWN: 9, OSS: 7 });
     expect(jLinkedin.seniority).toEqual({ code: "junior", months: 13.5, source: "linkedin" });
     expect(jGithub.seniority).toEqual({ code: "junior", months: 24, source: "github" });
     expect(jCase.seniority).toEqual(jLinkedin.seniority);
-    expect(jLinkedin.overall).toBe(60);
-    expect(jGithub.overall).toBe(77);
-    expect(jCase.overall).toBe(72);
+    expect(jLinkedin.overall).toBe(67);
+    expect(jGithub.overall).toBe(87);
+    expect(jCase.overall).toBe(80);
     // L'expérience ne pèse plus, nulle part : elle garde sa lecture, hors moyenne.
     for (const g of [jLinkedin, jGithub, jCase]) expect(crit(g, "XP").counted).toBe(false);
-    // L'ownership seulement déclaré (4) est sous le parcours (6) : hors moyenne, comme l'école (6, pas au-dessus).
-    expect(crit(jLinkedin, "OWN").counted).toBe(false);
+    // L'ownership déclaré compte comme le reste (0.6.0) ; l'école (6) reste hors moyenne, pas au-dessus.
+    expect(crit(jLinkedin, "OWN").counted).toBe(true);
     expect(crit(jLinkedin, "EDU").counted).toBe(false);
-    // L'open source (6) n'est au-dessus ni de 7,7 sur la fiche GitHub ni de 7,2 au dossier : hors moyenne.
+    // L'open source (7) n'est au-dessus ni de 8,7 sur la fiche GitHub ni de 8 au dossier : hors moyenne.
     expect(crit(jGithub, "OSS").counted).toBe(false);
     expect(crit(jCase, "OSS").counted).toBe(false);
     expect(jLinkedin.rule).toBe("capped_unproven");
     expect(jGithub.rule).toBeUndefined();
   });
 
-  // Barème 0.4.0 : LinkedIn 45, dossier 45.
-  it("Lumine, niveau « Junior » : LinkedIn 66, GitHub 20 (dossier vide), dossier 66 « code non prouvé »", () => {
-    expect(scores(lLinkedin)).toEqual({ EDU: 8, XP: 3, EMP: 6, STK: null, CODE: null, ACT: null, OWN: 4, OSS: null });
+  // Barème 0.4.0 : LinkedIn 45, dossier 45. 0.5.0 : 66. 0.6.0 : deux entreprises fondées, 21 mois cumulés,
+  // l'expérience à 8 (au lieu de 6, chacune lue seule) et l'ownership déclaré à 6 (au lieu de 4) : 75.
+  it("Lumine, niveau « Junior » : LinkedIn 75 (66 sous 0.5.0, les mois de fondatrice cumulés), GitHub 20 (dossier vide), dossier 75 « code non prouvé »", () => {
+    expect(scores(lLinkedin)).toEqual({ EDU: 8, XP: 3, EMP: 8, STK: null, CODE: null, ACT: null, OWN: 6, OSS: null });
     expect(lLinkedin.seniority?.code).toBe("junior");
-    expect(lLinkedin.overall).toBe(66);
+    expect(lLinkedin.overall).toBe(75);
     expect(lGithub.overall).toBe(20);
     expect(lGithub.rule).toBe("empty_file");
     expect(lGithub.criteria.every((c) => c.score === null && !c.counted)).toBe(true);
-    expect(lCase.overall).toBe(66);
+    expect(lCase.overall).toBe(75);
     expect(lCase.rule).toBe("capped_unproven");
     expect(crit(lCase, "STK").state).toBe("unproven");
     expect(crit(lCase, "ACT").state).toBe("unproven");
@@ -165,7 +170,8 @@ describe("les deux fondateurs (§7), à un point près", () => {
     expect(sp(crit(jLinkedin, "XP").reached.fr)).toBe("1,1 an compté sur les postes datés : niveau « Junior » (de 1 à 3 ans).");
     expect(crit(jLinkedin, "XP").next).toBeUndefined();
     expect(sp(crit(jLinkedin, "EMP").reached.fr)).toBe("Azerit fondée et tenue 7 mois.");
-    expect(sp(crit(jLinkedin, "EMP").next?.fr)).toBe("Pour 8 : un an dans une équipe produit exigeante (startup, scale-up), ou une entreprise fondée tenue un an.");
+    // Le poste est confirmé par le code (+1) : la ligne suivante se dit avec la preuve, 9.
+    expect(sp(crit(jLinkedin, "EMP").next?.fr)).toBe("Pour 9 : un an dans une équipe produit exigeante (startup, scale-up), ou une entreprise fondée tenue un an.");
     // La table lue est celle du niveau, portée par la grille : la ligne obtenue y figure.
     expect(crit(jLinkedin, "EMP").table?.map((r) => r.score)).toEqual(GRID.EMP.tables.junior.map((r) => r.score));
     expect(sp(crit(jLinkedin, "EMP").table?.find((r) => r.score === 6)?.text.fr)).toBe("6 mois dans une équipe produit exigeante (startup, scale-up), ou une entreprise fondée tenue 6 mois, ou un poste tenu 2 ans.");
@@ -181,11 +187,11 @@ describe("les deux fondateurs (§7), à un point près", () => {
     expect(crit(jGithub, "XP").reached.fr).toMatch(/^Estimée : 2 années actives/);
   });
 
-  it("la comparaison garde les deux notes de chaque critère, et retient le prouvé", () => {
+  it("la comparaison garde les deux notes de chaque critère, et retient la plus haute, preuve comprise (0.6.0)", () => {
     const own = crit(jCase, "OWN");
-    expect([own.declared, own.proven, own.score, own.source]).toEqual([4, 8, 8, "both"]);
+    expect([own.declared, own.proven, own.score, own.source]).toEqual([6, 9, 9, "both"]);
     const stk = crit(jCase, "STK");
-    expect([stk.declared, stk.proven, stk.score, stk.source]).toEqual([null, 8, 8, "github"]);
+    expect([stk.declared, stk.proven, stk.score, stk.source]).toEqual([null, 9, 9, "github"]);
     const xp = crit(jCase, "XP");
     expect([xp.declared, xp.proven, xp.score, xp.source]).toEqual([3, 4, 3, "linkedin"]);
   });
@@ -207,17 +213,19 @@ describe("les recoupements LinkedIn × GitHub : la pièce « recoupé » (§3, �
       "LinkedIn : Research Intern, McMaster University, février 2025 – novembre 2025. GitHub : agda-notes, 25 commits, actif sur les mêmes mois. Poste confirmé par le code.",
     );
     expect(crit(g, "STK").evidence!.text.fr).toMatch(/\(sequence-mail\)\. Agda aussi dans le code\. Déclarées sur LinkedIn\u00a0: Python, Agda, TypeScript, Kubernetes\. Retrouvées dans le code\u00a0: Agda, TypeScript\.$/);
-    expect(crit(g, "OWN").evidence!.text.fr).toBe("sequence-mail : 120 commits sur 17 mois. Sur LinkedIn\u00a0: une entreprise fondée (Azerit). Aucun résultat daté et chiffré.");
+    expect(sp(crit(g, "OWN").evidence!.text.fr)).toBe("sequence-mail : 120 commits sur 17 mois. Sur LinkedIn : une entreprise fondée (Azerit), tenue 7 mois. Aucun résultat daté et chiffré.");
     // Un dossier, une fiche, une note (§18.36) : aucune tournure d'écart dans les pièces.
     for (const c of g.criteria) expect(JSON.stringify([c.evidence, c.flags]), c.code).not.toMatch(/Sans trace publique|Moins d'années|Du code public sur plus|en dessous de la vérité|Déclaré :/);
   });
 
-  it("un recoupement ne change aucune note, ni la note du dossier", () => {
+  it("un recoupement qui confirme ajoute la preuve, +1, et rien d'autre (0.6.0 ; aucun effet sous 0.5.0)", () => {
     const alone = declaredGrid(decl(jacquesReading(), jacquesProfile()));
-    expect(scores(jDeclared())).toEqual(scores(alone));
-    expect(jDeclared().overall).toBe(alone.overall);
-    // Au dossier, les notes déclarées sont celles de la pièce lue seule.
-    for (const c of jCase().criteria) if (c.declared != null) expect(c.declared, c.code).toBe(score(alone, c.code));
+    // Le poste confirmé par le code : l'expérience 6 → 7, la seule note qui bouge.
+    expect(scores(jDeclared())).toEqual({ ...scores(alone), EMP: score(alone, "EMP")! + 1 });
+    expect(crit(jDeclared(), "EMP").bonus).toBe(1);
+    expect([alone.overall, jDeclared().overall]).toEqual([60, 67]);
+    // Au dossier, les notes déclarées sont celles de la pièce lue seule, plus la preuve quand le code la confirme.
+    for (const c of jCase().criteria) if (c.declared != null) expect(c.declared, c.code).toBe(score(jDeclared(), c.code));
   });
 
   it("moins d'années de code public que de métier compté : la pièce reste celle de LinkedIn, le point passe « à confirmer », pour la personne seule", () => {
@@ -225,7 +233,8 @@ describe("les recoupements LinkedIn × GitHub : la pièce « recoupé » (§3, �
     const withGh = declaredGrid(d, gh(jacquesFacts()));
     const xp = crit(withGh, "XP");
     expect(xp.score).toBe(crit(declaredGrid(d), "XP").score);
-    expect(withGh.overall).toBe(declaredGrid(d).overall);
+    // Seule la stack retrouvée dans le code prend la preuve, 6 → 7 : 76 → 78.
+    expect([declaredGrid(d).overall, withGh.overall]).toEqual([76, 78]);
     expect(xp.evidence!.source).toBe("linkedin");
     expect(xp.evidence!.text.fr).toMatch(/ GitHub : 2 années actives \(50 contributions ou plus sur douze mois\)\.$/);
     expect(xp.evidence!.publicText!.fr).not.toMatch(/GitHub/);
@@ -294,12 +303,14 @@ describe("aucune note par addition", () => {
     declaredGrid(decl(jacquesReading(), jacquesProfile())),
   ];
 
-  it("chaque critère rend une note de sa table, entière de 0 à 10", () => {
+  it("chaque critère rend une note de sa table, entière de 0 à 10, plus la preuve (+1 au plus, 0.6.0)", () => {
     for (const g of grids)
       for (const c of g.criteria) {
         if (c.score === null) continue;
         expect(Number.isInteger(c.score), c.code).toBe(true);
-        expect(TABLE[c.code], `${c.code} ${c.score}`).toContain(c.score);
+        expect(c.bonus ?? 0, c.code).toBeLessThanOrEqual(GRID.final.proofBonus);
+        expect(c.score, c.code).toBeLessThanOrEqual(10);
+        expect(TABLE[c.code], `${c.code} ${c.score}`).toContain(c.score - (c.bonus ?? 0));
       }
   });
 
@@ -312,28 +323,29 @@ describe("aucune note par addition", () => {
       reached: { fr: "x", en: "x" },
       flags: [],
     });
-    // L'expérience ne pèse pas (coefficient 0). Sans l'école ni l'open source :
-    // (4 × 2,5 + 8 × 2 + 6 × 1,5 + 2 × 1,5 + 10) ÷ 8,5 = 48 ÷ 8,5 = 5,65.
-    // École 4 sous 5,65 : dehors. Open source 8 au-dessus : dedans, 52 ÷ 9 = 5,78 → 58.
+    // Le niveau ne pèse pas (coefficient 0) ; l'expérience pèse 4 depuis 0.6.0. Sans l'école ni l'open source :
+    // (4 × 4 + 8 × 2 + 6 × 1,5 + 2 × 1,5 + 10) ÷ 10 = 54 ÷ 10 = 5,4.
+    // École 4 sous 5,4 : dehors. Open source 8 au-dessus : dedans, 58 ÷ 10,5 = 5,52 → 55 (58 sous 0.5.0, l'expérience à 2,5).
     const g = finalize([c("EDU", 4), c("XP", 4), c("EMP", 4), c("STK", 6), c("CODE", 8), c("ACT", 10), c("OWN", 2), c("OSS", 8)]);
-    expect(g.overall).toBe(58);
+    expect(g.overall).toBe(55);
     expect(g.criteria.filter((x) => !x.counted).map((x) => x.code)).toEqual(["EDU", "XP"]);
     expect(g.weights).toEqual(GRID.weights);
     // Dix ans ou un an d'expérience : la même note, à critères égaux.
-    expect(finalize([c("EDU", 4), c("XP", 10), c("EMP", 4), c("STK", 6), c("CODE", 8), c("ACT", 10), c("OWN", 2), c("OSS", 8)]).overall).toBe(58);
-    // Arrondi au supérieur à ,5 : (7 × 2,5 + 7 × 2 + 6 × 1,5 + 6 × 1,5 + 8) ÷ 8,5 = 57,5 ÷ 8,5 = 6,7647 → 68 ; 62,5 ÷ 10 = 6,25 → 63.
+    expect(finalize([c("EDU", 4), c("XP", 10), c("EMP", 4), c("STK", 6), c("CODE", 8), c("ACT", 10), c("OWN", 2), c("OSS", 8)]).overall).toBe(55);
+    // (7 × 4 + 7 × 2 + 6 × 1,5 + 6 × 1,5 + 8) ÷ 10 = 6,8 → 68 ; arrondi au supérieur à ,5 : (60 + 7 + 3,5) ÷ 11,5 = 6,13 → 61.
     expect(finalize([c("EDU", 6), c("XP", 3), c("EMP", 7), c("STK", 6), c("CODE", 7), c("ACT", 8), c("OWN", 6), c("OSS", 6)]).overall).toBe(68);
-    expect(finalize([c("EDU", 7), c("XP", 3), c("EMP", 5), c("STK", 6), c("CODE", 7), c("ACT", 8), c("OWN", 6), c("OSS", 7)]).overall).toBe(63);
+    expect(finalize([c("EDU", 7), c("XP", 3), c("EMP", 5), c("STK", 6), c("CODE", 7), c("ACT", 8), c("OWN", 6), c("OSS", 7)]).overall).toBe(61);
     // Rien n'est ajouté à une base : tous les critères à n donnent 10 × n.
     for (const n of [2, 5, 8]) expect(finalize(CRITERION_CODES.map((k) => c(k, n))).overall).toBe(10 * n);
-    // Seulement déclaré (LinkedIn ou CV, sans preuve) : jamais vers le bas, comme l'école. Parcours 8 seul = 80 ;
-    // une stack déclarée à 4 n'y entre pas, à 6 sous un parcours à 5 elle y entre : (5 × 2,5 + 6 × 1,5) ÷ 4 = 5,375 → 54.
+    // Déclaré (LinkedIn ou CV, sans preuve) : compté comme le reste depuis 0.6.0, vers le haut comme vers le bas.
+    // Expérience 8 et stack 4 : (8 × 4 + 4 × 1,5) ÷ 5,5 = 6,91 → 69 (80 sous 0.5.0, la stack hors moyenne) ;
+    // expérience 5 et stack 6 : (5 × 4 + 6 × 1,5) ÷ 5,5 = 5,27 → 53.
     const declared = (code: CriterionCode, n: number): Omit<GridCriterion, "counted"> => ({ ...c(code, n), state: "declared", source: "linkedin" });
     const none = (code: CriterionCode) => c(code, null);
     const li = (emp: number, stk: number) => finalize([none("EDU"), none("XP"), { ...c("EMP", emp), source: "linkedin" }, declared("STK", stk), none("CODE"), none("ACT"), none("OWN"), none("OSS")]);
-    expect(li(8, 4).overall).toBe(80);
-    expect(li(8, 4).criteria.find((x) => x.code === "STK")!.counted).toBe(false);
-    expect(li(5, 6).overall).toBe(54);
+    expect(li(8, 4).overall).toBe(69);
+    expect(li(8, 4).criteria.find((x) => x.code === "STK")!.counted).toBe(true);
+    expect(li(5, 6).overall).toBe(53);
   });
 
   it("un chef d'accusation ne change aucune note", () => {
@@ -536,14 +548,14 @@ describe("les traces dans le code (§3.4)", () => {
     for (const n of named) expect(flag.fr).not.toContain(n);
   });
 
-  it("des technos vérifiables absentes du code : « À confirmer », dès la première ; la note ne bouge pas", () => {
+  it("des technos vérifiables absentes du code : « À confirmer », dès la première ; la retrouvée prend la preuve, +1 (0.6.0)", () => {
     const r = cvReading({ technos_listed: ["Kubernetes", "Terraform", "Redis", "MongoDB", "TypeScript"], technos_described: ["TypeScript", "React"] });
     const flags = stackFlags(decl(r), gh(facts()));
     expect(flags[0].fr).toMatch(/^À confirmer\u00a0: Kubernetes, Terraform, Redis\. Déclarées sur le CV/);
     const withGh = declaredGrid(decl(r), gh(facts()));
     const without = declaredGrid(decl(r));
-    expect(crit(withGh, "STK").score).toBe(crit(without, "STK").score);
-    expect(withGh.overall).toBe(without.overall);
+    expect([crit(without, "STK").score, crit(withGh, "STK").score]).toEqual([4, 5]);
+    expect([without.overall, withGh.overall]).toEqual([56, 58]);
     // Sans seuil : une techno sur deux absente suffit, la retrouvée n'est pas citée
     const few = cvReading({ technos_listed: ["Kubernetes", "TypeScript"], technos_described: [] });
     expect(stackFlags(decl(few), gh(facts())).filter((x) => /^À confirmer/.test(x.fr)).map((x) => [x.fr, x.en])).toEqual([
@@ -579,18 +591,18 @@ describe("les traces dans le code (§3.4)", () => {
 });
 
 describe("données de la tâche 1, facultatives", () => {
-  it("sans elles, les niveaux restent fermés ; avec elles, ils s'ouvrent", () => {
-    // Open source : la destination des PR ouvre le niveau 8.
+  it("sans elles, les niveaux restent fermés ; avec elles, ils s'ouvrent (sur GitHub, la ligne + la preuve, 0.6.0)", () => {
+    // Open source : la destination des PR ouvre le niveau 8 (9 avec la preuve).
     const f0 = jacquesFacts();
-    expect(score(githubGrid(gh(f0, JACQUES_AI)), "OSS")).toBe(6);
+    expect(score(githubGrid(gh(f0, JACQUES_AI)), "OSS")).toBe(7);
     const withDest = { ...f0, externalMergedPRList: [{ repo: "agda/agda-stdlib", stars: 1100, mergedAt: "2025-11-03T10:00:00Z" }] };
     const oss = crit(githubGrid(gh(withDest, JACQUES_AI)), "OSS");
-    expect(oss.score).toBe(8);
+    expect(oss.score).toBe(9);
     expect(oss.evidence?.text.fr).toBe("1 PR fusionnée dans agda/agda-stdlib, la dernière en novembre 2025.");
     // PR entre proches : comptées jusqu'au niveau 4.
     const friends = { ...f0, accomplices: [{ login: "lumbuilds0", avatarUrl: "" }], externalMergedPRList: [{ repo: "LumBuilds0/app", stars: 3, mergedAt: "2026-01-01T00:00:00Z" }] };
     const fo = crit(githubGrid(gh(friends, JACQUES_AI)), "OSS");
-    expect(fo.score).toBe(4);
+    expect(fo.score).toBe(5);
     expect(fo.flags[0].fr).toMatch(/^PR entre proches/);
 
     // Parcours : sans type d'employeur ni liste, deux ans d'un poste donnent 6 ; scale-up lue par l'IA, 8 ; liste et trajectoire, 10.
@@ -630,11 +642,13 @@ describe("des débuts de carrière différents n'ont plus la même note (les tro
   const tenMonthsHighBar = early([role("Software Engineer", "Fictiva Labs", "2026-01", null)], ["Go", "Kafka", "React"], 2);
   const all = [twoInternships, shortJobAndInternship, apprentice, tenMonthsAnywhere, tenMonthsHighBar];
 
-  it("cinq débuts de carrière, moins d'un an comptés chacun : plus une seule et même note, et plus 38", () => {
+  it("cinq débuts de carrière, moins d'un an comptés chacun : plus une seule et même note, et plus 38 (0.6.0 : la stack déclarée compte, plafond 80)", () => {
     const notes = all.map((g) => g.overall);
     expect(notes).not.toEqual([38, 38, 38, 38, 38]);
-    // Deux stages, un premier poste : 60. Dix-huit mois d'alternance et de stage : 70. Dix mois chez un employeur très sélectif : 85, le plafond sans code prouvé.
-    expect(notes).toEqual([60, 60, 70, 60, 85]);
+    // Deux stages : 55 (60 sous 0.5.0 : deux technos rattachées, la stack à 4, compte maintenant comme sur GitHub).
+    // Un premier poste et un stage : 56 (60). Dix-huit mois d'alternance et de stage : 70. Un premier poste ailleurs : 60.
+    // Dix mois chez un employeur très sélectif : 80, le plafond sans code prouvé (85 sous 0.5.0).
+    expect(notes).toEqual([55, 56, 70, 60, 80]);
     for (const g of all) expect(g.seniority?.code).toBe("student");
   });
 
@@ -649,14 +663,15 @@ describe("des débuts de carrière différents n'ont plus la même note (les tro
     expect(starsFor(g.overall)).toBe(4);
   });
 
-  it("8 mois de stage (0,3 an compté) : la note suit ce que valent les stages, de 50 à 85", () => {
+  it("8 mois de stage (0,3 an compté) : la note suit ce que valent les stages, de 50 à 80 (le plafond sans code prouvé, 85 sous 0.5.0)", () => {
     const one = early([role("Stagiaire développeur", "Atelier Brume", "2026-01", "2026-09")]);
     const two = early([role("Stagiaire développeur", "Atelier Brume", "2026-03", "2026-09"), role("Stagiaire", "Usine Navale", "2025-06", "2025-08")]);
     const product = early([role("Stagiaire développeur", "Atelier Brume", "2026-03", "2026-09", { employerType: "startup" }), role("Stagiaire", "Usine Navale", "2025-06", "2025-08")]);
     const highBar = early([role("Software Engineer Intern", "Fictiva Labs", "2026-03", "2026-09"), role("Stagiaire", "Usine Navale", "2025-06", "2025-08")]);
     for (const g of [one, two, product, highBar]) expect(g.seniority).toMatchObject({ code: "student", months: 4 });
     expect([one, two, product, highBar].map((g) => score(g, "EMP"))).toEqual([5, 6, 7, 10]);
-    expect([one, two, product, highBar].map((g) => g.overall)).toEqual([53, 60, 70, 85]);
+    // Un seul stage : 52 (53 sous 0.5.0, l'école à 6 pèse moins face à l'expérience au coefficient 4).
+    expect([one, two, product, highBar].map((g) => g.overall)).toEqual([52, 60, 70, 80]);
     expect(sp(crit(highBar, "EMP").reached.fr)).toBe("Un stage ou une alternance de 6 mois chez Fictiva Labs, employeur très sélectif à l'embauche.");
   });
 

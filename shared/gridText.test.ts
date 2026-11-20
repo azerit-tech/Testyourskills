@@ -47,7 +47,7 @@ describe("la note sur 100 tirée de la grille", () => {
 
   it("une grille 0.5.0 porte ses coefficients : l'expérience hors moyenne, « elle donne le niveau » ; une grille d'avant garde les siens", () => {
     expect(weightsOf(JACQUES)).toEqual(LEGACY_GRID_WEIGHTS);
-    // Le même dossier, lu au niveau « Junior » : parcours 6 (2,5), ownership 6 (1,5), l'expérience sans poids.
+    // Le même dossier, lu au niveau « Junior » : expérience 6 (4 depuis 0.6.0, 2,5 sous 0.5.0), ownership 6 (1,5), le niveau sans poids.
     const now: Grid = {
       overall: 65,
       weights: GRID_WEIGHTS,
@@ -55,8 +55,9 @@ describe("la note sur 100 tirée de la grille", () => {
       criteria: JACQUES.criteria.map((c) => (c.code === "XP" ? { ...c, counted: false } : c.code === "EMP" ? { ...c, score: 6 } : c.code === "EDU" || c.code === "OSS" ? { ...c, counted: false } : c)),
     };
     const m = gridMath(now);
-    expect(m.terms.map((t) => `${t.code} ${t.score} × ${t.weight}`)).toEqual(["EMP 6 × 2.5", "CODE 7 × 2", "STK 6 × 1.5", "OWN 6 × 1.5", "ACT 8 × 1"]);
-    expect([m.num, m.den, m.raw]).toEqual([55, 8.5, 65]);
+    expect(m.terms.map((t) => `${t.code} ${t.score} × ${t.weight}`)).toEqual(["EMP 6 × 4", "CODE 7 × 2", "STK 6 × 1.5", "OWN 6 × 1.5", "ACT 8 × 1"]);
+    // (6 × 4 + 7 × 2 + 6 × 1,5 + 6 × 1,5 + 8) ÷ 10 = 6,4 → 64 (65 sous 0.5.0).
+    expect([m.num, m.den, m.raw]).toEqual([64, 10, 64]);
     expect(m.excluded).toEqual([
       { code: "EDU", why: "below" },
       { code: "OSS", why: "below" },

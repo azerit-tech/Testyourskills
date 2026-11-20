@@ -11,13 +11,13 @@
 //   leamd        GitHub seul, 82 : maintient un projet
 //   nour-rs      GitHub seul, 70 : école lue sur un dépôt de hackathon, sous la moyenne
 //   jplefevre    GitHub seul, 62 : stack arrêtée par la fraîcheur
-//   ghost-coder  GitHub seul, 30 : « code non prouvé », plafond 85 (sans effet ici)
+//   ghost-coder  GitHub seul, 30 : « code non prouvé », plafond 80 (sans effet ici)
 //   x            dossier vide, 20
-//   linkedin.com/in/sans-github  LinkedIn seul, 66 : déclaré, non prouvé, plafond 85
+//   linkedin.com/in/sans-github  LinkedIn seul, 66 : déclaré, non prouvé, plafond 80
 //   camille-ardent (ou un LinkedIn et un pseudo)  la comparaison et la note du dossier, 76
 //   un LinkedIn et le pseudo x  face à un GitHub vide : code non prouvé, dossier 66
 
-import { GRID_WEIGHTS, SENIORITY_TEXT } from "../../../shared/gridText";
+import { GRID_CAP_UNPROVEN, GRID_WEIGHTS, SENIORITY_TEXT } from "../../../shared/gridText";
 import { EDU_NEXT, EDU_NEXT_GITHUB, SCHOOL_COUNTED, schoolCounted } from "../../../shared/schoolRank";
 import type { CriterionCode, Fact, Grid, GridCriterion, GridSeniority, GridSource } from "../../../shared/types";
 import { CRITERION_CODES } from "../../../shared/types";
@@ -31,7 +31,7 @@ function c(code: CriterionCode, score: number | null, state: GridCriterion["stat
 
 /**
  * Les quatre règles du §4, comme le moteur : hors moyenne sans note ou sans coefficient (l'expérience, 0.5.0) ;
- * école, open source et critère seulement déclaré seulement au-dessus ; plafond 85 sans code ; dossier vide 20.
+ * école et open source seulement au-dessus ; le déclaré compte comme le reste (0.6.0) ; plafond sans code ; dossier vide 20.
  */
 export function finalizeMock(drafts: Draft[], given?: GridSeniority): Grid {
   const byCode = new Map(drafts.map((d) => [d.code, d]));
@@ -46,7 +46,7 @@ export function finalizeMock(drafts: Draft[], given?: GridSeniority): Grid {
   if (scored.reduce((s, d) => s + w2(d.code), 0) < 0.25 * total2)
     return { criteria: ordered.map((d) => ({ ...d, counted: false })), overall: 20, rule: "empty_file", ...meta };
   const neverCodes = new Set<CriterionCode>(["EDU", "OSS"]);
-  const never = { has: (code: CriterionCode) => neverCodes.has(code) || (byCode.get(code)!.state === "declared" && byCode.get(code)!.source === "linkedin") };
+  const never = { has: (code: CriterionCode) => neverCodes.has(code) };
   const base = scored.filter((d) => !never.has(d.code));
   const n0 = base.reduce((s, d) => s + d.score! * w2(d.code), 0);
   const d0 = base.reduce((s, d) => s + w2(d.code), 0);
@@ -57,7 +57,7 @@ export function finalizeMock(drafts: Draft[], given?: GridSeniority): Grid {
   const den = inMean.reduce((s, d) => s + w2(d.code), 0);
   let overall = den ? Math.floor((20 * n + den) / (2 * den)) : 1;
   const capped = byCode.get("CODE")?.score == null;
-  if (capped) overall = Math.min(overall, 85);
+  if (capped) overall = Math.min(overall, GRID_CAP_UNPROVEN);
   overall = Math.min(99, Math.max(1, overall));
   return { criteria: ordered.map((d) => ({ ...d, counted: counted.has(d.code) })), overall, ...(capped ? { rule: "capped_unproven" as const } : {}), ...meta };
 }
@@ -373,7 +373,7 @@ function declaredDrafts(src: "LinkedIn" | "CV", proof?: string, ghRepos?: number
 /** Le niveau d'expérience de la personne de démo : 8,4 ans comptés sur ses postes datés. */
 const DECLARED_SENIORITY: GridSeniority = { code: "senior", months: 101, source: "linkedin" };
 
-/** La fiche LinkedIn seule, ou CV seul : 66, déclarée, plafond 85 sans code prouvé (sans effet ici). */
+/** La fiche LinkedIn seule, ou CV seul : 66, déclarée, plafond 80 sans code prouvé (sans effet ici). */
 export function declaredGridMock(src: "LinkedIn" | "CV", proof?: string): Grid {
   return finalizeMock(declaredDrafts(src, proof), DECLARED_SENIORITY);
 }

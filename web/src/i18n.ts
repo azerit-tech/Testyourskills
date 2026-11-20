@@ -537,7 +537,7 @@ const fr = frTypoDeep({
     fromBoth: (src: string) => `${src} et GitHub`,
     /** La place d'une note absente : jamais un tiret long. */
     none: "n. c.",
-    short: { XP: "Expérience", EMP: "Parcours", STK: "Stack", CODE: "Code", OWN: "Ownership", ACT: "Activité", EDU: "École", OSS: "Open source" } as Record<CriterionCode, string>,
+    short: { XP: "Niveau", EMP: "Expérience", STK: "Stack", CODE: "Code", OWN: "Ownership", ACT: "Activité", EDU: "École", OSS: "Open source" } as Record<CriterionCode, string>,
   },
   grid: {
     /** Le seul pli qui explique la note, fermé par défaut (§18.76). */
@@ -571,8 +571,8 @@ const fr = frTypoDeep({
     criteriaLabel: "Les huit critères",
     names: {
       EDU: "École et sélection",
-      XP: "Expérience",
-      EMP: "Parcours et employeurs",
+      XP: "Niveau",
+      EMP: "Expérience",
       STK: "Stack technique",
       CODE: "Niveau du code",
       ACT: "Activité",
@@ -584,7 +584,9 @@ const fr = frTypoDeep({
     gauge: (n: number) => `${n} sur 10`,
     gaugeNone: "Pas de note",
     tags: {
-      declared: "déclaré, à confirmer",
+      declared: "sur LinkedIn",
+      declaredCv: "au CV",
+      proven: "prouvé",
       unproven: "à prouver",
       missing: "pas au dossier",
       estimated: "estimée",
@@ -594,7 +596,9 @@ const fr = frTypoDeep({
     },
     /** Vue par quelqu'un d'autre : rien ne s'adresse à la personne fichée. */
     tagsThem: {
-      declared: "déclaré, à confirmer",
+      declared: "sur LinkedIn",
+      declaredCv: "au CV",
+      proven: "prouvé",
       unproven: "à prouver",
       missing: "pas au dossier",
       estimated: "estimée",
@@ -697,23 +701,25 @@ const fr = frTypoDeep({
     /** Déclaré sur LinkedIn ou le CV, sans GitHub pour le prouver : la table s'arrête à 6. */
     declaredLevels: {
       STK: [
-        [6, "Cinq technos ou plus rattachées à une réalisation concrète, dont deux dans un poste de moins de 2 ans."],
-        [4, "Deux à quatre technos rattachées à une réalisation concrète."],
+        [8, "5 technos rattachées à un poste ou une réalisation, dont 2 dans un poste de moins de 2 ans."],
+        [6, "3 technos rattachées à un poste ou une réalisation."],
+        [4, "2 technos rattachées à un poste ou une réalisation."],
       ],
       OWN: [
-        [6, "Trois résultats datés et chiffrés (mise en ligne, migration, usage)."],
-        [4, "Une entreprise fondée, ou un résultat daté et chiffré."],
+        [8, "3 résultats datés et chiffrés, ou une entreprise fondée tenue un an, avec 1 résultat."],
+        [6, "2 résultats datés et chiffrés, ou une entreprise fondée tenue 6 mois."],
+        [4, "1 résultat daté et chiffré, ou une entreprise fondée."],
       ],
     } as Partial<Record<CriterionCode, [number, string][]>>,
     /** Sous la table : comment elle se lit. */
     levelNotes: {
       EDU: "Sans école de tech, pas de note d'école : le critère sort de la moyenne, et apprendre en autodidacte ne coûte rien. Liste française d'abord\u00a0: une école absente de la liste s'arrête à 6/10 pour l'instant. Une école ne fait jamais baisser la note.",
       XP: "Compté poste par poste : stage et alternance pour moitié, association étudiante et bénévolat pour zéro, deux postes en même temps une seule fois. Sans LinkedIn : estimée sur les années actives de GitHub, arrêtée à 8.",
-      EMP: "Lu sur LinkedIn ou le CV seulement.",
-      STK: "Se lit dans le code public. Sans GitHub au dossier, elle se lit sur LinkedIn et la table s'arrête à 6.",
+      EMP: "Lu sur LinkedIn ou le CV, à ton niveau : les mois du même genre se cumulent. Un poste confirmé par le code : prouvé +1.",
+      STK: "Sur LinkedIn ou le CV, les technos rattachées à un poste ; sur GitHub, le code public : même table. Retrouvée dans le code : prouvé +1.",
       CODE: "Trois repos lus : deux fois leur niveau moyen. 9 et 10 demandent des tests dans la moitié des repos actifs ; 7 et plus, un repo de 20\u00a0commits.",
       ACT: "8 et 10 demandent un repo public de 20\u00a0commits.",
-      OWN: "Se lit sur LinkedIn comme sur GitHub\u00a0: la lecture la plus favorable est gardée.",
+      OWN: "Sur LinkedIn ou le CV, les résultats datés et chiffrés ou l'entreprise fondée ; sur GitHub, les projets portés : même table, la meilleure lecture gardée. Montré sur GitHub : prouvé +1.",
       OSS: "Ne fait jamais baisser la note : la plupart des bons profils n'ont pas d'open source.",
     } as Record<CriterionCode, string>,
     /** Page partagée, vue par quelqu'un d'autre (question 5 de la grille) : ni nom d'école, ni nom d'ancien employeur. */
@@ -730,13 +736,13 @@ const fr = frTypoDeep({
     final: {
       title: "La note de la fiche",
       caseTitle: "La note de la fiche",
-      how: "Moyenne pondérée des critères notés, × 10.",
+      how: "La note se tire des critères notés, chacun selon son poids.",
       /** « (Code 7 × 2 + Stack 6 × 1,5) ÷ 3,5 » : chaque note sur 10 et son coefficient. */
       term: (name: string, score: number, coef: string) => `${name} ${score} × ${coef}`,
       /** L'école comptée, sans son niveau. */
       termCounted: (name: string, coef: string) => `${name} (comptée) × ${coef}`,
-      formula: (terms: string, den: string) => `(${terms}) ÷ ${den}`,
-      result: (mean: string) => `= ${mean} sur 10`,
+      /** Les critères comptés et leur poids, sans résultat chiffré (§18.106). */
+      formula: (terms: string) => terms,
       out: {
         unproven: "Non prouvé, hors moyenne",
         missing: "Non renseigné, hors moyenne",
@@ -746,17 +752,16 @@ const fr = frTypoDeep({
       belowWhy: "L'open source ne fait jamais baisser la note.",
       /** L'école hors moyenne : sa propre ligne, jamais « sous la moyenne des autres » (§18.52). */
       schoolOut: (name: string) => `Hors moyenne : ${name}. Une école ne fait jamais baisser la note.`,
-      capped: "Aucun code prouvé : la note ne peut pas dépasser 85. La sixième étoile se prouve.",
-      cappedHit: (raw: number) => `Aucun code prouvé : le calcul donne ${raw}, la note s'arrête à 85.`,
+      capped: (cap: number) => `Aucun code prouvé : la note s'arrête à ${cap}. Au-delà, ça se prouve sur GitHub.`,
       empty: "Fiche vide : moins d'un quart des coefficients sont notés. Note plancher : 20, une étoile.",
       emptyWhy: "Non prouvé ne veut pas dire mauvais : le jour où le code est public, les critères s'ouvrent.",
       score: (n: number) => `${n}`,
       outOf: "sur 100",
       /** La note du dossier face à un GitHub « dossier vide » : le code n'est pas prouvé, et ce qui changerait la note. */
-      caseUnproven: (src: string, opens: string) =>
-        `Code non prouvé : ton GitHub public ne montre encore rien de jugeable. La note du dossier se fait sur ton ${src}, sans dépasser 85. Ce qui la changerait : un vrai projet public sur GitHub${opens ? `, qui ouvre ${opens}` : ""}.`,
-      caseUnprovenThem: (src: string, opens: string) =>
-        `Code non prouvé : son GitHub public ne montre encore rien de jugeable. La note du dossier se fait sur son ${src}, sans dépasser 85. Ce qui la changerait : un vrai projet public sur GitHub${opens ? `, qui ouvre ${opens}` : ""}.`,
+      caseUnproven: (src: string, opens: string, cap: number) =>
+        `Code non prouvé : ton GitHub public ne montre encore rien de jugeable. La note du dossier se fait sur ton ${src}, sans dépasser ${cap}. Ce qui la changerait : un vrai projet public sur GitHub${opens ? `, qui ouvre ${opens}` : ""}.`,
+      caseUnprovenThem: (src: string, opens: string, cap: number) =>
+        `Code non prouvé : son GitHub public ne montre encore rien de jugeable. La note du dossier se fait sur son ${src}, sans dépasser ${cap}. Ce qui la changerait : un vrai projet public sur GitHub${opens ? `, qui ouvre ${opens}` : ""}.`,
       /** « stack technique, niveau du code et activité ». */
       opensList: (names: string[]) => names.map((n) => n.toLowerCase()).join(", ").replace(/, ([^,]*)$/, " et $1"),
     },
@@ -1323,7 +1328,7 @@ const en: Dict = {
     tileFrom: (name: string, n: number, from: string) => `${name}: ${n} out of 10, ${from}`,
     fromBoth: (src: string) => `${src} and GitHub`,
     none: "n/a",
-    short: { XP: "Experience", EMP: "Career", STK: "Stack", CODE: "Code", OWN: "Ownership", ACT: "Activity", EDU: "School", OSS: "Open source" },
+    short: { XP: "Level", EMP: "Experience", STK: "Stack", CODE: "Code", OWN: "Ownership", ACT: "Activity", EDU: "School", OSS: "Open source" },
   },
   grid: {
     title: "How it's scored",
@@ -1352,8 +1357,8 @@ const en: Dict = {
     criteriaLabel: "The eight criteria",
     names: {
       EDU: "School and selectivity",
-      XP: "Experience",
-      EMP: "Career path and employers",
+      XP: "Level",
+      EMP: "Experience",
       STK: "Tech stack",
       CODE: "Code level",
       ACT: "Activity",
@@ -1364,7 +1369,9 @@ const en: Dict = {
     gauge: (n: number) => `${n} out of 10`,
     gaugeNone: "No score",
     tags: {
-      declared: "declared, to be confirmed",
+      declared: "on LinkedIn",
+      declaredCv: "on the résumé",
+      proven: "proven",
       unproven: "unproven",
       missing: "not on file",
       estimated: "estimated",
@@ -1373,7 +1380,9 @@ const en: Dict = {
       private: "private to you",
     },
     tagsThem: {
-      declared: "declared, to be confirmed",
+      declared: "on LinkedIn",
+      declaredCv: "on the résumé",
+      proven: "proven",
       unproven: "unproven",
       missing: "not on file",
       estimated: "estimated",
@@ -1473,22 +1482,24 @@ const en: Dict = {
     } as Record<CriterionCode, [number, string][]>,
     declaredLevels: {
       STK: [
-        [6, "Five technologies or more tied to a concrete achievement, two of them in a role from the last 2 years."],
-        [4, "Two to four technologies tied to a concrete achievement."],
+        [8, "5 technologies tied to a role or an achievement, 2 of them in a role from the last 2 years."],
+        [6, "3 technologies tied to a role or an achievement."],
+        [4, "2 technologies tied to a role or an achievement."],
       ],
       OWN: [
-        [6, "Three dated and quantified outcomes (launch, migration, usage)."],
-        [4, "A company founded, or one dated and quantified outcome."],
+        [8, "3 dated and quantified outcomes, or a company founded and run for a year, with 1 outcome."],
+        [6, "2 dated and quantified outcomes, or a company founded and run for 6 months."],
+        [4, "1 dated and quantified outcome, or a company founded."],
       ],
     } as Partial<Record<CriterionCode, [number, string][]>>,
     levelNotes: {
       EDU: "No tech school, no school score: the criterion leaves the average, and being self-taught costs nothing. French schools first for now: a school not on the list stops at 6/10. A school never lowers the rating.",
       XP: "Counted role by role: internships and apprenticeships at half, student clubs and volunteering at zero, overlapping roles once. Without LinkedIn: estimated from active years on GitHub, capped at 8.",
-      EMP: "Read on LinkedIn or the résumé only.",
-      STK: "Read in public code. With no GitHub on file, it is read on LinkedIn and the table stops at 6.",
+      EMP: "Read on LinkedIn or the résumé, at your level: months of the same kind add up. A role confirmed by the code: proven +1.",
+      STK: "On LinkedIn or the résumé, technologies tied to a role; on GitHub, public code: same table. Found in the code: proven +1.",
       CODE: "Three repos read: twice their average level. 9 and 10 need tests in half the active repos; 7 and up, a repo with 20 commits.",
       ACT: "8 and 10 need a public repo with 20 commits.",
-      OWN: "Read on LinkedIn and on GitHub alike: the most favorable reading is kept.",
+      OWN: "On LinkedIn or the résumé, dated results with figures or a company founded; on GitHub, projects carried: same table, the best reading kept. Shown on GitHub: proven +1.",
       OSS: "Never lowers the rating: most good devs have no open source.",
     } as Record<CriterionCode, string>,
     shared: {
@@ -1503,11 +1514,11 @@ const en: Dict = {
     final: {
       title: "The sheet's rating",
       caseTitle: "The sheet's rating",
-      how: "Weighted average of the scored criteria, × 10.",
+      how: "The rating comes from the scored criteria, each by its weight.",
       term: (name: string, score: number, coef: string) => `${name} ${score} × ${coef}`,
       termCounted: (name: string, coef: string) => `${name} (counted) × ${coef}`,
-      formula: (terms: string, den: string) => `(${terms}) ÷ ${den}`,
-      result: (mean: string) => `= ${mean} out of 10`,
+      /** Les critères comptés et leur poids, sans résultat chiffré (§18.106). */
+      formula: (terms: string) => terms,
       out: {
         unproven: "Not proven, left out of the average",
         missing: "Not on file, left out of the average",
@@ -1516,16 +1527,15 @@ const en: Dict = {
       outList: (label: string, names: string) => `${label}: ${names}.`,
       belowWhy: "Open source never lowers the rating.",
       schoolOut: (name: string) => `Not averaged: ${name}. A school never lowers the rating.`,
-      capped: "No code proven: the rating cannot go above 85. The sixth star has to be proven.",
-      cappedHit: (raw: number) => `No code proven: the math gives ${raw}, the rating stops at 85.`,
+      capped: (cap: number) => `No code proven: the rating stops at ${cap}. Beyond that, it is proven on GitHub.`,
       empty: "Empty sheet: under a quarter of the weights are scored. Floor rating: 20, one star.",
       emptyWhy: "Not proven does not mean bad: the day the code goes public, the criteria open up.",
       score: (n: number) => `${n}`,
       outOf: "out of 100",
-      caseUnproven: (src: string, opens: string) =>
-        `Code not proven: your public GitHub shows nothing to judge yet. The file's rating rests on your ${src}, capped at 85. What would change it: one real public project on GitHub${opens ? `, which opens ${opens}` : ""}.`,
-      caseUnprovenThem: (src: string, opens: string) =>
-        `Code not proven: their public GitHub shows nothing to judge yet. The file's rating rests on their ${src}, capped at 85. What would change it: one real public project on GitHub${opens ? `, which opens ${opens}` : ""}.`,
+      caseUnproven: (src: string, opens: string, cap: number) =>
+        `Code not proven: your public GitHub shows nothing to judge yet. The file's rating rests on your ${src}, capped at ${cap}. What would change it: one real public project on GitHub${opens ? `, which opens ${opens}` : ""}.`,
+      caseUnprovenThem: (src: string, opens: string, cap: number) =>
+        `Code not proven: their public GitHub shows nothing to judge yet. The file's rating rests on their ${src}, capped at ${cap}. What would change it: one real public project on GitHub${opens ? `, which opens ${opens}` : ""}.`,
       opensList: (names: string[]) => names.map((n) => n.toLowerCase()).join(", ").replace(/, ([^,]*)$/, " and $1"),
     },
     compare: {
