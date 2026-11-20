@@ -189,7 +189,7 @@ export function BackLine({ mine, pending, owed = false }: Pick<Memory, "mine" | 
           <span>{pending ? b.pending : b.owed}</span>
         ) : (
           <span>
-            {b.mine} <Stars n={stars} label={t.plea.count(stars)} /> {mine!.overall}/100.
+            {b.mine} <Stars n={stars} label={t.plea.count(stars)} /> {t.result.score.pct(mine!.overall)}.
           </span>
         )}
         <span className="link-alt">{pending ? b.pendingGo : owed ? b.owedGo : b.mineGo}</span>
@@ -218,7 +218,7 @@ export function MineCard({ mine, card }: { mine: MyCard; card: CardData | null |
       <div className="home-mine-line">
         <p className="home-back">
           <span>
-            {b.mine} <Stars n={stars} label={t.plea.count(stars)} /> {mine.overall}/100.
+            {b.mine} <Stars n={stars} label={t.plea.count(stars)} /> {t.result.score.pct(mine.overall)}.
           </span>
         </p>
         {see}

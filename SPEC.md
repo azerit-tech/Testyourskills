@@ -2912,3 +2912,14 @@ Jacques : « Pourquoi quand on dénonce, ça n'ajoute pas le GitHub ? En plus c'
 
   Aussi : `match/github.test.ts`, `denounce.test.ts` (la route avec `name`, le dossier au top), `web/src/components/denounce.test.ts`. `tsc -b`, la suite serveur et `vite build` sont verts.
 - **Pas vérifié** : la production ; le sens GitHub vers LinkedIn en vrai.
+
+### 18.122 Le score dit en toutes lettres : « Ton profil a un score de 82 % » (20 novembre 2026, branche `site/score-explicite`)
+
+Jacques : « Ce n'est pas clair ce que veut dire le score : il faut que ce soit explicitement dit, "ton profil a un score de 80 %". » La note sur 100 se dit désormais en pourcentage, dans une phrase. Ce paragraphe remplace, pour le site et les textes, l'échelle « /100 » du §18.48.
+
+- **Sur la page de la fiche**, juste au-dessus de la fiche, premier vu à 390 px : « Ton profil a un score de **82 %** » à qui l'a faite, « Son profil a un score de **82 %** » au visiteur (EN « Your profile scores 82% », « Their profile scores 82% »). Le nombre en grand, gras, dans la police de la fiche (32 px sur téléphone, 44 au bureau). Au bureau seulement, une ligne dessous : « Lu comme un recruteur, à expérience égale. » Sur téléphone, elle tient sur une ligne pour que « Voir les pièces à conviction » reste au-dessus de la barre fixe à 390 × 844. Sa place est tenue pendant le film, la phrase paraît quand la fiche est posée (`ScoreLine`). Ni sur une fiche scellée, ni sur le face-à-face (§18.115).
+- **Face-à-face et duel** : la ligne du VS et le titre du duel disent « 82 % contre 65 % » (EN « 82% vs 65% »). Le texte du duel envoyé aussi.
+- **Classement** : l'en-tête de la colonne dit « Score », chaque note porte son « % », plus petit et collé (« 82% »), dans une colonne de 36 px qui tient à 390 px. Même chose au tableau des primes. Le libellé lu par les lecteurs d'écran dit « Place 2 : leamd, score de 79 % ».
+- **Textes** : le partage LinkedIn et X, la ligne « Ta fiche : ★★★★★☆ 79 %. », l'annonce de la fiche posée et la description Open Graph (« Fiche ★★★★★☆, score de 79 % ») passent au « % ».
+- **Inchangé** : le dessin de la fiche (recto « 82 », verso « = 79/100 ») et l'image de partage rendue par le serveur ; « Comment c'est noté » garde « sur 100 ». Le film ne montre pas la note ; l'ancien ascenseur (hors révélation par défaut) garde son nombre seul.
+- **Vérifié** : `cardPage.test.ts` (phrase FR et EN, à qui l'a faite et au visiteur, avant la fiche, rien sur une fiche scellée), `i18n.test.ts`, `shareText.test.ts`, `duel.test.ts`, `homeBoards.test.ts`, `profileLinks.test.ts`, `home.test.ts`, `html.test.ts`, `app.test.ts`, `tsc -b` et `vite build` verts ; capture 390 × 844 de la fiche en démo.

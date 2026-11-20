@@ -166,7 +166,7 @@ const fr = frTypoDeep({
       free: "Place libre",
       freeLabel: (rank: number) => `Place ${rank} libre : fais ta fiche`,
       /** `who` : le nom de la fiche, ou son « @pseudo ». */
-      rowLabel: (rank: number, who: string, overall: number) => `Place ${rank} : ${who}, note ${overall}/100`,
+      rowLabel: (rank: number, who: string, overall: number) => `Place ${rank} : ${who}, score de ${overall} %`,
     },
     errLogin: "Ce pseudo ne ressemble pas à un pseudo GitHub.",
     errEmptyLogin: "Donne-nous un pseudo GitHub (ou une URL de profil).",
@@ -260,7 +260,7 @@ const fr = frTypoDeep({
     watch: "Voir la poursuite",
     /** Sa propre poursuite, jamais vue ici (repliée faute de réseau, ou mouvement réduit). */
     watchMine: "Voir ma poursuite",
-    revealed: (level: string, overall: number) => `Fiche ${level}, ${overall}/100.`,
+    revealed: (level: string, overall: number) => `Fiche ${level}, score de ${overall} %.`,
     revealedSealed: "Fiche scellée\u00a0: le code reste à prouver.",
     fireworks: "Clique ou Espace : feux d'artifice",
     fireworksTouch: "Touche l'écran : feux d'artifice",
@@ -334,6 +334,13 @@ const fr = frTypoDeep({
     leadYours: "La tienne prend une minute, sans compte.",
     /** Au-dessus de la fiche, sur téléphone : la même chose en deux lignes au plus (`who` : « @pseudo » ou le prénom). */
     leadShort: (who: string) => `La fiche de dev de ${who}.`,
+    /** Ce que dit la note, en toutes lettres, au-dessus de la fiche (§18.122) : « Ton profil a un score de 82 % ». */
+    score: {
+      own: "Ton profil a un score de",
+      their: "Son profil a un score de",
+      pct: (n: number) => `${n} %`,
+      means: "Lu comme un recruteur, à expérience égale.",
+    },
     /** Au-dessus d'une fiche dénoncée, sur téléphone : ce qui arrive, en une ligne. */
     leadDenounced: (who: string, by: string | null) => (by ? `@${by} a dénoncé ${who}.` : `Quelqu'un a dénoncé ${who}.`),
     /** Sans bloc des critères au-dessus (fiche dénoncée sans grille) : la même question, sans « ces huit critères ». */
@@ -382,9 +389,9 @@ const fr = frTypoDeep({
         /** Deuxième ligne, après la fiche : le pari et son mot, en bas de casse (« Je plaidais ★★★☆☆☆ : trop modeste. »). */
         plea: (pleaded: string, gap: "over" | "exact" | "under") => `Je plaidais ${pleaded} : ${{ over: "excès de confiance", exact: "lucide", under: "trop modeste" }[gap]}.`,
         /** Fiche d'avant la grille : la première ligne, sans « selon la grille ». */
-        sheet: (stars: string, level: string, overall: number) => `Ma fiche de dev : ${stars} ${level}, ${overall}/100.`,
+        sheet: (stars: string, level: string, overall: number) => `Ma fiche de dev : ${stars} ${level}, ${overall} %.`,
         /** Fiche notée par la grille (§18.37) : ce qu'est la note, dès la première ligne. */
-        file: (stars: string, level: string, overall: number) => `Ma fiche de dev selon la grille de recrutement d'Azerit : ${stars} ${level}, ${overall}/100.`,
+        file: (stars: string, level: string, overall: number) => `Ma fiche de dev selon la grille de recrutement d'Azerit : ${stars} ${level}, ${overall} %.`,
         /** En tête de la ligne suivante : « Profil « Machine à livrer » », puis le rang. */
         profile: (label: string) => `Profil « ${label} »`,
         charge: (status: string) => `Chef d'accusation : « ${status} ».`,
@@ -841,7 +848,7 @@ const fr = frTypoDeep({
     notMe: "Ce n'est pas moi : faire la mienne",
     andYou: "À ton tour",
     mine: "Ma fiche",
-    versus: (me: number, them: number, verdict: string) => `${me}/100 contre ${them}/100 : ${verdict}`,
+    versus: (me: number, them: number, verdict: string) => `${me} % contre ${them} % : ${verdict}`,
     starsAhead: (n: number) => (n === 1 ? "une étoile d'avance" : `${n} étoiles d'avance`),
     starsBehind: (n: number) => (n === 1 ? "une étoile de retard" : `${n} étoiles de retard`),
     pointsAhead: (n: number) => (n === 1 ? "1 point d'avance" : `${n} points d'avance`),
@@ -852,7 +859,7 @@ const fr = frTypoDeep({
     /** Sur sa fiche toute neuve : la fiche par laquelle on est arrivé (le duel, une fois). */
     duelFrom: (who: string) => `Tu viens de la fiche de ${who}`,
     duelText: (me: number, them: number, verdict: string, who: string, rel: "ahead" | "behind" | "tie") =>
-      `${me}/100 contre ${them}/100 : ${verdict} ${rel === "tie" ? "avec" : "sur"} ${who}. Verdict d'Azerit :`,
+      `${me} % contre ${them} % : ${verdict} ${rel === "tie" ? "avec" : "sur"} ${who}. Verdict d'Azerit :`,
     scoreCopied: "Note copiée : colle-la dans ton message.",
   },
   /* le jury de la page partagée (§18.27) : on vote sur le chef d'accusation, jamais sur la personne */
@@ -922,7 +929,7 @@ const fr = frTypoDeep({
   /** Le face-à-face reçu (§18.115) : la fiche de qui a envoyé le lien, « VS », la fiche de la page. */
   vs: {
     label: "Face-à-face",
-    line: (left: number, right: number, gap: string | null, who: string) => (gap === null ? `${left} contre ${right} : égalité` : `${left} contre ${right} : ${gap} pour ${who}`),
+    line: (left: number, right: number, gap: string | null, who: string) => (gap === null ? `${left} % contre ${right} % : égalité` : `${left} % contre ${right} % : ${gap} pour ${who}`),
     sealed: (who: string) => `Fais mieux que ${who} ?`,
     open: (who: string) => `Voir la fiche de ${who} en grand`,
     close: "Fermer",
@@ -1049,7 +1056,7 @@ const en: Dict = {
       take: (n) => (n === 1 ? "Take it" : "Take one"),
       free: "Open spot",
       freeLabel: (rank) => `Spot ${rank} is open: get your rap sheet`,
-      rowLabel: (rank, who, overall) => `Spot ${rank}: ${who}, rating ${overall}/100`,
+      rowLabel: (rank, who, overall) => `Spot ${rank}: ${who}, scores ${overall}%`,
     },
     errLogin: "That doesn't look like a GitHub username.",
     errEmptyLogin: "Give us a GitHub username (or profile URL).",
@@ -1125,7 +1132,7 @@ const en: Dict = {
     replay: "Replay my chase",
     watch: "Watch the chase",
     watchMine: "Watch my chase",
-    revealed: (level, overall) => `${level} sheet, rated ${overall}/100.`,
+    revealed: (level, overall) => `${level} sheet, scores ${overall}%.`,
     revealedSealed: "Sealed sheet: code still unproven.",
     fireworks: "Click or Space: fireworks",
     fireworksTouch: "Tap the screen: fireworks",
@@ -1190,6 +1197,12 @@ const en: Dict = {
     lead: (who) => `Azerit drew up ${who}'s dev rap sheet the way a recruiter would: experience first, code as proof.`,
     leadYours: "Yours takes one minute, no account.",
     leadShort: (who) => `${who}'s dev rap sheet.`,
+    score: {
+      own: "Your profile scores",
+      their: "Their profile scores",
+      pct: (n) => `${n}%`,
+      means: "Read like a recruiter, against same-level peers.",
+    },
     leadDenounced: (who, by) => (by ? `@${by} turned in ${who}.` : `Someone turned in ${who}.`),
     yourTurnBare: "What about you, how many stars? Your LinkedIn or your GitHub is all it takes.",
     pieces: {
@@ -1222,8 +1235,8 @@ const en: Dict = {
       imageAlt: "Your rap sheet",
       words: {
         plea: (pleaded, gap) => `I pleaded ${pleaded}: ${{ over: "overconfident", exact: "clear-eyed", under: "too modest" }[gap]}.`,
-        sheet: (stars, level, overall) => `My dev rap sheet: ${stars} ${level}, ${overall}/100.`,
-        file: (stars, level, overall) => `My dev rap sheet, scored on Azerit's hiring scorecard: ${stars} ${level}, ${overall}/100.`,
+        sheet: (stars, level, overall) => `My dev rap sheet: ${stars} ${level}, ${overall}%.`,
+        file: (stars, level, overall) => `My dev rap sheet, scored on Azerit's hiring scorecard: ${stars} ${level}, ${overall}%.`,
         profile: (label) => `Profile: “${label}”`,
         charge: (status) => `Charge: “${status}”.`,
         ai: (secs) => `Rap sheet drawn up by Azerit in ${secs}s.`,
@@ -1611,7 +1624,7 @@ const en: Dict = {
     notMe: "Not me: get mine",
     andYou: "Your turn",
     mine: "My sheet",
-    versus: (me, them, verdict) => `${me}/100 vs ${them}/100: ${verdict}`,
+    versus: (me, them, verdict) => `${me}% vs ${them}%: ${verdict}`,
     starsAhead: (n) => (n === 1 ? "one star ahead" : `${n} stars ahead`),
     starsBehind: (n) => (n === 1 ? "one star behind" : `${n} stars behind`),
     pointsAhead: (n) => (n === 1 ? "1 point ahead" : `${n} points ahead`),
@@ -1619,7 +1632,7 @@ const en: Dict = {
     tie: "dead heat",
     sendScore: "Send them my rating",
     duelFrom: (who) => `You came from ${who}'s sheet`,
-    duelText: (me, them, verdict, who, rel) => `${me}/100 vs ${them}/100: ${verdict}${rel === "ahead" ? " of" : rel === "tie" ? " with" : ""} ${who}. Azerit's verdict:`,
+    duelText: (me, them, verdict, who, rel) => `${me}% vs ${them}%: ${verdict}${rel === "ahead" ? " of" : rel === "tie" ? " with" : ""} ${who}. Azerit's verdict:`,
     scoreCopied: "Rating copied: paste it into your message.",
   },
   jury: {
@@ -1675,7 +1688,7 @@ const en: Dict = {
   crash: { title: "The page didn't load", text: "The network may have dropped, or the site was just updated.", reload: "Reload" },
   vs: {
     label: "Face-off",
-    line: (left, right, gap, who) => (gap === null ? `${left} vs ${right}: dead heat` : `${left} vs ${right}: ${who} is ${gap}`),
+    line: (left, right, gap, who) => (gap === null ? `${left}% vs ${right}%: dead heat` : `${left}% vs ${right}%: ${who} is ${gap}`),
     sealed: (who) => `Beat ${who}?`,
     open: (who) => `See ${who}'s sheet full size`,
     close: "Close",

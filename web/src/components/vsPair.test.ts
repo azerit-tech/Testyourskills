@@ -26,11 +26,11 @@ function render(node: ReturnType<typeof createElement>) {
 describe("le face-à-face reçu (§18.115)", () => {
   it("la ligne : les deux notes, l'écart, pour qui ; les étoiles d'abord ; l'égalité ; un dossier scellé invite", () => {
     const fr = DICTS.fr;
-    expect(vsLine(fr, sender, page)).toBe("79 contre 80 : 1 point d'avance pour @camroux");
-    expect(vsLine(fr, { ...sender, overall: 95 }, page)).toBe("95 contre 80 : une étoile d'avance pour @leamd");
-    expect(vsLine(fr, page, page)).toBe("80 contre 80 : égalité");
+    expect(vsLine(fr, sender, page).replace(/\s/g, " ")).toBe("79 % contre 80 % : 1 point d'avance pour @camroux");
+    expect(vsLine(fr, { ...sender, overall: 95 }, page).replace(/\s/g, " ")).toBe("95 % contre 80 % : une étoile d'avance pour @leamd");
+    expect(vsLine(fr, page, page).replace(/\s/g, " ")).toBe("80 % contre 80 % : égalité");
     expect(vsLine(fr, sender, { ...page, sealed: true })).toBe("Fais mieux que @leamd ?");
-    expect(vsLine(DICTS.en, sender, page)).toBe("79 vs 80: @camroux is 1 point ahead");
+    expect(vsLine(DICTS.en, sender, page)).toBe("79% vs 80%: @camroux is 1 point ahead");
   });
 
   it("deux fiches, « VS » entre elles, chacune s'ouvre en grand", () => {

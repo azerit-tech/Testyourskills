@@ -66,7 +66,7 @@ describe("les lignes du top de la semaine", () => {
     expect(count(html, "is-linkedin")).toBe(2);
     expect(count(html, "is-github")).toBe(2);
     // Le logo suit le lien de la ligne, il n'est pas dedans (pas de lien dans un lien).
-    expect(html).toMatch(/<span class="board-score">89<\/span><\/a><span class="plinks"/);
+    expect(html).toMatch(/<span class="board-score">89<span class="board-pct">%<\/span><\/span><\/a><span class="plinks"/);
     expect(html).toContain('href="https://github.com/nour-rs"');
   });
 });

@@ -14,6 +14,7 @@ import { Duel, useDuelSend } from "../components/Duel";
 import { useVsSender, VsPair } from "../components/VsPair";
 import { EntryForm } from "../components/EntryForm";
 import { ReturnCall } from "../components/ReturnCall";
+import { ScoreLine } from "../components/ScoreLine";
 import { PrimeRace } from "../components/Primes";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { CardNotFound, Unreachable } from "../components/ErrorPage";
@@ -781,6 +782,8 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
         )}
         {/* Au retour du film, sur téléphone : le verdict du pari au-dessus de la fiche (§18.52). */}
         {!visitor && pleaTop && <PleaStrip cardId={id} overall={main.overall} shown={settled} />}
+        {/* Ce que dit la note, en toutes lettres (§18.122) : « Ton profil a un score de 82 % », juste au-dessus de la fiche. */}
+        {!vs && !main.sealed && <ScoreLine overall={main.overall} own={!visitor} shown={settled} />}
 
         {animating && (
           // Morceau 3D introuvable : même repli que sans WebGL, la fiche sort sans révélation.

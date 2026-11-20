@@ -197,6 +197,26 @@ describe("page partagée, vue par un visiteur", () => {
   });
 });
 
+describe("le score dit en toutes lettres, juste au-dessus de la fiche (§18.122)", () => {
+  const say = (html: string) => /<p class="score-line is-on"><span class="score-say">([^<]*)<b class="score-pct">([^<]*)<\/b><\/span>/.exec(html.replace(/ /g, " "))?.slice(1).join("");
+
+  it("à qui a fait la fiche : « Ton profil a un score de 79 % », en français et en anglais, avant la fiche", () => {
+    const fr = renderResult(card({ id: "ScoreOwn001" }), { owner: true, token: "tok" });
+    expect(say(fr)).toBe(`Ton profil a un score de ${FIXTURES.gold.overall} %`);
+    expect(fr.indexOf("score-line")).toBeLessThan(fr.indexOf("result-stage"));
+    expect(say(renderResult(card({ id: "ScoreOwn002" }), { owner: true, token: "tok", lang: "en-US" }))).toBe(`Your profile scores ${FIXTURES.gold.overall}%`);
+  });
+
+  it("au visiteur : « Son profil a un score de 79 % » ; « Their profile scores 79% »", () => {
+    expect(say(renderResult(card({ id: "ScoreVis001" }), { owner: false }))).toBe(`Son profil a un score de ${FIXTURES.gold.overall} %`);
+    expect(say(renderResult(card({ id: "ScoreVis002" }), { owner: false, lang: "en-US" }))).toBe(`Their profile scores ${FIXTURES.gold.overall}%`);
+  });
+
+  it("une fiche scellée n'a pas de score à dire", () => {
+    expect(renderResult(card({ id: "ScoreSeal01", sealed: true }), { owner: false })).not.toContain("score-line");
+  });
+});
+
 describe("après-fiche, vue par qui a fait la fiche (§18.27)", () => {
   const mine = (id: string) => card({ id });
 
@@ -586,7 +606,7 @@ describe("qui reçoit sa fiche : sa note d'abord, puis la vérifier soi-même (�
     expect(pinks(html)).toEqual(["C'est bien moi"]);
     expect(html).not.toContain("Lui envoyer ma note");
     expect(ascending(at(html, ['class="denounced', 'class="you duel"']))).toBe(true);
-    expect(html).toMatch(/class="you duel"[^]*83\/100 contre/);
+    expect(html).toMatch(/class="you duel"[^]*83\s% contre/);
   });
 
   it("qui a sa fiche, sur celle d'un autre : aucun rose, l'envoi en contour sous la fiche et le jury", () => {

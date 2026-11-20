@@ -54,11 +54,11 @@ describe("le top de la semaine sur l'accueil", () => {
     top.entries[1] = { ...entry(2), name: "Léa Martin-Dubois", initials: "LM" };
     const html = render(createElement(WeekBoardView, { top, now: 0, onPlay: () => undefined }));
     expect(count(html, 'class="board-row"')).toBe(3);
-    expect(html).toMatch(/href="\/c\/Lnkd000001" aria-label="Place 1\s: Florence Delmas, note 88\/100"/);
+    expect(html).toMatch(/href="\/c\/Lnkd000001" aria-label="Place 1\s: Florence Delmas, score de 88\s%"/);
     expect(html).toContain('<span class="board-avatar">FD</span><span class="board-login">Florence Delmas</span>');
     expect(html).toContain('<span class="board-avatar">LM</span><span class="board-login">Léa Martin-Dubois</span>');
     expect(html).toContain('<span class="board-login">@dev3</span>');
-    expect(html).toMatch(/aria-label="Place 3\s: @dev3, note 87\/100"/);
+    expect(html).toMatch(/aria-label="Place 3\s: @dev3, score de 87\s%"/);
     // Plus de ligne anonyme : ni la lettre de remplacement, ni « Fiche LinkedIn ».
     expect(html).not.toMatch(/board-avatar[^>]*>I<|Fiche LinkedIn/);
   });
@@ -102,7 +102,7 @@ describe("la ligne de mémoire au-dessus du formulaire", () => {
     const html = render(createElement(BackLine, { mine: { id: "Card000001", login: "dev1", overall: 79 }, pending: null }));
     expect(html).toContain('href="/c/Card000001"');
     expect(html).toContain('aria-label="5 étoiles sur 6"');
-    expect(html).toContain("79/100.");
+    expect(html).toContain("79\u00a0%.");
     expect(html).toContain("La revoir");
     expect(render(createElement(BackLine, { mine: { id: "Card000001", login: null, overall: 46 }, pending: null }), "en-US")).toContain("See it again");
   });
@@ -112,7 +112,7 @@ describe("la ligne de mémoire au-dessus du formulaire", () => {
     expect(html).toContain('href="/c/Card000009"');
     expect(html).toContain("Ton dossier s&#x27;ouvre encore.");
     expect(html).toContain("Y retourner");
-    expect(html).not.toContain("79/100");
+    expect(html).not.toContain("79\u00a0%");
   });
 
   it("rien en mémoire : pas de ligne", () => {

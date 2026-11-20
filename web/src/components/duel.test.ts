@@ -59,17 +59,17 @@ describe("le duel de qui a déjà sa fiche", () => {
 
   it("les deux notes en titre, l'écart ensuite ; « Lui envoyer ma note » en contour, jamais le rose (§18.104), « Ma fiche » en lien", () => {
     const html = duel(83).replace(/\u00a0/g, " ");
-    expect(html).toContain('<h2 id="you-title">83/100 contre 68/100 : une étoile d\'avance</h2>');
+    expect(html).toContain('<h2 id="you-title">83 % contre 68 % : une étoile d\'avance</h2>');
     expect(html).toMatch(/<button type="button" class="pill">Lui envoyer ma note<\/button><a class="link-alt" href="\/c\/MyCard00001">Ma fiche<\/a>/);
     expect(html).not.toContain("pill-big");
     const en = duel(83, {}, "en-US");
-    expect(en).toContain(">83/100 vs 68/100: one star ahead</h2>");
+    expect(en).toContain(">83% vs 68%: one star ahead</h2>");
     expect(en).toContain(">Send them my rating</button>");
   });
 
   it("sur une fiche dénoncée : l'écart pour information, rien à envoyer (§18.104)", () => {
     const html = duel(83, {}, undefined, true).replace(/\u00a0/g, " ");
-    expect(html).toContain(">83/100 contre 68/100 : une étoile d'avance</h2>");
+    expect(html).toContain(">83 % contre 68 % : une étoile d'avance</h2>");
     expect(html).not.toContain("<button");
     expect(html).toContain(">Ma fiche</a>");
   });
@@ -84,10 +84,10 @@ describe("le duel de qui a déjà sa fiche", () => {
 
   it("le texte envoyé : chaque note avec son échelle, la préposition qui va avec l'écart", () => {
     const { fr, en } = DICTS;
-    expect(fr.denounce.duelText(83, 68, fr.denounce.starsAhead(1), "@camroux", "ahead")).toMatch(/^83\/100 contre 68\/100.: une étoile d'avance sur @camroux\. Verdict d'Azerit.:$/);
+    expect(fr.denounce.duelText(83, 68, fr.denounce.starsAhead(1), "@camroux", "ahead")).toMatch(/^83.% contre 68.%.: une étoile d'avance sur @camroux\. Verdict d'Azerit.:$/);
     expect(fr.denounce.duelText(68, 68, fr.denounce.tie, "@camroux", "tie")).toContain("à égalité avec @camroux.");
-    expect(en.denounce.duelText(83, 68, en.denounce.starsAhead(1), "@camroux", "ahead")).toBe("83/100 vs 68/100: one star ahead of @camroux. Azerit's verdict:");
-    expect(en.denounce.duelText(60, 68, en.denounce.pointsBehind(8), "@camroux", "behind")).toBe("60/100 vs 68/100: 8 points behind @camroux. Azerit's verdict:");
-    expect(en.denounce.duelText(68, 68, en.denounce.tie, "@camroux", "tie")).toBe("68/100 vs 68/100: dead heat with @camroux. Azerit's verdict:");
+    expect(en.denounce.duelText(83, 68, en.denounce.starsAhead(1), "@camroux", "ahead")).toBe("83% vs 68%: one star ahead of @camroux. Azerit's verdict:");
+    expect(en.denounce.duelText(60, 68, en.denounce.pointsBehind(8), "@camroux", "behind")).toBe("60% vs 68%: 8 points behind @camroux. Azerit's verdict:");
+    expect(en.denounce.duelText(68, 68, en.denounce.tie, "@camroux", "tie")).toBe("68% vs 68%: dead heat with @camroux. Azerit's verdict:");
   });
 });

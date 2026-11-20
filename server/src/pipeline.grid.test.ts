@@ -399,7 +399,7 @@ describe("garde-fou : une personne, un dossier, une note, partout (SPEC §18.84)
       const page = await ctx.app.request(`/c/${address}`);
       expect([page.status, page.headers.get("location")], address).toEqual([302, `/c/${id}`]);
     }
-    expect(await (await ctx.app.request(`/c/${id}`)).text()).toContain(`${note}/100`);
+    expect(await (await ctx.app.request(`/c/${id}`)).text()).toMatch(new RegExp(`${note}(\\s|&nbsp;|&#160;)?%`));
     // L'image : celle du dossier, quelle que soit l'adresse.
     for (const address of [id, ...pieces, alone.card.id]) {
       ctx.rendered.length = 0;
