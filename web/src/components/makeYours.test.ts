@@ -45,7 +45,7 @@ describe("la barre « Faire ma fiche » du visiteur", () => {
   it("pas sur ordinateur : « À ton tour » ouvre la colonne de droite, sous la tête", () => {
     expect(render(false)).toBe("");
     const desktop = css.slice(css.indexOf("/* ============ ordinateur ============ */"));
-    expect(desktop).toMatch(/\.page-result\.is-visitor > \.result-top > \.you \{\s*grid-column: 4;\s*grid-row: 2;/);
+    expect(desktop).toMatch(/\.page-result\.is-visitor > \.result-top > \.you,\s*\.page-result\.is-visitor > \.result-top > \.you-col \{\s*grid-column: 4;\s*grid-row: 2;/);
     // Fiche dénoncée : son bloc d'abord, « À ton tour » dessous.
     expect(desktop).toMatch(/\.page-result\.is-visitor\.is-wanted \.visitor-col \{\s*grid-row: 2;/);
   });

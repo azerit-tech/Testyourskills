@@ -127,7 +127,7 @@
     position: static;
     padding-bottom: 24px;
   }
-  #main.has-vs > .result-top > :is(.you, .visitor-col, .removal),
+  #main.has-vs > .result-top > :is(.you, .you-col, .visitor-col, .removal),
   #main.has-vs > .after {
     grid-column: 2 / 5;
     grid-row: auto;

@@ -1361,9 +1361,6 @@ svg {
 .you-mine .home-return {
   max-width: none;
 }
-.you-mine + .after-block {
-  margin-top: 16px;
-}
 /* /<pseudo> d'un autre, fiche déjà faite : le bloc « Dénonce un complice », son bouton en rose (le seul ici) */
 .home-denounce {
   max-width: 440px;
@@ -3184,6 +3181,13 @@ svg {
 .result-top > .you {
   margin-top: 16px;
 }
+/* le duel (ou « Voir ma fiche ») puis « Dénonce un complice » : une pile, au même pas, jamais collés */
+.result-top > .you-col {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  margin-top: 16px;
+}
 .result-top > .removal {
   margin-top: 16px;
 }
@@ -4397,10 +4401,21 @@ a.dossier-item:hover {
   .page-result.is-visitor .result-stage {
     grid-row: 2 / 6;
   }
-  .page-result.is-visitor > .result-top > .you {
+  .page-result.is-visitor > .result-top > .you,
+  .page-result.is-visitor > .result-top > .you-col {
     grid-column: 4;
     grid-row: 2;
     margin-top: 0;
+  }
+  /* qui a sa fiche, sur celle d'un autre : le duel et « Dénonce un complice » en bas de la colonne, sous le jury
+     et les plis (§18.104, §18.118) ; le jury ouvre la colonne, à hauteur de la fiche */
+  .page-result.is-visitor > .result-top > .you-col.is-duel {
+    grid-row: 3;
+    padding-top: 16px;
+  }
+  .page-result.is-visitor:has(> .result-top > .you-col.is-duel) .visitor-col {
+    grid-row: 2;
+    padding-top: 0;
   }
   .page-result.is-visitor .visitor-col {
     grid-column: 4;
