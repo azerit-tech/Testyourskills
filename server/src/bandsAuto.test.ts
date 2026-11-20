@@ -8,7 +8,9 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { MyBands } from "../../shared/bands";
 import { FIXTURES } from "../../shared/fixtures";
-import type { CardData } from "../../shared/types";
+import type { CardData, ComparisonData } from "../../shared/types";
+import { fileOf } from "../../shared/caseFile";
+import { isColorway } from "../../shared/card/colorways";
 import { createApp } from "./app";
 import { autoJoinBands, bandStanding, joinBand, leaveBand, starsOfRow } from "./bands";
 import { RETENTION_MS, Store } from "./db";
@@ -318,5 +320,38 @@ describe("un dossier à deux pièces : une personne, une entrée", () => {
       { kind: "boite", band: "doctolib", card: li.id },
       { kind: "ecole", band: "centrale-mediterranee", card: li.id },
     ]);
+  });
+});
+
+describe("le coloris de la fiche (§18.102)", () => {
+  const colorOf = (store: Store, id: string) => {
+    const row = store.getCard(id)!;
+    return row.kind === "comparison" ? fileOf(row.data as ComparisonData).colorway : (row.data as CardData).colorway;
+  };
+
+  it("une fiche naît avec un coloris rangé, que la page relit tel quel", async () => {
+    const ctx = setup();
+    const li = await make(ctx, { linkedin: LINKEDIN });
+    const cw = colorOf(ctx.store, li.id);
+    expect(isColorway(cw)).toBe(true);
+    const page = await api<{ card: CardData }>(ctx, `/api/card/${li.id}`);
+    expect(page.json.card.colorway).toBe(cw);
+  });
+
+  it("le dossier qui complète sa fiche garde sa couleur ; sans le jeton, il a la sienne", async () => {
+    const ctx = setup();
+    const li = await make(ctx, { linkedin: LINKEDIN });
+    const before = colorOf(ctx.store, li.id);
+    const dossier = await make(ctx, { login: "leamd", linkedin: LINKEDIN, from: li.id }, { "x-card-token": li.token! });
+    expect(colorOf(ctx.store, dossier.id)).toBe(before);
+    // Sans le jeton, rien n'est repris : le dossier tire son coloris (douze tirages, au moins un autre).
+    const seen = new Set<string>();
+    for (let i = 0; i < 12; i++) {
+      const c = setup();
+      const l = await make(c, { linkedin: LINKEDIN });
+      const other = await make(c, { login: "leamd", linkedin: LINKEDIN, from: l.id }, { "x-card-token": "pas-le-bon" });
+      seen.add(`${colorOf(c.store, l.id)}>${colorOf(c.store, other.id)}`);
+    }
+    expect([...seen].some((s) => s.split(">")[0] !== s.split(">")[1])).toBe(true);
   });
 });
