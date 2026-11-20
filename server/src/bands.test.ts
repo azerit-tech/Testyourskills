@@ -161,7 +161,7 @@ describe("entrer et sortir : les droits", () => {
     expect((await join_(ctx, id, { type: "ecole", id: "epita" }, { token: null, headers: asOwner("autre", 7) })).status).toBe(403);
   });
 
-  it("une fiche née d'une dénonciation n'entre qu'une fois revendiquée", async () => {
+  it("la bande d'une fiche née d'une dénonciation ne change qu'à la main de sa personne, revendiquée", async () => {
     const ctx = setup();
     const by = insert(ctx.store);
     const id = insert(ctx.store, { login: "cible" });
@@ -446,7 +446,7 @@ describe("pages publiques", () => {
     expect(JSON.stringify(r.json)).not.toMatch(/linkedin\.com|rang [SABC]|tier|"school"|"club"/);
   });
 
-  it("une fiche née d'une dénonciation reste anonyme tant qu'elle n'est pas revendiquée ; un pseudo masqué n'y est pas", async () => {
+  it("une fiche née d'une dénonciation se montre comme les autres, sans LinkedIn avant d'être revendiquée ; un pseudo masqué n'y est pas", async () => {
     const ctx = setup();
     const by = insert(ctx.store, { login: "balance", stars: 6, name: "Bal Ance" });
     const tip = insert(ctx.store, { login: "victime", stars: 5, name: "Nom Caché", avatarUrl: "https://avatars.githubusercontent.com/u/2?v=4" });
@@ -459,19 +459,17 @@ describe("pages publiques", () => {
     ctx.store.setOwnerHidden("parti", true);
     const page = async () => (await call<BandPage>(ctx, "/api/bands/ecole/epitech")).json;
     const before = await page();
-    // Le profil et les étoiles, sans nom, sans visage, sans lien ; la fiche masquée n'est pas rendue.
-    expect(before.members.map((m) => [m.stars, m.cardId ?? null, m.name ?? null, m.login ?? null, m.initials ?? null])).toEqual([
-      [6, by, "Bal Ance", "balance", "LM"],
-      [5, null, null, null, null],
-      [4, null, null, null, null],
+    // Toutes nommées (§18.119) ; la fiche masquée n'est pas rendue.
+    expect(before.members.map((m) => [m.stars, m.cardId ?? null, m.name ?? null, m.login ?? null])).toEqual([
+      [6, by, "Bal Ance", "balance"],
+      [5, tip, "Nom Caché", "victime"],
+      [4, tipLi, "Personne Dénoncée", null],
     ]);
     expect(before.members[1]!.profile).toEqual(aliasFor(FIXTURES.gold.profile!.id, tip));
-    expect(JSON.stringify(before)).not.toMatch(/Nom Caché|victime|Personne Dénoncée|Partie Loin|parti|avatars\.githubusercontent/);
-    // « C'est moi » : la fiche revendiquée se montre ; la fiche LinkedIn seule ne se revendique pas.
-    ctx.store.claimOwner("victime", 4);
-    const after = await page();
-    expect(after.members[1]).toMatchObject({ cardId: tip, name: "Nom Caché", login: "victime" });
-    expect(after.members[2]!.cardId).toBeUndefined();
+    expect(before.members[1]!.avatarUrl).toBe("https://avatars.githubusercontent.com/u/2?v=4");
+    // Son LinkedIn attend sa personne (§18.108).
+    expect(before.members[2]!.linkedinUrl).toBeUndefined();
+    expect(JSON.stringify(before)).not.toMatch(/Partie Loin|"parti"|linkedin\.com\/in\/y/);
   });
 
   it("une école de la liste sans membre existe, en formation ; une boîte inconnue non", async () => {

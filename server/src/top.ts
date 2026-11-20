@@ -8,16 +8,16 @@
 // - une fiche LinkedIn seule : sa note, sous le nom de sa fiche.
 // Chaque ligne est la vraie personne (§18.88, shared/boardPerson.ts) : le nom de sa
 // fiche (le @pseudo d'une fiche GitHub sans nom), sa photo ou ses initiales, et le
-// lien vers sa fiche. Personne d'anonyme n'entre : voir la dénonciation plus bas.
+// lien vers sa fiche.
 // Une pièce d'un dossier n'entre jamais : elle n'a pas de note à elle. Un dossier
 // dont le lien n'est pas prouvé (monté par un tiers sur le pseudo d'un autre, ou
 // un CV déposé avec un pseudo) ne classe personne. Pour un login : il n'est pas
 // masqué, son compte a 5 000 abonnés au plus (les célébrités gardent leur fiche
-// mais ne bouchent pas le haut du tableau), et une fiche née d'une dénonciation
-// (`cards.denounce_born`) n'entre, et ne porte la spéciale, qu'une fois son login
-// revendiqué (`owners`) ; une fiche déjà faite, dénoncée ensuite depuis le cache,
-// garde sa place. Une fiche LinkedIn seule née d'une dénonciation n'entre pas.
-// Une ligne par personne : son dossier s'il existe, sinon sa fiche seule ; entre
+// mais ne bouchent pas le haut du tableau). Une fiche née d'une dénonciation
+// (`cards.denounce_born`) entre comme les autres, revendiquée ou non, GitHub ou
+// LinkedIn seule (§18.119) : ce ne sont que des données publiques. Elle ne montre
+// pas le LinkedIn de sa personne tant qu'elle n'est pas revendiquée (§18.108,
+// boardLinkedin). Une ligne par personne : son dossier s'il existe, sinon sa fiche seule ; entre
 // deux du même genre, la meilleure note de la semaine ; à égalité, la plus ancienne
 // passe devant. Tout se calcule à la lecture, rien n'est écrit.
 // Le classement d'une semaine est gardé 60 s en mémoire : il est demandé à
@@ -30,6 +30,7 @@ import { fileOf } from "../../shared/caseFile";
 import { catalogProfile, withCatalogProfiles } from "../../shared/profileCatalog";
 import type { CardData, ComparisonData, Fact, TopEntry, WeekRank, WeekTop } from "../../shared/types";
 import { starsFor } from "../../shared/types";
+import { githubShowsLinkedin } from "./linkedinProfile/url";
 import { isoWeekLabel, weekStart } from "./weekly";
 
 export const WEEK_MS = 7 * 24 * 3600 * 1000;
@@ -51,6 +52,8 @@ interface Ranked {
   ids: string[];
   /** L'adresse LinkedIn de la fiche qui porte le rang, s'il y en a une (§18.108). */
   linkedinUrl?: string | null;
+  /** La fiche qui porte le rang est née d'une dénonciation. */
+  denounceBorn: boolean;
 }
 
 /** Numéro de la semaine ISO de ce lundi (« 2026-W46 » donne 46). */
@@ -66,6 +69,9 @@ const FOLLOWERS_SQL = `COALESCE(
 
 /**
  * Les fiches racines `c` qui peuvent porter le rang d'une personne (voir l'en-tête).
+ * Une fiche remplacée par un dossier que sa personne a fait n'entre plus : sa note est
+ * celle du dossier. Remplacée par un dossier né d'une dénonciation, elle garde son
+ * adresse (db.ts, fileRow) et entre encore ; les deux sont la même personne, une ligne.
  * Paramètres, dans l'ordre : `now` (expiration), le plafond d'abonnés.
  */
 const ENTERS_SQL = `c.parent_id IS NULL AND c.degraded = 0
@@ -76,9 +82,8 @@ const ENTERS_SQL = `c.parent_id IS NULL AND c.degraded = 0
              AND ((c.kind = 'card' AND c.source = 'github')
                OR (c.kind = 'comparison' AND c.source = 'linkedin' AND COALESCE(json_extract(c.facts_json, '$.linkedinProven'), 0) = 1))
              AND ${FOLLOWERS_SQL} <= ?
-             AND NOT EXISTS (SELECT 1 FROM owners o WHERE o.login = c.login AND o.hidden = 1)
-             AND (c.denounce_born = 0 OR EXISTS (SELECT 1 FROM owners o WHERE o.login = c.login)))
-           OR (c.login IS NULL AND c.kind = 'card' AND c.source = 'linkedin' AND c.denounce_born = 0)
+             AND NOT EXISTS (SELECT 1 FROM owners o WHERE o.login = c.login AND o.hidden = 1))
+           OR (c.login IS NULL AND c.kind = 'card' AND c.source = 'linkedin')
          )`;
 
 /** Durée pendant laquelle le classement d'une semaine est gardé en mémoire. */
@@ -112,6 +117,7 @@ interface WeekRow {
   createdAt: number;
   overall: number | null;
   linkedinUrl: string | null;
+  denounceBorn: number;
 }
 
 /**
@@ -125,7 +131,8 @@ function computeWeek(db: Database.Database, monday: number, now: number): Ranked
               CASE WHEN c.kind = 'comparison'
                    THEN COALESCE(json_extract(c.json, '$.grid.overall'), json_extract(c.json, '$.github.overall'))
                    ELSE json_extract(c.json, '$.overall') END AS overall,
-              COALESCE(json_extract(c.facts_json, '$.linkedinUrl'), json_extract(c.json, '$.linkedinUrl')) AS linkedinUrl
+              COALESCE(json_extract(c.facts_json, '$.linkedinUrl'), json_extract(c.json, '$.linkedinUrl')) AS linkedinUrl,
+              c.denounce_born AS denounceBorn
        FROM cards c
        WHERE c.created_at >= ? AND c.created_at < ?
          AND ${ENTERS_SQL}
@@ -151,8 +158,26 @@ function computeWeek(db: Database.Database, monday: number, now: number): Ranked
     }
   }
   return [...best.values()]
-    .map(({ row, ids }) => ({ id: row.id, login: row.login, overall: row.overall!, createdAt: row.createdAt, ids, linkedinUrl: row.linkedinUrl }))
+    .map(({ row, ids }) => ({ id: row.id, login: row.login, overall: row.overall!, createdAt: row.createdAt, ids, linkedinUrl: row.linkedinUrl, denounceBorn: row.denounceBorn === 1 }))
     .sort((a, b) => b.overall - a.overall || a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1));
+}
+
+/**
+ * L'adresse LinkedIn qu'une ligne de classement peut montrer (§18.108, la règle de
+ * shared/profileLinks.ts) : celle de la fiche, sauf pour une fiche née d'une
+ * dénonciation dont le login n'est pas revendiqué, qui ne la montre que si son GitHub
+ * l'affiche déjà lui-même (la pièce GitHub d'un dossier). Ni nom ni ligne n'en dépendent.
+ */
+export function boardLinkedin(
+  db: Database.Database,
+  r: { login: string | null; linkedinUrl?: string | null; denounceBorn: boolean; kind?: string; githubPieceId?: string | null },
+): string | null {
+  const url = r.linkedinUrl ?? null;
+  if (!url || !r.denounceBorn) return url;
+  if (r.login && db.prepare(`SELECT 1 FROM owners WHERE login = ?`).get(r.login.toLowerCase())) return url;
+  if (r.kind !== "comparison" || !r.githubPieceId) return null;
+  const gh = db.prepare(`SELECT facts_json FROM cards WHERE id = ?`).get(r.githubPieceId) as { facts_json: string | null } | undefined;
+  return gh?.facts_json && githubShowsLinkedin(JSON.parse(gh.facts_json), url) ? url : null;
 }
 
 /** Le haut du classement de la semaine en cours. */
@@ -172,8 +197,8 @@ export function weekTop(db: Database.Database, opts: { now?: number; limit?: num
     return {
       rank: i + 1,
       // La personne de la fiche : son nom, son visage, sa fiche (une fiche LinkedIn seule comprise).
-      // Son LinkedIn (§18.108) : n'entre au top qu'une fiche faite ou revendiquée par sa personne (ENTERS_SQL).
-      ...boardPerson(card, r.id, r.login, r.linkedinUrl),
+      // Son LinkedIn (§18.108) : pas pour une fiche née d'une dénonciation et pas encore revendiquée.
+      ...boardPerson(card, r.id, r.login, boardLinkedin(db, { ...r, kind: raw?.kind, githubPieceId: (data as Partial<ComparisonData>).github?.id })),
       overall: r.overall,
       stars: starsFor(r.overall),
       ...(profile ? { profile } : {}),

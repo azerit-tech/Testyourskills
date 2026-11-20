@@ -392,29 +392,46 @@ describe("withWeekSpecial", () => {
   });
 });
 
-describe("fiche née d'une dénonciation", () => {
-  it("n'entre au top et ne porte la spéciale qu'une fois son login revendiqué", () => {
+describe("fiche née d'une dénonciation (§18.119)", () => {
+  it("une fiche GitHub dénoncée, pas revendiquée, entre au top avec sa personne et la spéciale", () => {
     const store = newStore();
     const snitch = gh("delateur", 50, W46 + H);
-    const target = gh("cible", 95, W46 + H);
+    const target = gh("cible", 95, W46 + H, {}, { name: "Léa Cible" });
     store.insertCards([snitch, target, ...crowd("n", TOTW_MIN_ENTRIES, W46 + H)]);
-    // Avant d'être dénoncée, une fiche ordinaire : elle mène (le classement est gardé 60 s).
-    expect(weekTop(store.db, { now: NOW }).entries[0]!.login).toBe("cible");
     store.markDenounced(target.id, snitch.id, null);
-    const read = () => withWeekSpecial(store.db, store.getCard(target.id)!.data as CardData, NOW);
-    // Dénoncée, non revendiquée : hors du top dès la lecture suivante, ni rang ni spéciale.
-    expect(weekTop(store.db, { now: NOW }).entries.map((e) => e.login)).not.toContain("cible");
-    expect(weekTop(store.db, { now: NOW }).total).toBe(TOTW_MIN_ENTRIES + 1);
-    expect(weekRank(store.db, target.id, NOW)).toBeNull();
-    expect(read().data.special).toBeUndefined();
-    expect(read().week).toBeNull();
-    // Les fiches ordinaires ne changent pas.
-    expect(weekRank(store.db, snitch.id, NOW)).toMatchObject({ rank: 1 });
-    // Revendiquée : elle entre, en tête, avec la spéciale.
-    store.claimOwner("cible", 4242);
-    expect(weekTop(store.db, { now: NOW }).entries[0]).toMatchObject({ login: "cible", cardId: target.id });
+    expect(store.getCard(target.id)!.denounceBorn).toBe(true);
+    const top = weekTop(store.db, { now: NOW });
+    expect(top.entries[0]).toMatchObject({ rank: 1, cardId: target.id, login: "cible", name: "Léa Cible", overall: 95 });
+    expect(top.entries[0]!.initials).toBeTruthy();
+    expect(top.total).toBe(TOTW_MIN_ENTRIES + 2);
     expect(weekRank(store.db, target.id, NOW)).toMatchObject({ rank: 1, inTop5: true });
-    expect(read().data.special).toBe("totw");
+    expect(withWeekSpecial(store.db, store.getCard(target.id)!.data as CardData, NOW).data.special).toBe("totw");
+  });
+
+  it("une fiche LinkedIn seule dénoncée entre, nommée, sans le logo LinkedIn tant qu'elle n'est pas à sa personne", () => {
+    const store = newStore();
+    const snitch = gh("delateur4", 50, W46 + H);
+    const tip = li("ines-tip", 80, W46 + H);
+    store.insertCards([snitch, tip]);
+    store.markDenounced(tip.id, snitch.id, null);
+    const top = weekTop(store.db, { now: NOW });
+    expect(top.entries.map((e) => e.cardId)).toEqual([tip.id, snitch.id]);
+    expect(top.entries[0]).toMatchObject({ name: FIXTURES.cv.name, initials: FIXTURES.cv.initials, overall: 80 });
+    expect(top.entries[0]!.linkedinUrl).toBeUndefined();
+    expect(weekRank(store.db, tip.id, NOW)).toMatchObject({ rank: 1 });
+  });
+
+  it("masquée par sa personne, elle reste dehors", () => {
+    const store = newStore();
+    const snitch = gh("delateur5", 50, W46 + H);
+    const target = gh("cachee", 95, W46 + H);
+    store.insertCards([snitch, target]);
+    store.markDenounced(target.id, snitch.id, null);
+    expect(weekRank(store.db, target.id, NOW)).toMatchObject({ rank: 1 });
+    store.claimOwner("cachee", 5151);
+    store.setOwnerHidden("cachee", true);
+    expect(weekTop(store.db, { now: NOW }).entries.map((e) => e.login)).toEqual(["delateur5"]);
+    expect(weekRank(store.db, target.id, NOW)).toBeNull();
   });
 
   it("une fiche déjà faite, dénoncée ensuite par un tiers, garde sa place", () => {
@@ -430,31 +447,56 @@ describe("fiche née d'une dénonciation", () => {
     expect(withWeekSpecial(store.db, store.getCard(own.id)!.data as CardData, NOW).data.special).toBe("totw");
   });
 
-  it("une autre fiche du même login, faite par lui, garde sa place", () => {
+  it("dénoncée, puis faite par sa personne : une seule ligne", () => {
     const store = newStore();
-    const own = gh("cible2", 70, W46 + H);
-    const denounced = gh("cible2", 90, W46 + 2 * H);
-    store.insertCards([own, denounced]);
-    store.markDenounced(denounced.id, own.id, null);
-    expect(weekTop(store.db, { now: NOW }).entries.map((e) => [e.login, e.cardId])).toEqual([["cible2", own.id]]);
-    expect(weekRank(store.db, denounced.id, NOW)).toBeNull();
+    const denounced = gh("cible2", 90, W46 + H);
+    store.insertCards([denounced]);
+    store.markDenounced(denounced.id, "someone02", null);
+    const own = gh("cible2", 70, W46 + 2 * H);
+    store.insertCards([own]);
+    const top = weekTop(store.db, { now: NOW });
+    expect(top.entries.map((e) => [e.login, e.cardId])).toEqual([["cible2", denounced.id]]);
+    expect(top.total).toBe(1);
+    // Sa propre fiche lit le rang de sa ligne.
+    expect(weekRank(store.db, own.id, NOW)).toMatchObject({ rank: 1, total: 1 });
+    // LinkedIn seule : dénoncée, puis faite par sa personne, une ligne aussi.
+    const tip = li("sam", 60, W46 + H);
+    store.insertCards([tip]);
+    store.markDenounced(tip.id, "someone02", null);
+    store.insertCards([li("sam", 65, W46 + 3 * H)]);
+    expect(weekTop(store.db, { now: NOW + RANK_CACHE_MS }).total).toBe(2);
   });
 
-  it("dossier dénoncé : il attend aussi la revendication, et ne prend pas l'adresse de la fiche que la personne a faite", () => {
+  it("dénoncée en LinkedIn seule, puis son dossier prouvé : le dossier la remplace, une ligne", () => {
+    const store = newStore();
+    const tip = li("duo2", 60, W46 + H);
+    store.insertCards([tip]);
+    store.markDenounced(tip.id, "someone03", null);
+    store.insertCards(dossier("cmpOwn0001", "duo2", 75, W46 + 2 * H, { facts: { linkedinUrl: "https://www.linkedin.com/in/duo2", linkedinProven: true } }));
+    expect(store.getCard(tip.id)!.supersededBy).toBe("cmpOwn0001");
+    const top = weekTop(store.db, { now: NOW });
+    expect(top.entries.map((e) => [e.cardId, e.overall])).toEqual([["cmpOwn0001", 75]]);
+    expect(top.entries[0]!.linkedinUrl).toBe("https://www.linkedin.com/in/duo2");
+  });
+
+  it("dossier dénoncé : il entre, une ligne avec la fiche que la personne a faite, qui garde son adresse ; son LinkedIn à la revendication", () => {
     const store = newStore();
     const own = gh("duo", 60, W46);
     store.insertCards([own]);
     const rows = dossier("cmpDenon1", "duo", 88, W46 + H);
     store.insertCards(rows);
-    expect(weekRank(store.db, rows[2]!.id, NOW)).toMatchObject({ rank: 1 });
     store.markDenounced("cmpDenon1", "someone01", null);
-    // Le dossier fait par un tiers sort ; la fiche de la personne garde sa place et son adresse.
-    expect(weekTop(store.db, { now: NOW }).entries.map((e) => [e.cardId, e.overall])).toEqual([[own.id, 60]]);
-    expect(weekRank(store.db, "cmpDenon1", NOW)).toBeNull();
+    // Une personne, une ligne : son dossier, même fait par un tiers.
+    let top = weekTop(store.db, { now: NOW });
+    expect(top.entries.map((e) => [e.cardId, e.overall])).toEqual([["cmpDenon1", 88]]);
+    expect(top.total).toBe(1);
+    expect(top.entries[0]!.linkedinUrl).toBeUndefined();
+    expect(weekRank(store.db, "cmpDenon1", NOW)).toMatchObject({ rank: 1 });
+    expect(weekRank(store.db, own.id, NOW)).toMatchObject({ rank: 1, total: 1 });
     expect(store.fileRow(own.id)!.id).toBe(own.id);
     store.claimOwner("duo", 77);
-    expect(weekRank(store.db, rows[2]!.id, NOW)).toMatchObject({ rank: 1 });
-    expect(weekTop(store.db, { now: NOW }).entries.map((e) => [e.cardId, e.overall])).toEqual([["cmpDenon1", 88]]);
+    top = weekTop(store.db, { now: NOW });
+    expect(top.entries[0]).toMatchObject({ cardId: "cmpDenon1", linkedinUrl: "https://www.linkedin.com/in/duo" });
   });
 });
 

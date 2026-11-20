@@ -218,8 +218,8 @@ const mock = {
       null,
     ];
     const positions = ["BE", "FE", "DATA", "FS", "OPS"] as const;
-    // Comme le serveur (§18.88) : toutes les fiches jusqu'à 50 (BAND_PAGE_MEMBERS), chacune avec sa
-    // personne ; `?anon=2` laisse les deux dernières anonymes (nées d'une dénonciation, pas revendiquées).
+    // Comme le serveur (§18.88, §18.119) : toutes les fiches jusqu'à 50 (BAND_PAGE_MEMBERS), chacune avec sa
+    // personne ; `?anon=2` fait des deux dernières des dénonciations pas revendiquées : nommées, sans LinkedIn (§18.108).
     let anon = 0;
     try {
       anon = Math.max(0, Number(new URLSearchParams(window.location.search).get("anon")) || 0);
@@ -235,7 +235,7 @@ const mock = {
         stars: Math.max(1, 6 - Math.floor(i / 3)),
         profile: profiles[i % profiles.length]!,
         position: positions[i % positions.length],
-        ...(i >= count - anon ? {} : boardPerson(p, cardId, null, p.linkedin)),
+        ...boardPerson(p, cardId, null, i >= count - anon ? null : p.linkedin),
       };
     });
     return { band, members };
