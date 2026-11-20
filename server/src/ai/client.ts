@@ -139,7 +139,8 @@ export function creditErrorIn(res: ChatResponse): boolean {
 // ---------------------------------------------------------------------------
 // Modèles
 
-export const DEFAULT_MODEL = "z-ai/glm-5.3-flash";
+/** Le modèle par défaut des deux lectures (SPEC §18.96), à servir par Cerebras (`AI_PROVIDER_ORDER`). */
+export const DEFAULT_MODEL = "openai/gpt-oss-120b";
 
 /** Température 0 seulement là où le modèle l'accepte (la génération 5 de Claude la refuse). */
 function supportsTemperature(model: string): boolean {
@@ -159,9 +160,15 @@ function supportsTemperature(model: string): boolean {
  * les mêmes niveaux lus. La sortie est une extraction contrainte par schéma, et
  * `observations` y ancre déjà le niveau. Un fournisseur qui refuserait la coupure
  * ramène le modèle au minimum (`minimalOnly`).
+ *
+ * gpt-oss (le modèle par défaut, SPEC §18.96) : au plus bas qu'il accepte,
+ * `effort: "low"`. Il refuse la coupure (« Reasoning is mandatory ») et ne
+ * connaît pas `minimal`. Chez Cerebras, 300 à 1 500 tokens de raisonnement
+ * passent en moins d'une seconde.
  */
 function reasoningFor(model: string): ChatRequest["reasoning"] | undefined {
   if (/claude-haiku-5/.test(model)) return { effort: minimalOnly.has(model) ? "minimal" : "none" };
+  if (/(^|\/)gpt-oss-/.test(model)) return { effort: "low" };
   return /(^|\/)glm-5/.test(model) ? { effort: "minimal" } : undefined;
 }
 

@@ -39,6 +39,8 @@ const PRICES: { match: RegExp; price: Price }[] = [
   { match: /opus-5[.-]5/, price: { input: 4, output: 20 } },
   { match: /opus/, price: { input: 5, output: 25 } },
   { match: /glm-5\.3-flash(?!x)/, price: { input: 0.04, output: 0.078 } },
+  // Tarif Cerebras, le fournisseur choisi (SPEC §18.96) ; les autres sont moins chers.
+  { match: /gpt-oss-120b/, price: { input: 0.35, output: 0.75 } },
 ];
 // Modèle inconnu : on compte au prix le plus cher pour rester prudent.
 const FALLBACK_PRICE: Price = { input: 10, output: 50 };
@@ -194,7 +196,7 @@ let creditsExhaustedAt: number | null = null;
 let creditBalanceUsd: number | null = null;
 
 /** Seuil de solde sous lequel l'IA est fermée (AI_MIN_CREDIT_USD, défaut 0,50 $).
- * Une fiche coûte 0,001 à 0,003 $ : 0,05 $ suffit à couvrir le `max_tokens` d'un appel (.env.example). */
+ * Une fiche coûte 0,001 à 0,01 $ : 0,05 $ suffit à couvrir le `max_tokens` d'un appel (.env.example). */
 export function minCreditUsd(): number {
   const raw = process.env.AI_MIN_CREDIT_USD;
   const n = Number(raw);

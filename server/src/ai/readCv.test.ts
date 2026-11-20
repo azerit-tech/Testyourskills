@@ -218,9 +218,9 @@ Certificat — École polytechnique`;
     const { client, calls } = fakeClient([VALID]);
     await readCv(CV, { client });
     const body = calls[0].body;
-    expect(body.model).toBe("z-ai/glm-5.3-flash");
-    // GLM raisonne d'office : on le réduit au minimum, sinon la réponse sort vide ou hors délai.
-    expect(body.reasoning).toEqual({ effort: "minimal" });
+    expect(body.model).toBe("openai/gpt-oss-120b");
+    // gpt-oss raisonne d'office et refuse la coupure : au plus bas qu'il accepte (SPEC §18.96).
+    expect(body.reasoning).toEqual({ effort: "low" });
     expect(body.temperature).toBe(0);
     expect(body.messages[0].content).toEqual([{ type: "text", text: CV_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }]);
     expect(body.response_format?.json_schema.name).toBe("cv_reading");

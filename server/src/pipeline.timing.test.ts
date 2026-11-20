@@ -99,7 +99,7 @@ describe("la ligne de chronométrage", () => {
     await pipeline.wait(id);
     expect(traces[0]!.ai).toHaveLength(1);
     expect(traces[0]!.ai[0]).toMatchObject({ label: "readCode", inputTokens: 5000, outputTokens: 200, cachedTokens: 4000, finish: "stop" });
-    expect(lines[0]).toMatch(/code@\d+\.\d\+\d+\.\d \(glm-5\.3-flash 5000→200 cache 4000 \d+\.\ds\)/);
+    expect(lines[0]).toMatch(/code@\d+\.\d\+\d+\.\d \(gpt-oss-120b 5000→200 cache 4000 \d+\.\ds\)/);
     expect(FILES[0]!.files).toHaveLength(1);
   });
 

@@ -41,6 +41,14 @@ describe("le raisonnement", () => {
     expect(calls[0]!.body.reasoning).toEqual({ effort: "minimal" });
   });
 
+  it("gpt-oss : au plus bas qu'il accepte, il refuse la coupure", async () => {
+    const { client, calls } = fakeClient([{}]);
+    await callStructured(call("openai/gpt-oss-120b", client));
+    expect(calls[0]!.body.reasoning).toEqual({ effort: "low" });
+    expect(calls[0]!.body.temperature).toBe(0);
+    expect(calls[0]!.body.response_format?.type).toBe("json_schema");
+  });
+
   it("un modèle qui ne raisonne pas d'office : aucune consigne", async () => {
     const { client, calls } = fakeClient([{}]);
     await callStructured(call("anthropic/claude-haiku-4.5", client));
