@@ -64,4 +64,25 @@ describe("registre Postgres", () => {
     expect(await fake([]).db.cv("x")).toBeNull();
     expect(await fake([{ data: new Uint8Array([2]), content_type: "image/jpeg" }]).db.photo("x")).toEqual({ data: new Uint8Array([2]), contentType: "image/jpeg" });
   });
+
+  it("par le nom : des tranches de l'index (bornes en deux tableaux), comptes non marqués, avec CV et photo (§18.96)", async () => {
+    const { db, calls } = fake([
+      { handle_key: "camille-ardent", data: new Uint8Array([1]), fetched_at: "2026-11-01T00:00:00", has_photo: true },
+      { handle_key: "camille-ardent-2", data: null, fetched_at: null, has_photo: false },
+    ]);
+    expect(await db.namesakes([{ lo: "camille-ardent", hi: "camille-ardenu" }], 25)).toEqual([
+      { key: "camille-ardent", cv: { data: new Uint8Array([1]), fetchedAt: "2026-11-01T00:00:00" }, hasPhoto: true },
+      { key: "camille-ardent-2", cv: null, hasPhoto: false },
+    ]);
+    expect(calls[0]!.values).toEqual([["camille-ardent"], ["camille-ardenu"], 25]);
+    expect(SQL.NAMESAKES_SQL).toMatch(/handle_key >= r\.lo AND handle_key < r\.hi AND deleted_at IS NULL/);
+    expect(await db.namesakes([], 25)).toEqual([]);
+    expect(calls).toHaveLength(1);
+  });
+
+  it("par l'email : la fonction de l'App, l'email en paramètre, des adresses en retour", async () => {
+    const { db, calls } = fake([{ handle_key: "camille-ardent" }]);
+    expect(await db.linkedinByEmail("camille@paysolde.io")).toEqual(["camille-ardent"]);
+    expect(calls[0]).toEqual({ text: SQL.EMAIL_SQL, values: ["camille@paysolde.io"] });
+  });
 });

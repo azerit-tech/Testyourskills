@@ -185,3 +185,68 @@ describe("signaux de la connexion LinkedIn", () => {
     expect(signInSignal("email", "name").strength).toBe(1);
   });
 });
+
+describe("registre : par le nom et par l'email (§18.96)", () => {
+  /** Un compte LinkedIn de l'App, avec un CV à ce nom (ou sans CV) et une photo. */
+  function person(db: MemoryRegistryDb, slug: string, o: { name?: string; headline?: string; photo?: boolean } = {}) {
+    const a = db.ensure("linkedin", slug);
+    if (o.name) {
+      const [first, ...rest] = o.name.split(" ");
+      const doc = newCvDocument(`https://www.linkedin.com/in/${slug}`, trimApifyItem({ ...ITEM, firstName: first, lastName: rest.join(" "), headline: o.headline ?? "Dev" })!, { fetchedAt: "2026-11-01T09:00:00" });
+      db.cvs.push({ account: a.id, data: packCv(doc), sha256: doc.versions[0]!.sha256, fetchedAt: "2026-11-01T09:00:00" });
+    }
+    if (o.photo) db.photos.push({ account: a.id, data: new Uint8Array([0xff, 0xd8, 0xff]), contentType: "image/jpeg" });
+    return a;
+  }
+
+  it("nom complet : les CV à ce nom d'abord, puis les adresses à ce nom sans CV ; jamais un autre nom", async () => {
+    const { db, reg } = setup();
+    person(db, "camille-ardent-4b2a", { name: "Camille Ardent", headline: "Backend chez Paysolde", photo: true });
+    person(db, "ardent-camille", { name: "Camille Ardent" });
+    person(db, "camille-ardent-x9", {});
+    person(db, "camille-ardentes", { name: "Camille Ardentes" });
+    person(db, "camille-ardent-77", { name: "Claire Martin" });
+    person(db, "camille-ardentx", {});
+    expect(await reg.namesakes("Camille Ardent")).toEqual([
+      { url: "https://www.linkedin.com/in/camille-ardent-4b2a", name: "Camille Ardent", headline: "Backend chez Paysolde", hasPhoto: true },
+      { url: "https://www.linkedin.com/in/ardent-camille", name: "Camille Ardent", headline: "Dev", hasPhoto: false },
+      { url: "https://www.linkedin.com/in/camille-ardent-x9", name: null, headline: "", hasPhoto: false },
+    ]);
+  });
+
+  it("en cours de frappe : seuls les CV dont le nom commence par ce qui est tapé", async () => {
+    const { db, reg } = setup();
+    person(db, "camille-ardent", { name: "Camille Ardent" });
+    person(db, "camille-ardentes", { name: "Camille Ardentes" });
+    person(db, "camille-arnaud", {});
+    expect((await reg.namesakes("camille ard", { partial: true })).map((n) => n.name)).toEqual(["Camille Ardent", "Camille Ardentes"]);
+    expect(await reg.namesakes("camille")).toEqual([]);
+    expect(db.calls).toEqual(["namesakes"]);
+  });
+
+  it("base en panne ou lente : [], sans attendre", async () => {
+    const { db, reg } = setup({ timeoutMs: 20 });
+    person(db, "camille-ardent", { name: "Camille Ardent" });
+    db.delayMs = 60;
+    expect(await reg.namesakes("Camille Ardent")).toEqual([]);
+  });
+
+  it("l'email : le seul profil qu'il désigne ; deux profils : rien", async () => {
+    const { db, reg } = setup();
+    db.emails = { "camille-ardent": "camille@paysolde.io", "c-ardent": "c@ardent.dev", "c-ardent-2": "c@ardent.dev" };
+    expect(await reg.linkedinOfEmail("Camille@Paysolde.io")).toBe(URL_);
+    expect(await reg.linkedinOfEmail("c@ardent.dev")).toBeNull();
+    expect(await reg.linkedinOfEmail("pas un email")).toBeNull();
+  });
+
+  it("fonction des emails pas encore posée : rien, une ligne au journal, et les autres lectures continuent", async () => {
+    const { db, reg, logs } = setup();
+    db.emails = null;
+    db.seedLink("camardent", "camille-ardent", 2);
+    expect(await reg.linkedinOfEmail("camille@paysolde.io")).toBeNull();
+    expect(await reg.linkedinOfEmail("camille@paysolde.io")).toBeNull();
+    expect(logs).toHaveLength(1);
+    expect(db.calls.filter((c) => c === "linkedinByEmail")).toHaveLength(1);
+    expect(await reg.linkedinOf("camardent")).toEqual({ url: URL_, strength: 2 });
+  });
+});

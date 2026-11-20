@@ -552,6 +552,8 @@ describe("le registre de l'App Azerit (§18.95)", () => {
       recordLink: (l) => void links.push(l),
       recordAccounts: (a) => void accounts.push(a),
       recordProfile: () => {},
+      namesakes: async () => [],
+      linkedinOfEmail: async () => null,
     };
     return { registry, links, accounts };
   }
@@ -609,4 +611,5 @@ describe("le registre de l'App Azerit (§18.95)", () => {
     expect(got.auto).toBeUndefined();
     expect(ctx.calls.peek).toEqual([bare(1).url, bare(2).url]);
   });
+
 });

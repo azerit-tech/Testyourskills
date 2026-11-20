@@ -29,6 +29,8 @@ export class MemoryRegistryDb implements RegistryDb {
   links_: MemLink[] = [];
   cvs: { account: number; data: Uint8Array; sha256: string; fetchedAt: string; deleted?: boolean }[] = [];
   photos: { account: number; data: Uint8Array; contentType: string }[] = [];
+  /** Les emails que l'App connaît, par profil LinkedIn (la fonction d'ops/registre-email.sql) ; null : fonction absente. */
+  emails: Record<string, string> | null = {};
   /** Chaque appel, pour vérifier ce qui part vers la base. */
   calls: string[] = [];
   /** Lève ou traîne à la demande. */
@@ -85,6 +87,31 @@ export class MemoryRegistryDb implements RegistryDb {
     const a = this.account("linkedin", key);
     const p = a && !a.deleted ? this.photos.find((x) => x.account === a.id) : undefined;
     return p ? { data: p.data, contentType: p.contentType } : null;
+  }
+
+  async namesakes(ranges: { lo: string; hi: string }[], perRange: number) {
+    await this.gate("namesakes");
+    const out: { key: string; cv: { data: Uint8Array; fetchedAt: string } | null; hasPhoto: boolean }[] = [];
+    for (const r of ranges) {
+      const hit = this.accounts
+        .filter((a) => a.platform === "linkedin" && !a.deleted && a.key >= r.lo && a.key < r.hi)
+        .sort((x, y) => (x.key < y.key ? -1 : 1))
+        .slice(0, perRange);
+      for (const a of hit) {
+        const c = this.cvs.find((x) => x.account === a.id && !x.deleted);
+        out.push({ key: a.key, cv: c ? { data: c.data, fetchedAt: c.fetchedAt } : null, hasPhoto: this.photos.some((p) => p.account === a.id) });
+      }
+    }
+    return out;
+  }
+
+  async linkedinByEmail(email: string) {
+    await this.gate("linkedinByEmail");
+    if (!this.emails) throw Object.assign(new Error("function testyourskills_linkedin_by_email(text) does not exist"), { code: "42883" });
+    const want = email.trim().toLowerCase();
+    return Object.entries(this.emails)
+      .filter(([, e]) => e.toLowerCase() === want)
+      .map(([slug]) => slug);
   }
 
   async addAccounts(accounts: AccountRef[]) {

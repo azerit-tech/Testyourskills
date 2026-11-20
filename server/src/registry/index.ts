@@ -20,6 +20,8 @@
 import { normalizeLinkedinUrl } from "../../../shared/entry";
 import type { LinkedinProfile } from "../linkedinProfile/profile";
 import { githubKey, isoSeconds, latestVersion, linkedinKey, newCvDocument, packCv, parseIso, profileFromApp, trimApifyItem, unpackCv, withoutPlaces } from "./appFormat";
+import { nameStartsWith, slugOfName, slugRanges } from "./names";
+import { samePublicFullName } from "../names";
 import { PgRegistryDb } from "./pg";
 import { DECLARED, onlyOwner, soleOwner, strongest, validLinks, type LinkRow } from "./rules";
 
@@ -38,6 +40,10 @@ export interface RegistryDb {
   links(from: { platform: AccountRef["platform"]; key: string }, otherPlatform: AccountRef["platform"]): Promise<(LinkRow & { handle: string })[]>;
   cv(linkedinKey: string): Promise<{ data: Uint8Array; fetchedAt: string } | null>;
   photo(linkedinKey: string): Promise<{ data: Uint8Array; contentType: string } | null>;
+  /** Les comptes LinkedIn dont l'adresse tombe dans ces tranches (names.ts), `perRange` au plus par tranche. */
+  namesakes(ranges: { lo: string; hi: string }[], perRange: number): Promise<{ key: string; cv: { data: Uint8Array; fetchedAt: string } | null; hasPhoto: boolean }[]>;
+  /** Les profils LinkedIn qu'un email désigne chez l'App (fonction d'ops/registre-email.sql). */
+  linkedinByEmail(email: string): Promise<string[]>;
   /** Les comptes qui manquent ; rend le nombre créé. */
   addAccounts(accounts: AccountRef[]): Promise<number>;
   /** Un lien `testyourskills`, sauf s'il en existe déjà un au moins aussi fort ; true s'il est écrit. */
@@ -53,12 +59,38 @@ export interface RegistryPort {
   githubOf(url: string): Promise<{ login: string; strength: number } | null>;
   profileOf(url: string): Promise<LinkedinProfile | null>;
   photoOf(url: string): Promise<{ bytes: Uint8Array; ext: "jpg" | "png" } | null>;
+  /**
+   * Les profils de l'App à ce nom (§18.96), le nom et le titre de leur CV. `partial` : le
+   * dernier mot est en cours de frappe, seuls les profils dont le CV dit le nom sortent.
+   * Sinon (un nom complet), aussi les profils sans CV dont l'adresse est ce nom (`name` null) :
+   * ils ne servent qu'à comparer une photo. Jamais d'erreur : [] .
+   */
+  namesakes(name: string, opts?: { partial?: boolean }): Promise<Namesake[]>;
+  /** Le seul profil LinkedIn qu'un email vérifié désigne chez l'App, ou null. */
+  linkedinOfEmail(email: string): Promise<string | null>;
   /** Un lien établi par le jeu ; `step` : le signal (`github_social`, `linkedin_signin:photo+github_email`…). */
   recordLink(link: { login: string; url: string; strength: number; step: string }): void;
   recordAccounts(accounts: { github?: string | null; linkedin?: string | null }): void;
   /** Un profil payé chez Apify (sortie brute de l'acteur) ; `login` : le GitHub prouvé de ce profil. */
   recordProfile(url: string, raw: unknown, opts?: { login?: string }): void;
 }
+
+/** Un profil de l'App trouvé par le nom (§18.96) : rien de plus que ce que « C'est toi ? » montre. */
+export interface Namesake {
+  url: string;
+  /** Le nom du CV ; null sans CV (l'adresse seule est faite du nom). */
+  name: string | null;
+  headline: string;
+  /** L'App garde sa photo. */
+  hasPhoto: boolean;
+}
+
+/** Comptes lus par tranche d'adresses. */
+export const NAMESAKES_PER_RANGE = 25;
+/** Profils rendus par une recherche par nom. */
+export const NAMESAKES_MAX = 8;
+/** La fonction des emails absente ou refusée : plus demandée pendant ce temps-là. */
+export const EMAIL_OFF_MS = 10 * 60_000;
 
 /** Un lien de force 2 ou plus vaut « prouvé » pour la fiche (§18.24). */
 export const isProven = (strength: number) => strength >= DECLARED;
@@ -92,6 +124,7 @@ export class Registry implements RegistryPort {
   private readonly now: () => number;
   private readonly log: (msg: string) => void;
   private pausedUntil = 0;
+  private emailOffUntil = 0;
   private readonly pending = new Set<Promise<unknown>>();
 
   constructor(
@@ -201,6 +234,57 @@ export class Registry implements RegistryPort {
       const row = await this.db.photo(li.key);
       const ext = row ? PHOTO_EXT[row.contentType] : undefined;
       return row && ext ? { bytes: row.data, ext } : null;
+    });
+  }
+
+  namesakes(name: string, o: { partial?: boolean } = {}): Promise<Namesake[]> {
+    const ranges = slugRanges(name, o);
+    if (!ranges.length) return Promise.resolve([]);
+    return this.read("recherche par nom", async () => {
+      const rows = await this.db.namesakes(ranges, NAMESAKES_PER_RANGE);
+      const out: Namesake[] = [];
+      const seen = new Set<string>();
+      for (const r of rows) {
+        if (seen.has(r.key)) continue;
+        seen.add(r.key);
+        const url = normalizeLinkedinUrl(`https://www.linkedin.com/in/${encodeURIComponent(r.key)}`);
+        if (!url) continue;
+        const doc = r.cv ? unpackCv(r.cv.data) : null;
+        const p = doc ? latestVersion(doc)?.profile : undefined;
+        const cvName = typeof p?.name === "string" ? p.name.trim().slice(0, 120) : "";
+        const headline = typeof p?.headline === "string" ? p.headline.trim().slice(0, 200) : "";
+        if (o.partial) {
+          if (cvName && nameStartsWith(cvName, name)) out.push({ url, name: cvName, headline, hasPhoto: r.hasPhoto });
+        } else if (cvName) {
+          if (samePublicFullName(name, cvName)) out.push({ url, name: cvName, headline, hasPhoto: r.hasPhoto });
+        } else if (slugOfName(r.key, ranges)) {
+          out.push({ url, name: null, headline: "", hasPhoto: r.hasPhoto });
+        }
+      }
+      // Ceux dont le CV dit le nom d'abord.
+      return [...out.filter((n) => n.name), ...out.filter((n) => !n.name)].slice(0, NAMESAKES_MAX);
+    }).then((r) => r ?? []);
+  }
+
+  linkedinOfEmail(email: string): Promise<string | null> {
+    const e = email.trim();
+    if (!/^[^@\s]{1,64}@[^@\s]{1,190}$/.test(e) || this.now() < this.emailOffUntil) return Promise.resolve(null);
+    return this.read("profil par l'email", async () => {
+      let keys: string[];
+      try {
+        keys = await this.db.linkedinByEmail(e);
+      } catch (err) {
+        // La fonction pas encore posée par Jacques, ou refusée : rien, sans troubler le reste.
+        const code = (err as { code?: unknown })?.code;
+        if (code === "42883" || code === "42501") {
+          if (this.now() >= this.emailOffUntil) this.log(`[registre] profil par l'email : fonction absente ou refusée (${code}), rien ne change.`);
+          this.emailOffUntil = this.now() + EMAIL_OFF_MS;
+          return null;
+        }
+        throw err;
+      }
+      const urls = [...new Set(keys.map((k) => normalizeLinkedinUrl(`https://www.linkedin.com/in/${encodeURIComponent(k)}`)).filter((u): u is string => !!u))];
+      return urls.length === 1 ? urls[0]! : null;
     });
   }
 

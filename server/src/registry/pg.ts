@@ -79,7 +79,24 @@ SELECT a.id, $2, $3, $4
    AND NOT EXISTS (SELECT 1 FROM cvs c WHERE c.account_id = a.id)
 ON CONFLICT (account_id) DO NOTHING`;
 
-export const SQL = { LINKS_SQL, CV_SQL, PHOTO_SQL, ACCOUNTS_SQL, LINK_SQL, ADD_CV_SQL };
+// Les comptes LinkedIn dont l'adresse commence par l'un de ces débuts (names.ts) : une
+// tranche de l'index unique (platform, handle_key) chacune, avec le CV et « a une photo ».
+const NAMESAKES_SQL = `
+SELECT a.handle_key, c.data, c.fetched_at,
+       EXISTS (SELECT 1 FROM photo_profiles pp WHERE pp.account_id = a.id AND pp.deleted_at IS NULL) AS has_photo
+  FROM unnest($1::text[], $2::text[]) AS r(lo, hi)
+  CROSS JOIN LATERAL (
+        SELECT id, handle_key FROM accounts
+         WHERE platform = 'linkedin' AND handle_key >= r.lo AND handle_key < r.hi AND deleted_at IS NULL
+         ORDER BY handle_key
+         LIMIT $3) a
+  LEFT JOIN cvs c ON c.account_id = a.id AND c.deleted_at IS NULL`;
+
+// Le LinkedIn d'un email vérifié, par la fonction que l'App prête au jeu
+// (ops/registre-email.sql) : l'email entre, jamais un email ne sort.
+const EMAIL_SQL = `SELECT handle_key FROM testyourskills_linkedin_by_email($1) LIMIT 5`;
+
+export const SQL = { LINKS_SQL, CV_SQL, PHOTO_SQL, ACCOUNTS_SQL, LINK_SQL, ADD_CV_SQL, NAMESAKES_SQL, EMAIL_SQL };
 
 const bytes = (v: unknown): Uint8Array | null => (v instanceof Uint8Array ? v : null);
 
@@ -131,6 +148,20 @@ export class PgRegistryDb implements RegistryDb {
     const r = (await this.client.query(PHOTO_SQL, [key])).rows[0];
     const data = bytes(r?.data);
     return r && data ? { data, contentType: String(r.content_type ?? "") } : null;
+  }
+
+  async namesakes(ranges: { lo: string; hi: string }[], perRange: number) {
+    if (!ranges.length) return [];
+    const { rows } = await this.client.query(NAMESAKES_SQL, [ranges.map((r) => r.lo), ranges.map((r) => r.hi), perRange]);
+    return rows.map((r) => {
+      const data = bytes(r.data);
+      return { key: String(r.handle_key ?? ""), cv: data ? { data, fetchedAt: String(r.fetched_at ?? "") } : null, hasPhoto: r.has_photo === true };
+    });
+  }
+
+  async linkedinByEmail(email: string) {
+    const { rows } = await this.client.query(EMAIL_SQL, [email]);
+    return rows.map((r) => String(r.handle_key ?? "")).filter(Boolean);
   }
 
   async addAccounts(accounts: AccountRef[]) {
