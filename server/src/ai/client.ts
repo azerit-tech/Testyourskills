@@ -159,9 +159,14 @@ function supportsTemperature(model: string): boolean {
  * les mêmes niveaux lus. La sortie est une extraction contrainte par schéma, et
  * `observations` y ancre déjà le niveau. Un fournisseur qui refuserait la coupure
  * ramène le modèle au minimum (`minimalOnly`).
+ *
+ * DeepSeek V4.x : coupé aussi (SPEC §18.98). Sans consigne, il raisonnait
+ * jusqu'au bout des 3 000 tokens de la lecture du code, la réponse sortait
+ * tronquée et repartait : 14 à 16 s la fiche. Sans raisonnement : 2 à 3 s
+ * l'appel, mêmes notes.
  */
 function reasoningFor(model: string): ChatRequest["reasoning"] | undefined {
-  if (/claude-haiku-5/.test(model)) return { effort: minimalOnly.has(model) ? "minimal" : "none" };
+  if (/claude-haiku-5|(^|\/)deepseek-v4/.test(model)) return { effort: minimalOnly.has(model) ? "minimal" : "none" };
   return /(^|\/)glm-5/.test(model) ? { effort: "minimal" } : undefined;
 }
 
