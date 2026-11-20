@@ -54,7 +54,7 @@ describe("Dénoncer à la suite, sans recharger (§18.114)", () => {
       expect(lines[0]!.who).toBe(`@${login}`);
     }
     lines = shotsReducer(lines, { type: "done", key: "gh:jplefevre", card: { ...FIXTURES.silver, login: "jplefevre" } });
-    lines = shotsReducer(lines, { type: "fail", key: "gh:camroux", error: "Dix dénonciations par jour, c'est le maximum. Reviens demain." });
+    lines = shotsReducer(lines, { type: "fail", key: "gh:camroux", error: "Cinquante dénonciations aujourd'hui : c'est le maximum. Reviens demain." });
     lines = shotsReducer(lines, { type: "done", key: "gh:nour-rs", card: { ...FIXTURES.gold, login: "nour-rs" } });
     expect(lines.map((l) => [l.who, l.status])).toEqual([
       ["@nour-rs", "done"],

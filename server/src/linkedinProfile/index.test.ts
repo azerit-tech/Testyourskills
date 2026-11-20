@@ -275,8 +275,8 @@ describe("forUrl (entrée LinkedIn)", () => {
     warn.mockRestore();
   });
 
-  it("limite par IP : 40 lectures payées passent, la 41e est refusée pour l'IP ; un profil au cache ne compte pas", async () => {
-    expect(PAID_CALLS_PER_IP).toBe(40);
+  it("limite par IP : 60 lectures payées passent, la 61e est refusée pour l'IP ; un profil au cache ne compte pas", async () => {
+    expect(PAID_CALLS_PER_IP).toBe(60);
     const store = new Store(":memory:");
     const limiter = new RateLimiter(store, "sel");
     const spend = () => limiter.take("linkedin", "1.2.3.4", PAID_CALLS_PER_IP, NOW);
@@ -288,7 +288,7 @@ describe("forUrl (entrée LinkedIn)", () => {
       expect(await t.finder.forUrl(url(1), { spend })).toMatchObject({ status: "found" });
     }
     expect(t.calls).toHaveLength(PAID_CALLS_PER_IP);
-    expect(await t.finder.forUrl(url(41), { spend })).toEqual({ status: "unavailable", reason: "ip" });
+    expect(await t.finder.forUrl(url(PAID_CALLS_PER_IP + 1), { spend })).toEqual({ status: "unavailable", reason: "ip" });
     expect(await t.finder.forUrl(url(7), { spend })).toMatchObject({ status: "found" });
     expect(t.calls).toHaveLength(PAID_CALLS_PER_IP);
     store.close();
