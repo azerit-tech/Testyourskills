@@ -69,19 +69,38 @@ describe("l'entrée connectée", () => {
     expect(en).toMatch(/Redo my sheet<\/button>.*Sign out<\/button>/);
   });
 
-  it("connecté sans fiche : les boutons d'aujourd'hui", async () => {
-    const html = await render("entry", { account: { ...LI, cardId: null } });
+  it("connecté par LinkedIn, sa fiche partie (§18.105) : « Refaire ma fiche » en rose, « Se déconnecter », jamais « Se connecter avec LinkedIn »", async () => {
+    for (const which of ["entry", "inline"] as const) {
+      const html = await render(which, { account: { ...LI, cardId: null } });
+      expect(html).toMatch(/<button type="button" class="pill pill-big entry-mine entry-redo">Refaire ma fiche<\/button>/);
+      expect(html).toMatch(/entry-or[^>]*><button[^>]*>Se déconnecter<\/button><\/div>/);
+      expect(html).not.toContain("Se connecter avec LinkedIn");
+      expect(html).not.toContain("Voir ma fiche");
+    }
+  });
+
+  it("connecté par GitHub seul, sans fiche : les boutons d'aujourd'hui, LinkedIn compris (il n'est pas encore au compte)", async () => {
+    const html = await render("entry", { account: { ...GH, cardId: null } });
     expect(html).not.toContain("entry-mine");
     expect(html).toContain("Se connecter avec LinkedIn");
     expect(html).toContain("ou colle un lien");
   });
 
-  it("ouverte par « Faire une autre fiche » : les boutons de connexion, jamais un second « Voir ma fiche »", async () => {
+  it("ouverte par « Faire une autre fiche » : jamais un second « Voir ma fiche » ; LinkedIn déjà au compte, son bouton n'y est plus et GitHub prend le rose", async () => {
     for (const which of ["entry", "inline"] as const) {
       const html = await render(which, { account: LI, another: true });
       expect(html).not.toContain("entry-mine");
-      expect(html).toContain("Se connecter avec LinkedIn");
+      expect(html).not.toContain("Se connecter avec LinkedIn");
+      expect(html).toMatch(/class="pill pill-big entry-login"[^>]*>.*Se connecter avec GitHub/);
+      expect(html).toContain("ou colle un lien");
+      // Connecté par GitHub seul : le bouton LinkedIn reste, il ajoute LinkedIn au compte.
+      expect(await render(which, { account: GH, another: true })).toContain("Se connecter avec LinkedIn");
     }
+  });
+
+  it("pas connecté : « Se connecter avec LinkedIn » d'abord, en rose", async () => {
+    const html = await render("entry");
+    expect(html).toMatch(/class="pill pill-big entry-login"[^>]*>.*Se connecter avec LinkedIn/);
   });
 
   it("le repli sans compte (§18.90) : « Voir ma fiche », pas de pastille", async () => {
@@ -97,6 +116,6 @@ describe("l'entrée connectée", () => {
     const { readFileSync } = await import("node:fs");
     const src = readFileSync(new URL("./EntryForm.tsx", import.meta.url), "utf8");
     expect(src).toMatch(/const returned = useSyncExternalStore\(subscribeReturn, getReturn/);
-    expect(src).toMatch(/const connected = buttonsOn && !!acct\?\.cardId && !another && !working && !picking && !returned;/);
+    expect(src).toMatch(/const connected = buttonsOn && \(!!acct\?\.cardId \|\| liMine\) && !another && !working && !picking && !returned;/);
   });
 });

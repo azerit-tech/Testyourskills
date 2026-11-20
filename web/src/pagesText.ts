@@ -312,10 +312,11 @@ const fr = {
         blocks: [
           [
             "Te connecter avec LinkedIn ou GitHub crée ton compte, sans mot de passe : te reconnecter, sur n'importe quel appareil, te ramène à ta fiche.",
-            "On garde un identifiant tiré au hasard, ton identifiant GitHub public ou une empreinte de ton identifiant LinkedIn, deux dates (création, dernière visite) et le lien vers ta fiche. Ni mot de passe, ni jeton, ni nom, ni photo, ni email.",
+            "On garde un identifiant tiré au hasard, ton identifiant GitHub public ou une empreinte de ton identifiant LinkedIn, deux dates (création, dernière visite) et le lien vers ta fiche.",
+            "Après une connexion LinkedIn, ton compte retient aussi ton nom, l'adresse du profil de ta fiche, une copie de ta photo LinkedIn et le GitHub retrouvé à ta connexion : refaire ta fiche ou y mettre ta photo ne te renvoie plus chez LinkedIn. Ni mot de passe, ni jeton, ni email.",
             "Un cookie signé, valable 180 jours, te garde connecté.",
             "Après une connexion LinkedIn, un second cookie signé, valable 90 jours, retient ton nom, l'adresse de ton profil et ta fiche, pour te la remontrer à ta prochaine visite même sans compte. Il ne contient ni email ni photo, et ne donne aucun droit sur la fiche.",
-            "« Se déconnecter » efface les deux. Supprimer ta fiche depuis ton compte supprime aussi ton compte et les deux cookies.",
+            "« Se déconnecter » efface les deux. Supprimer ta fiche depuis ton compte supprime aussi ton compte, la copie de ta photo et les deux cookies.",
           ],
         ],
       },
@@ -515,10 +516,11 @@ const en: PagesDict = {
         blocks: [
           [
             "Signing in with LinkedIn or GitHub creates your account, with no password: signing in again, on any device, takes you back to your sheet.",
-            "We keep a randomly drawn identifier, your public GitHub ID or a hash of your LinkedIn ID, two dates (created, last visit) and the link to your sheet. No password, no token, no name, no picture, no email.",
+            "We keep a randomly drawn identifier, your public GitHub ID or a hash of your LinkedIn ID, two dates (created, last visit) and the link to your sheet.",
+            "After a LinkedIn sign-in, your account also remembers your name, your sheet's profile address, a copy of your LinkedIn picture and the GitHub found when you signed in: redoing your sheet or adding your picture no longer sends you back to LinkedIn. No password, no token, no email.",
             "A signed cookie, valid for 180 days, keeps you signed in.",
             "After a LinkedIn sign-in, a second signed cookie, valid for 90 days, remembers your name, your profile's address and your sheet, to show it to you again on your next visit even without an account. It holds neither your email nor your picture, and gives no right over the sheet.",
-            "“Sign out” erases both. Deleting your sheet from your account deletes your account and both cookies too.",
+            "“Sign out” erases both. Deleting your sheet from your account deletes your account, the copy of your picture and both cookies too.",
           ],
         ],
       },
