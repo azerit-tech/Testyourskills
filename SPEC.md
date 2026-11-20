@@ -2884,3 +2884,31 @@ Jacques : « En fait on met tout le monde quand même, même s'ils n'ont pas enc
 - **Les mots** : la page Confidentialité dit « Une fiche faite par quelqu'un d'autre pour te dénoncer aussi : elle ne lit que des profils publics. Revendique-la pour la faire tienne, en changer la bande ou la masquer. » La démo des bandes nomme toutes ses fiches, avec leurs logos (`?anon` ne sert plus, §18.108).
 - **Vérifié** : `top.test.ts` (dénoncée GitHub non revendiquée, en tête avec la spéciale ; LinkedIn seule dénoncée, nommée, sans logo LinkedIn ; masquée par sa personne, dehors ; dénoncée puis faite par sa personne, une ligne ; LinkedIn seule dénoncée puis dossier prouvé, remplacée ; dossier dénoncé avec la fiche de sa personne, une ligne, le LinkedIn à la revendication), `bands.test.ts`, `bandsAuto.test.ts`, `tsc -b` et `vite build` verts. **Pas fait** : les fiches dénoncées d'avant n'entrent dans une bande qu'à leur prochaine sortie ou revendication. Au top, elles entrent dès maintenant.
 - **Rattrapage des bandes** (`ops/rattrapage-bandes.ts`, logique dans `server/src/rattrapageBandes.ts`) : chaque fiche vivante qui entre au classement passe par la même entrée d'office (`autoJoinBands`) ; une ligue déjà tenue n'est pas touchée (`keepHeld`), une ligue quittée reste quittée. Il couvre aussi les fiches nées avant l'entrée d'office (19 novembre) et celles resservies du cache, qui ne la relancent pas. À blanc par défaut, `--oui` écrit, idempotent : `ssh azerit docker exec testyourskills node_modules/.bin/tsx ops/rattrapage-bandes.ts [--oui]`, après une sauvegarde.
+
+### 18.121 La dénonciation trouve l'autre source d'office (20 novembre 2026, branche `site/denonce-avec-github`)
+
+Jacques : « Pourquoi quand on dénonce, ça n'ajoute pas le GitHub ? En plus c'est super long. » Une dénonciation par LinkedIn (§18.112) sortait LinkedIn seule : la recherche du GitHub (§18.100) était réservée à la fiche faite pour soi. Ce paragraphe complète les §18.6 et §18.100 ; il ne change ni le barème, ni l'entrée.
+
+- **Par LinkedIn.** Le nom de la suggestion touchée part avec le lien (`name`, sinon celui de l'adresse : « jean-dupont-4a5b6c7 »). Le serveur cherche les comptes GitHub à ce nom dès le départ (l'appel GraphQL du §18.100, deux secondes au plus), en même temps que la lecture du profil. Le compte que ce nom désigne part déjà en collecte, à l'essai : sa progression et ses trouvailles sont retenues.
+- **Le profil lu tranche** (`matchGithub`, `server/src/match/github.ts`) : le compte que la proposition choisirait (`pickGithub`) est attaché d'office s'il affiche ce LinkedIn, ou si son nom va avec le sien (`githubFitsName`) et qu'il nomme un de ses employeurs ou une de ses écoles (entreprise, site, bio). Le nom seul ne suffit jamais, nom rare ou courant. Le profil n'a pas de ville : la localisation n'est pas comparée.
+- **Attaché** : le dossier LinkedIn + GitHub, `linkedinProven: true`, `linkedinProof: "match"`. Il entre au top de la semaine et dans les bandes comme toute fiche dénoncée (§18.119). La collecte à l'essai est gardée si c'est ce compte ; sinon elle est coupée et rien n'en sort. Un compte qui ne se collecte pas ne fait pas échouer la fiche : elle sort LinkedIn seule. Le registre de l'App et les liens du profil passent toujours devant (§18.95).
+- **Pas assez sûr** : la fiche sort LinkedIn seule, comme avant. Le compte est rangé en proposition : la personne voit « C'est ton GitHub ? » sous sa fiche une fois revendiquée (§18.100, §18.118). Rien n'attend.
+- **Par GitHub**, le miroir. Rien n'a donné son LinkedIn (registre, comptes sociaux, site, bio, README) : la recherche du §18.113 (profils de l'App, puis l'index web en cache, une recherche de la limite par IP). Le profil au même nom complet dont le titre nomme l'entreprise de son GitHub est lu (une lecture payée) et attaché, prouvé `"match"`. Un autre est proposé, sans lecture.
+- **Mesuré**, avec les clés locales (Apify, DeepSeek V4.1 Flash chez Wafer, GitHub). Mesure de bout en bout : de `POST /api/card` à la fiche prête, interrogée toutes les 100 ms, base neuve, file vide. Le profil `jacquesmougeot` dénoncé avec son nom passe de 4,5 s (LinkedIn seule) à 7,1 s pour le dossier prouvé avec @jmougeot :
+  - la recherche : 0,4 s ;
+  - la collecte : partie à 0,4 s, pendant la lecture du profil (2,1 s) ;
+  - la lecture du code : finie à 7,0 s.
+
+  `florent-delorme` (rien de sûr) : 3,2 s avant, 4,6 s après ; l'écart vient d'Apify et de l'IA, la recherche tourne en parallèle. Sans nom, lien collé `jacquesmougeot` : 12,8 s ; la recherche attend le profil, et la collecte attend la recherche. Une lecture Apify à froid a pris 38,8 s une fois, contre 1,4 à 2,4 s d'habitude : c'est la cause probable d'une dénonciation « super longue ». Aucun second appel IA : la lecture du code est celle de tout dossier, en parallèle de celle du profil.
+- **Vérifié** : les tests `denounceMatch.test.ts` (nouveau) couvrent :
+  - nom et employeur : dossier prouvé, au top, collecte partie avant la fin de la lecture du profil ;
+  - l'école ;
+  - le nom seul : LinkedIn seule, proposition, collecte coupée ;
+  - un nom courant ;
+  - recherche et lecture lentes : la durée est la plus longue des deux, pas leur somme ;
+  - sans nom ;
+  - une fiche pour soi ne cherche pas ;
+  - par GitHub : titre à l'entreprise lu et prouvé, nom seul sans lecture.
+
+  Aussi : `match/github.test.ts`, `denounce.test.ts` (la route avec `name`, le dossier au top), `web/src/components/denounce.test.ts`. `tsc -b`, la suite serveur et `vite build` sont verts.
+- **Pas vérifié** : la production ; le sens GitHub vers LinkedIn en vrai.

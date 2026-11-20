@@ -13,7 +13,9 @@ import { SESSION_COOKIE, signSession } from "./auth";
 import { migrate, Store } from "./db";
 import { DENOUNCE_PER_DAY } from "./denounce";
 import type { LinkedinFinder } from "./linkedinProfile/index";
-import type { CardBody, Deps } from "./pipeline";
+import type { CardBody, Deps, PipelineOptions } from "./pipeline";
+import { enteringRootIds } from "./top";
+import { fakeDossier } from "./__fixtures__/fakeDossier";
 
 const BASE = "https://skills.test";
 const SECRET = "s".repeat(40);
@@ -66,6 +68,10 @@ const deps = {
   scoreCv(_r: unknown, _c: unknown, { lang, judgedInSeconds }: { lang: "fr" | "en"; judgedInSeconds: number }) {
     return { ...body(FIXTURES.cv), lang, judgedInSeconds };
   },
+  // Le dossier LinkedIn + GitHub d'une dénonciation qui trouve son GitHub (§18.121).
+  scoreDossier(declared: Parameters<Deps["scoreDossier"]>[0], github: Parameters<Deps["scoreDossier"]>[1], o: Parameters<Deps["scoreDossier"]>[2]) {
+    return fakeDossier(deps, declared, github, o);
+  },
 } as unknown as Deps;
 
 const LINKEDIN = "https://www.linkedin.com/in/camille-ardent";
@@ -88,7 +94,7 @@ afterEach(() => {
   while (stores.length) stores.pop()!.close();
 });
 
-function setup(opt: { linkedin?: boolean } = {}) {
+function setup(opt: { linkedin?: boolean; propose?: PipelineOptions["propose"] } = {}) {
   const store = new Store(":memory:");
   stores.push(store);
   const ogDir = join(mkdtempSync(join(tmpdir(), "tys-denounce-")), "og");
@@ -101,6 +107,7 @@ function setup(opt: { linkedin?: boolean } = {}) {
     ogDir,
     githubAuth: { clientId: "gh-client", clientSecret: "x", sessionSecret: SECRET },
     ...(opt.linkedin ? { linkedinProfiles } : {}),
+    ...(opt.propose ? { propose: opt.propose } : {}),
   });
   return { app, pipeline, store };
 }
@@ -248,6 +255,34 @@ describe("POST /api/card avec denouncedBy", () => {
     expect(again.status).toBe(200);
     expect(again.json.id).toBe(r.json.id);
     expect(ctx.store.listEvents("denounce_sent")).toHaveLength(2);
+  });
+
+  it("par un lien LinkedIn, avec le nom de la suggestion : son GitHub est cherché à ce nom et attaché, le dossier prouvé entre au top (§18.121)", async () => {
+    const searched: string[] = [];
+    const ctx = setup({
+      linkedin: true,
+      propose: {
+        githubAccounts: async (name) => {
+          searched.push(name);
+          // Ce LinkedIn sur son GitHub : le lien est sûr.
+          const camille = { login: "camille-ardent", name: "Camille Ardent", avatarUrl: "", bio: null, company: null, websiteUrl: null, socialAccounts: [{ provider: "LINKEDIN", url: LINKEDIN }] };
+          return { accounts: [camille], namesakes: 1 };
+        },
+      },
+    });
+    const mine = await post(ctx, { login: "leamd" });
+    const r = await post(ctx, { linkedin: LINKEDIN, name: "Camille Ardent", denouncedBy: mine.json.id });
+    expect(r.status).toBe(202);
+    await new Promise((res) => setTimeout(res, 0));
+    expect(searched).toEqual(["Camille Ardent"]);
+    const row = ctx.store.getCard(r.json.id)!;
+    expect(row).toMatchObject({ kind: "comparison", source: "linkedin", login: "camille-ardent", denounceBorn: true });
+    expect(row.facts).toMatchObject({ linkedinProven: true });
+    expect(enteringRootIds(ctx.store.db)).toContain(r.json.id);
+    // Une fiche faite pour soi ne cherche pas ainsi.
+    const own = await post(ctx, { linkedin: "https://www.linkedin.com/in/lea-md", name: "Léa Martin" });
+    expect(ctx.store.getCard(own.json.id)).toMatchObject({ kind: "card", source: "linkedin" });
+    expect(searched).toHaveLength(1);
   });
 
   it("par un lien LinkedIn : une fiche déjà faite par sa personne est dite dénoncée, pas reprise ; son propre lien n'est pas une dénonciation", async () => {

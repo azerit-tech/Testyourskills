@@ -6,13 +6,15 @@ import type { LinkedinFinder } from "../linkedinProfile/index";
 import type { LinkedinPeople } from "../linkedinProfile/search";
 import type { PipelineOptions } from "../pipeline";
 import type { RegistryPort } from "../registry/index";
-import { findGithubFor } from "./github";
+import { fetchGithubAccounts, findGithubFor } from "./github";
 import { findLinkedinFor } from "./linkedin";
 
 export function realProposers(o: { github: GithubAuth; registry?: RegistryPort; linkedinProfiles?: LinkedinFinder; linkedinPeople?: LinkedinPeople }): NonNullable<PipelineOptions["propose"]> {
   const { registry, linkedinPeople } = o;
   return {
     github: (person, signal) => findGithubFor(o.github, person, { signal }),
+    // Les comptes à ce nom, sans encore les noter : la dénonciation les cherche dès le départ (§18.121).
+    githubAccounts: (name, signal) => fetchGithubAccounts(o.github, name, { signal }),
     // Sans lecture de profils, « Ajoute ton LinkedIn » n'existe pas : rien à proposer.
     linkedin: o.linkedinProfiles
       ? (gh, x) =>

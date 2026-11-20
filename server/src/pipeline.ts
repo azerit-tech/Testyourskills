@@ -22,9 +22,10 @@ import type { NewCardRow, Store } from "./db";
 import { TokenPool } from "./github/tokens";
 import type { GithubLookup, LinkedinFinder, LinkedinProfile } from "./linkedinProfile/index";
 import { githubDeclaredOf, githubShowsLinkedin } from "./linkedinProfile/url";
-import { githubFitsName } from "./names";
-import type { PersonHints } from "./match/github";
-import type { GithubHints } from "./match/linkedin";
+import { githubFitsName, samePublicFullName } from "./names";
+import { linkedinSlug, normalizeLinkedinUrl } from "../../shared/entry";
+import { matchGithub, nameFromSlug, sameSearch, type GithubFound, type PersonHints } from "./match/github";
+import { strongLinkedin, type GithubHints } from "./match/linkedin";
 import { saveProposal } from "./match/store";
 import { asLinkedinCard, asLinkedinComparison, profileToText } from "./linkedinProfile/text";
 import { linkedinFindings } from "./linkedinProfile/findings";
@@ -381,6 +382,8 @@ export interface PipelineOptions {
   propose?: {
     github?: (person: PersonHints, signal: AbortSignal) => Promise<Proposal | null>;
     linkedin?: (gh: GithubHints, opts: { spend?: () => boolean; signal: AbortSignal }) => Promise<Proposal | null>;
+    /** Les comptes GitHub à ce nom, pas encore notés (§18.121) : la dénonciation les cherche dès son départ. */
+    githubAccounts?: (name: string, signal: AbortSignal) => Promise<GithubFound | null>;
   };
 }
 
@@ -459,6 +462,12 @@ export interface JobInput {
   photo?: string;
   /** La fiche est celle que la personne fait pour elle (jamais une dénonciation) : l'autre source se cherche pour la lui proposer (§18.100). */
   propose?: boolean;
+  /**
+   * Une dénonciation (§18.121) : l'autre source se trouve d'office, attachée quand le lien est fort
+   * (`linkedinProof: "match"`), proposée à la personne sinon. `name` : le nom de la suggestion
+   * touchée, qui lance la recherche du GitHub dès le départ, pendant la lecture du profil.
+   */
+  match?: { name?: string };
   /** Prend une unité de la limite par IP des recherches de profils par nom (§18.90) ; false : refusé. */
   searchSpend?: () => boolean;
   /** Le coloris de la fiche que ce dossier complète (§18.102) : la personne garde sa couleur. Absent : tiré au hasard. */
@@ -486,6 +495,16 @@ interface Ctx {
   extendTo(at: number): void;
   /** L'autre source à proposer sous la fiche (§18.100), rangée avec elle. */
   proposal?: Proposal | null;
+}
+
+/** Une collecte GitHub à l'essai (§18.121) : sa progression et ses trouvailles retenues tant qu'elle n'est pas gardée. */
+interface Trial {
+  login: string;
+  p: Promise<GithubResult>;
+  /** C'est ce compte : ce qu'elle a retenu passe à la fiche, la suite aussi. */
+  keep(): void;
+  /** Ce n'est pas ce compte : coupée, rien n'en sort. */
+  drop(): void;
 }
 
 /** La valeur de `p` si elle vient dans `ms`, sinon null ; une erreur vaut null. */
@@ -867,6 +886,22 @@ export class Pipeline {
     const earlyGh = sure ? this.githubBranch(sure, ctx, true) : undefined;
     earlyGh?.catch(() => {}); // lu plus bas ; si le profil échoue, la fiche s'arrête et coupe cette branche
 
+    // Dénonciation par LinkedIn (§18.121) : son GitHub se cherche dès le départ, par le nom de la
+    // suggestion touchée (sinon celui de l'adresse), pendant la lecture du profil. Le compte que
+    // ce nom désigne déjà part en collecte à l'essai : le profil lu le garde ou l'écarte.
+    const accountsOf = isEntry && input.match ? this.opts.propose?.githubAccounts : undefined;
+    const hint = accountsOf ? (input.match!.name ?? nameFromSlug(linkedinSlug(input.linkedinUrl))) : null;
+    const early: { found?: Promise<GithubFound | null>; trial?: Trial; decided?: boolean } = {};
+    if (accountsOf && hint) {
+      early.found = phase("correspondance", () => accountsOf(hint, ctx.signal)).catch(() => null);
+      void early.found.then((found) => {
+        if (early.decided || ctx.signal.aborted) return;
+        const guess = matchGithub({ name: hint, url: input.linkedinUrl!, companies: [] }, found);
+        const pick = guess.strong ?? guess.weak;
+        if (pick && !this.opts.store.isHidden(pick.login)) early.trial = this.trialBranch(pick.login, ctx);
+      });
+    }
+
     // Entrée LinkedIn (§18.24) : le profil, et le GitHub que ses liens donnent.
     const entry = isEntry ? await this.linkedinEntry(input.linkedinUrl!, input, ctx) : null;
     if (entry?.githubLogin) login = entry.githubLogin;
@@ -896,15 +931,59 @@ export class Pipeline {
     const lk: { p?: Promise<LinkedinResult | null> } = {};
     // Le GitHub que le registre de l'App lie à ce profil (force 2 ou plus) prouve la comparaison (§18.95).
     if (entry) lk.p = this.linkedinBranch(Promise.resolve({ profile: entry.profile, proven: !!entry.githubProven && login === entry.githubLogin }), ctx, false);
+
+    // Dénonciation par LinkedIn sans GitHub sur le profil (§18.121) : le compte qui va avec son nom
+    // et un de ses employeurs ou une de ses écoles est attaché d'office ; un compte moins sûr lui
+    // est proposé sous sa fiche, quand elle la revendique. La lecture IA du profil tourne déjà.
+    let matchedLogin: string | null = null;
+    if (entry && accountsOf) {
+      if (!login) {
+        const name = entry.profile.name;
+        const person: PersonHints = { name, url: input.linkedinUrl!, companies: entry.profile.roles.map((r) => r.company), schools: entry.profile.education.map((e) => e.school) };
+        let found = early.found ? await early.found : null;
+        if (!hint || !sameSearch(hint, name)) found = await phase("correspondance", () => accountsOf(name, ctx.signal)).catch(() => null);
+        const m = matchGithub(person, found);
+        const ok = (p: Proposal | null) => (p?.kind === "github" && !this.opts.store.isHidden(p.login) ? p : null);
+        const strong = ok(m.strong);
+        if (strong?.kind === "github") login = matchedLogin = strong.login;
+        else if (ok(m.weak)) offer.p = Promise.resolve(m.weak);
+      }
+      early.decided = true;
+    }
+    // La collecte à l'essai : gardée si c'est ce compte-là, coupée sinon.
+    const trial = early.trial && login && early.trial.login.toLowerCase() === login.toLowerCase() ? early.trial : null;
+    if (early.trial && !trial) early.trial.drop();
+    trial?.keep();
+
     const finder = !pdf ? this.opts.linkedin : undefined;
     const slow = linkedinSlow(ctx);
+    // Dénonciation par GitHub (§18.121) : rien n'a donné son LinkedIn, il se cherche par le nom ; le
+    // profil dont le titre nomme l'entreprise de son GitHub est lu et attaché, un autre proposé.
+    const matchLinkedin = !entry && input.match && login && !linkedinAsked ? this.opts.propose?.linkedin : undefined;
+    let matchedUrl: string | null = null;
     const onFacts =
       finder && !entry
         ? (facts: unknown) => {
-            const found = finder.forGithub(facts, { url: linkedinAsked, spend: input.linkedinSpend, onSlow: slow, signal: ctx.signal });
+            let found = finder.forGithub(facts, { url: linkedinAsked, spend: input.linkedinSpend, onSlow: slow, signal: ctx.signal });
+            const hints = githubHints(facts);
+            if (matchLinkedin && hints) {
+              const first = found;
+              found = first.then(async (r) => {
+                if (r) return r;
+                const p = await phase("correspondance", () => matchLinkedin(hints, { spend: input.searchSpend, signal: ctx.signal })).catch(() => null);
+                if (p?.kind !== "linkedin") return null;
+                if (!strongLinkedin(hints, p)) {
+                  offer.p = Promise.resolve(p);
+                  return null;
+                }
+                const read = await finder.forGithub(facts, { url: p.url, spend: input.linkedinSpend, onSlow: slow, signal: ctx.signal });
+                if (!read || !samePublicFullName(read.profile.name, hints.name)) return null;
+                matchedUrl = normalizeLinkedinUrl(read.profile.url) ?? normalizeLinkedinUrl(p.url);
+                return read;
+              });
+            }
             lk.p = this.linkedinBranch(found, ctx, true);
             // Fiche GitHub dont rien n'a donné le LinkedIn (§18.100) : il se cherche par le nom, pour le lui proposer.
-            const hints = githubHints(facts);
             if (!linkedinAsked && hints && propose?.linkedin) {
               offer.p = found.then(
                 (r) => (r ? null : phase("proposition", () => propose.linkedin!(hints, { spend: input.searchSpend, signal: ctx.signal }))),
@@ -916,10 +995,11 @@ export class Pipeline {
           }
         : undefined;
 
-    const ghP = !login ? Promise.resolve(null) : earlyGh && login === sure ? earlyGh : this.githubBranch(login, ctx, !!pdf || !!input.linkedinUrl, onFacts);
+    const ghP = !login ? Promise.resolve(null) : earlyGh && login === sure ? earlyGh : trial ? trial.p : this.githubBranch(login, ctx, !!pdf || !!input.linkedinUrl, onFacts);
     const [gh, cv] = await Promise.all([
-      // Le GitHub que le profil donne n'existe plus : la fiche LinkedIn sort seule.
-      entry ? ghP.catch((err) => (!ctx.signal.aborted && isMissingGithub(err) ? null : Promise.reject(err))) : ghP,
+      // Le GitHub que le profil donne n'existe plus : la fiche LinkedIn sort seule. Celui que la
+      // correspondance a trouvé (§18.121) ne fait jamais échouer la fiche : elle sort LinkedIn seule.
+      entry ? ghP.catch((err) => (!ctx.signal.aborted && (matchedLogin || isMissingGithub(err)) ? null : Promise.reject(err))) : ghP,
       pdf ? this.cvBranch(pdf, ctx) : Promise.resolve(null),
     ]);
     // Entrée LinkedIn : sa lecture est la fiche, on l'attend. Entrée GitHub : la
@@ -1022,9 +1102,11 @@ export class Pipeline {
     // se lit à son adresse et par le cache de son adresse LinkedIn, mais ne passe
     // jamais devant la fiche GitHub du pseudo et n'entre pas au top (§18.24).
     const vouchedLink = !!vouched && linkedinAsked === vouched.linkedinUrl;
+    // La correspondance d'une dénonciation (§18.121) : son nom et un employeur ou une école en commun.
+    const matchProof = !!linkedinUrl && ((!!matchedLogin && login === matchedLogin) || (!!matchedUrl && normalizeLinkedinUrl(linkedinUrl) === matchedUrl)) ? ("match" as const) : null;
     const shownProven = !!li && !!linkedinUrl && (li.proven || vouchedLink || identityProven || githubShowsLinkedin(gh.facts, linkedinUrl));
     // Connectée à LinkedIn, elle a donné ou confirmé ce GitHub, plausiblement le sien (§18.116).
-    const signedProof = !shownProven && !!li && !!linkedinUrl ? signedInProof(input, login, linkedinUrl, gh.facts, li.profile.name) : null;
+    const signedProof = !shownProven && !!li && !!linkedinUrl ? (signedInProof(input, login, linkedinUrl, gh.facts, li.profile.name) ?? matchProof) : null;
     const linkedinProven = shownProven || !!signedProof;
 
     // Le dossier : un seul calcul sur les deux pièces, une grille, une note (SPEC §18.84).
@@ -1109,6 +1191,37 @@ export class Pipeline {
     }
     text = "";
     return { profile, proven, cv: { counts, reading } };
+  }
+
+  /**
+   * La collecte d'un GitHub pas encore confirmé (§18.121) : elle part pendant la lecture du profil,
+   * sur son propre signal. Gardée, elle rend à la fiche ce qu'elle a retenu ; coupée, rien.
+   */
+  private trialBranch(login: string, ctx: Ctx): Trial {
+    const ac = new AbortController();
+    let live = false;
+    const held: (() => void)[] = [];
+    const child: Ctx = {
+      ...ctx,
+      signal: AbortSignal.any([ctx.signal, ac.signal]),
+      emit: (key, n) => (live ? ctx.emit(key, n) : void held.push(() => ctx.emit(key, n))),
+      find: (list) => (live ? ctx.find(list) : void held.push(() => ctx.find(list))),
+    };
+    const p = this.githubBranch(login, child, true);
+    p.catch(() => {}); // lue si elle est gardée ; coupée, son échec ne dit rien
+    return {
+      login,
+      p,
+      keep: () => {
+        if (live) return;
+        live = true;
+        for (const f of held.splice(0)) f();
+      },
+      drop: () => {
+        held.length = 0;
+        ac.abort();
+      },
+    };
   }
 
   private async githubBranch(login: string, ctx: Ctx, allowCache: boolean, onFacts?: (facts: unknown) => void): Promise<GithubResult> {

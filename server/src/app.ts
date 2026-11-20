@@ -40,6 +40,7 @@ import { mountGithubSearch, type GithubSearchRoutesOptions } from "./entry/githu
 import { createLinkedinEnter, type LinkedinEnterOptions } from "./entry/linkedinLogin";
 import type { RegistryPort } from "./registry/index";
 import { CLAIM_SIGNAL, proposalSignal, signInSignal } from "./registry/signals";
+import { parsePersonName } from "./names";
 import { answerProposal, openProposal } from "./match/store";
 import { SEARCHES_PER_IP } from "./linkedinProfile/search";
 import { mountGithubEnter, type GithubLoginConfig } from "./entry/githubLogin";
@@ -674,6 +675,8 @@ export function createApp(opts: AppOptions) {
       let ref: string | undefined;
       // Fiche du dénonciateur (§18.6, denounce.ts) : JSON seulement, on dénonce un pseudo, pas un CV.
       let denouncedBy: unknown;
+      // Le nom de la suggestion touchée pour la dénoncer (§18.121) : son GitHub se cherche dès le départ.
+      let denouncedName: string | undefined;
       // La fiche que celle-ci complète (« Ajoute ton GitHub », « Ajoute ton LinkedIn ») : ses bandes suivent (§18.82).
       let from: unknown;
       let linkedinUrl: string | undefined;
@@ -713,6 +716,7 @@ export function createApp(opts: AppOptions) {
         lang = parsed.data.lang ?? "fr";
         ref = parseRef((raw as { ref?: unknown }).ref, store);
         denouncedBy = (raw as { denouncedBy?: unknown }).denouncedBy;
+        denouncedName = parsePersonName((raw as { name?: unknown }).name)?.full;
         from = (raw as { from?: unknown }).from;
         noGithub = (raw as { noGithub?: unknown }).noGithub === true;
         noLinkedin = (raw as { noLinkedin?: unknown }).noLinkedin === true;
@@ -920,6 +924,8 @@ export function createApp(opts: AppOptions) {
         // Sa propre fiche, jamais une dénonciation : l'autre source se cherche pour la lui proposer (§18.100) ;
         // jamais après « Je n'en ai pas » (§18.111).
         ...(!denounce && !pdf && !noGithub && !noLinkedin ? { propose: true, searchSpend: () => limiter.take("li-search", ip, SEARCHES_PER_IP) } : {}),
+        // Une dénonciation : l'autre source se trouve d'office, attachée si le lien est fort (§18.121).
+        ...(denounce ? { match: denouncedName && linkedinUrl ? { name: denouncedName } : {}, searchSpend: () => limiter.take("li-search", ip, SEARCHES_PER_IP) } : {}),
         ...(shownBefore ? { colorway: colorwayOf(shownBefore) } : {}),
       });
       denounced(id, true);

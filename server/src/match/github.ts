@@ -20,7 +20,7 @@ import { normalizeLinkedinUrl } from "../../../shared/entry";
 import type { Proposal } from "../../../shared/types";
 import { graphql, makeCtx, type GithubAuth } from "../github/http";
 import { linkedinFromGithub } from "../linkedinProfile/url";
-import { nameWords, samePublicFullName } from "../names";
+import { githubFitsName, nameWords, samePublicFullName } from "../names";
 
 /** Ce que la recherche s'accorde, de son départ à sa réponse. */
 export const FIND_BUDGET_MS = 2000;
@@ -48,6 +48,8 @@ export interface PersonHints {
   url: string;
   /** Les employeurs de ses postes. */
   companies: string[];
+  /** Ses écoles (§18.121) : elles valent un employeur. Absent : non regardées. */
+  schools?: string[];
 }
 
 /** Un compte GitHub tel que l'appel le rend. */
@@ -88,6 +90,12 @@ function companyKeys(companies: string[]): string[] {
     for (const w of words) if (w.length >= 4) keys.add(w);
   }
   return [...keys];
+}
+
+/** Les mots qui ne disent pas quelle école : « École », « Université », « Institute of »… */
+const SCHOOL_NOISE = new Set(["ecole", "universite", "university", "universitat", "universidad", "universita", "school", "institut", "institute", "college", "faculte", "faculty", "academy", "academie", "superieure", "superieur", "nationale", "national", "graduate", "business", "technology", "technologie", "sciences", "science", "engineering", "ingenieurs", "lycee", "campus", "master", "bachelor"]);
+function schoolKeys(schools: string[]): string[] {
+  return companyKeys(schools.map((s) => nameWords(s).filter((w) => !SCHOOL_NOISE.has(w)).join(" ")));
 }
 
 /** Le nom sans ce qui le suit sur LinkedIn : « Jacques Mougeot, PhD (il/lui) | Azerit » → « Jacques Mougeot ». */
@@ -148,7 +156,7 @@ export function scoreGithub(person: PersonHints, a: GithubAccount): Scored {
   const login = a.login.toLowerCase();
   if (full.includes(login)) score += LOGIN_FULL;
   else if (initial.includes(login)) score += LOGIN_INITIAL;
-  const employer = namesEmployer(a, companyKeys(person.companies));
+  const employer = namesEmployer(a, companyKeys(person.companies)) || (!!person.schools?.length && namesEmployer(a, schoolKeys(person.schools)));
   return out(score + (employer ? EMPLOYER : 0), false, employer);
 }
 
@@ -172,6 +180,43 @@ export function pickGithub(person: PersonHints, accounts: GithubAccount[], names
   if (!best.sure && ranked[1] && best.score - ranked[1].score < MARGIN) return null;
   const a = best.account;
   return { kind: "github", login: a.login, name: a.name?.trim() ? a.name.trim().slice(0, 80) : null, avatarUrl: a.avatarUrl || `https://github.com/${a.login}.png?size=96`, sure: best.sure };
+}
+
+/** Ce que la correspondance d'une dénonciation (§18.121) décide d'un GitHub. */
+export interface GithubMatch {
+  /** Attaché d'office : ce LinkedIn sur son GitHub, ou son nom et un employeur ou une école en commun. */
+  strong: GithubProposal | null;
+  /** Le compte qu'on lui proposerait sous sa fiche (§18.100), pas assez sûr pour l'attacher. */
+  weak: GithubProposal | null;
+}
+
+/**
+ * Le GitHub d'une personne dénoncée par son LinkedIn (§18.121). Le compte que la proposition
+ * choisirait (`pickGithub`) est attaché d'office s'il affiche ce LinkedIn, ou si son nom va
+ * avec le sien (`githubFitsName`) et qu'il nomme un de ses employeurs ou une de ses écoles.
+ * Le nom seul ne suffit jamais, nom rare ou courant. Sinon il reste une proposition.
+ */
+export function matchGithub(person: PersonHints, found: GithubFound | null): GithubMatch {
+  const pick = found ? pickGithub(person, found.accounts, found.namesakes) : null;
+  if (!pick) return { strong: null, weak: null };
+  if (pick.sure) return { strong: pick, weak: null };
+  const a = found!.accounts.find((x) => x.login.toLowerCase() === pick.login.toLowerCase())!;
+  const strong = scoreGithub(person, a).employer && githubFitsName(bareName(person.name), a.login, a.name);
+  return strong ? { strong: pick, weak: null } : { strong: null, weak: pick };
+}
+
+/**
+ * Un nom tiré de l'adresse d'un profil, faute de mieux : « jean-dupont-4a5b6c7 » → « jean dupont ».
+ * Les morceaux à chiffres tombent ; il faut deux mots. null sinon (« jacquesmougeot »).
+ */
+export function nameFromSlug(slug: string | null | undefined): string | null {
+  const words = (slug ?? "").split(/[-_]+/).filter((w) => /^\p{L}{2,}$/u.test(w));
+  return words.length >= 2 && words.length <= 4 ? words.join(" ") : null;
+}
+
+/** Deux noms qui donnent la même recherche GitHub. */
+export function sameSearch(a: string, b: string): boolean {
+  return nameWords(bareName(a)).join(" ") === nameWords(bareName(b)).join(" ");
 }
 
 const FIELDS = `login name avatarUrl(size: 96) bio company websiteUrl socialAccounts(first: 10) { nodes { provider url } }`;

@@ -15,7 +15,7 @@
 import type { Proposal } from "../../../shared/types";
 import { mergeCandidates, type LinkedinCandidate, type SearchResult } from "../linkedinProfile/search";
 import { confidenceFor } from "../linkedinProfile/webSearch";
-import { nameWords, parsePersonName, samePublicFullName } from "../names";
+import { githubFitsName, nameWords, parsePersonName, samePublicFullName } from "../names";
 import type { Namesake } from "../registry/index";
 import { FIND_BUDGET_MS } from "./github";
 
@@ -56,7 +56,19 @@ export function pickLinkedin(gh: GithubHints, list: LinkedinCandidate[]): Linked
   return { kind: "linkedin", url: pick.url, name: pick.name.slice(0, 80), headline: (pick.headline ?? "").slice(0, 120), ...(pick.photoUrl ? { photoUrl: pick.photoUrl } : {}), sure: false };
 }
 
-const namesakeCandidate = (n: Namesake): LinkedinCandidate | null => (n.name ? { url: n.url, name: n.name, headline: n.headline } : null);
+/**
+ * Le LinkedIn trouvé est-il assez sûr pour qu'une dénonciation par GitHub l'attache d'office
+ * (§18.121) ? Son nom complet est celui du GitHub, ce GitHub va avec ce nom (`githubFitsName`),
+ * et son titre nomme l'entreprise du GitHub. Le nom seul ne suffit jamais.
+ */
+export function strongLinkedin(gh: GithubHints, p: LinkedinProposal): boolean {
+  const words = companyWords(gh.company);
+  if (!gh.name || !words.length || !samePublicFullName(gh.name, p.name) || !githubFitsName(p.name, gh.login, gh.name)) return false;
+  const headline = nameWords(p.headline);
+  return words.some((w) => headline.includes(w));
+}
+
+const namesakeCandidate =(n: Namesake): LinkedinCandidate | null => (n.name ? { url: n.url, name: n.name, headline: n.headline } : null);
 
 export interface LinkedinFindOptions {
   spend?: () => boolean;
