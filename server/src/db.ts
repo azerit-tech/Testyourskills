@@ -291,6 +291,11 @@ export class Store {
    * écrite dans la ligne à son insertion : le pipeline n'a pas à la connaître.
    */
   private pendingRefs = new Map<string, string>();
+  /**
+   * Fiches en cours de calcul pour une dénonciation (§18.6) : marquées nées d'une dénonciation
+   * juste après leur insertion. Le dossier qu'elles font ne prend pas les comptes (§18.106).
+   */
+  private pendingDenounced = new Set<string>();
 
   constructor(path: string) {
     if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
@@ -313,6 +318,37 @@ export class Store {
   /** Oublie l'origine d'une fiche dont le calcul est fini (insérée ou en erreur). */
   forgetRef(id: string) {
     this.pendingRefs.delete(id);
+  }
+
+  /** La fiche lancée est calculée pour une dénonciation : son dossier ne prendra pas les comptes (§18.106). */
+  expectDenounced(id: string) {
+    this.pendingDenounced.add(id);
+  }
+
+  forgetDenounced(id: string) {
+    this.pendingDenounced.delete(id);
+  }
+
+  /**
+   * Le compte suit le dossier (§18.106) : chaque compte (§18.91) dont la fiche est l'une de
+   * `ids` passe à la fiche qui se montre à son adresse (`fileRow` : au bout de `superseded_by`,
+   * jamais un dossier né d'une dénonciation). Sans `ids` : tous les comptes dont la fiche est
+   * remplacée ou est une pièce.
+   */
+  followAccounts(ids?: string[]) {
+    if (ids && !ids.length) return;
+    const rows = (
+      ids
+        ? this.db.prepare(`SELECT id, card_id FROM accounts WHERE card_id IN (${ids.map(() => "?").join(",")})`).all(...ids)
+        : this.db
+            .prepare(`SELECT a.id, a.card_id FROM accounts a JOIN cards c ON c.id = a.card_id WHERE c.superseded_by IS NOT NULL OR c.parent_id IS NOT NULL`)
+            .all()
+    ) as { id: string; card_id: string }[];
+    const move = this.db.prepare(`UPDATE accounts SET card_id = ? WHERE id = ?`);
+    for (const a of rows) {
+      const to = this.fileRow(a.card_id);
+      if (to && to.id !== a.card_id) move.run(to.id, a.id);
+    }
   }
 
   /** Insère une carte, ou une comparaison et ses deux cartes, en une transaction. */
@@ -368,16 +404,25 @@ export class Store {
     if (r.parentId || r.kind !== "comparison" || r.source !== "linkedin" || !r.login) return;
     const facts = r.facts as { linkedinUrl?: unknown; linkedinProven?: unknown } | null | undefined;
     if (facts?.linkedinProven !== true) return;
-    this.db
-      .prepare(
-        `UPDATE cards SET superseded_by = @id
-         WHERE parent_id IS NULL AND id <> @id AND created_at <= @at AND (
-           (login = @login AND (
-             (kind = 'card' AND source = 'github')
-             OR (kind = 'comparison' AND source = 'linkedin' AND json_extract(facts_json, '$.linkedinProven') = 1)))
-           OR (login IS NULL AND kind = 'card' AND source = 'linkedin' AND json_extract(facts_json, '$.linkedinUrl') = @url))`,
-      )
-      .run({ id: r.id, at: r.createdAt, login: r.login.toLowerCase(), url: typeof facts.linkedinUrl === "string" ? facts.linkedinUrl : null });
+    const login = r.login;
+    const mark = this.db.prepare(
+      `UPDATE cards SET superseded_by = @id
+       WHERE parent_id IS NULL AND id <> @id AND created_at <= @at AND (
+         (login = @login AND (
+           (kind = 'card' AND source = 'github')
+           OR (kind = 'comparison' AND source = 'linkedin' AND json_extract(facts_json, '$.linkedinProven') = 1)))
+         OR (login IS NULL AND kind = 'card' AND source = 'linkedin' AND json_extract(facts_json, '$.linkedinUrl') = @url))`,
+    );
+    this.db.transaction(() => {
+      mark.run({ id: r.id, at: r.createdAt, login: login.toLowerCase(), url: typeof facts.linkedinUrl === "string" ? facts.linkedinUrl : null });
+      // Les comptes des fiches remplacées passent au dossier (§18.106), sauf s'il est né d'une dénonciation.
+      if (!this.pendingDenounced.has(r.id)) this.followAccounts(this.supersededIds(r.id));
+    })();
+  }
+
+  /** Les fiches que ce dossier remplace. */
+  private supersededIds(id: string): string[] {
+    return (this.db.prepare(`SELECT id FROM cards WHERE superseded_by = ?`).all(id) as { id: string }[]).map((x) => x.id);
   }
 
   /**
@@ -387,7 +432,11 @@ export class Store {
    */
   completedBy(old: CardRow, dossier: CardRow) {
     if (old.id === dossier.id || old.parentId || dossier.parentId || old.kind !== "card" || dossier.kind !== "comparison") return;
-    this.db.prepare(`UPDATE cards SET superseded_by = ? WHERE id = ? AND created_at <= ?`).run(dossier.id, old.id, dossier.createdAt);
+    this.db.transaction(() => {
+      this.db.prepare(`UPDATE cards SET superseded_by = ? WHERE id = ? AND created_at <= ?`).run(dossier.id, old.id, dossier.createdAt);
+      // Le compte qui avait la fiche complétée a désormais le dossier (§18.106).
+      this.followAccounts(this.supersededIds(dossier.id));
+    })();
     forgetWeekRanks(this.db);
   }
 
@@ -533,13 +582,16 @@ export class Store {
     const ids = rows.map((r) => r.id);
     const stmt = this.db.prepare(`DELETE FROM cards WHERE id = ?`);
     const votes = this.db.prepare(`DELETE FROM votes WHERE card_id = ?`);
-    this.db.transaction(() =>
+    this.db.transaction(() => {
+      // Avant de partir, une fiche remplacée passe ses comptes au dossier (§18.106).
+      this.followAccounts(ids);
       ids.forEach((i) => {
         stmt.run(i);
         votes.run(i);
         this.unlinkEvents(i);
-      }),
-    )();
+      });
+      this.fallBackAccounts(ids);
+    })();
     this.db.prepare(`DELETE FROM events WHERE at < ?`).run(now - EVENTS_RETENTION_MS);
     // Compteurs de limite : on ne garde que les deux derniers jours.
     const cutoff = new Date(now - 2 * 24 * 3600 * 1000).toISOString().slice(0, 10);
@@ -550,6 +602,20 @@ export class Store {
     removeEntriesForCards(this.db, ids);
     removeProposals(this.db, ids);
     return ids;
+  }
+
+  /**
+   * Un dossier parti (§18.106) : ses comptes retombent sur la plus récente des fiches qu'il
+   * remplaçait et qui reste (celle qui porte un email n'expire pas, son dossier si).
+   */
+  private fallBackAccounts(gone: string[]) {
+    if (!gone.length) return;
+    const back = this.db.prepare(`SELECT id FROM cards WHERE superseded_by = ? AND parent_id IS NULL ORDER BY created_at DESC LIMIT 1`);
+    const move = this.db.prepare(`UPDATE accounts SET card_id = ? WHERE card_id = ?`);
+    for (const id of gone) {
+      const prev = back.get(id) as { id: string } | undefined;
+      if (prev) move.run(prev.id, id);
+    }
   }
 
   recordEvent(event: string, cardId?: string | null, meta?: unknown, at = Date.now()) {

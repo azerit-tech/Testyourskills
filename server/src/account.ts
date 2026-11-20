@@ -20,6 +20,10 @@
 // lancement, celle que l'entrée connectée a lancée. Toujours au bout de
 // `superseded_by` (Store.fileRow). Une fiche lancée par un lien collé, un nom
 // tapé ou une dénonciation n'est jamais liée : elle peut être celle d'un autre.
+// Le compte suit le dossier (§18.106) : quand un dossier remplace la fiche liée,
+// `card_id` passe au dossier dans la même transaction (Store.followAccounts), un
+// compte resté sur une fiche remplacée y passe à sa première lecture, et la purge
+// fait passer les comptes avant d'effacer une fiche remplacée.
 //
 // Sans SESSION_SECRET : pas de compte (createAccounts rend null), tout marche
 // comme avant.
@@ -162,6 +166,8 @@ export class Accounts {
   constructor(
     readonly db: Database.Database,
     private now: () => number = Date.now,
+    /** La fiche qui se montre à l'adresse d'une fiche (Store.fileRow) : le compte suit le dossier (§18.106). */
+    private resolve: (cardId: string) => string | null = (id) => id,
   ) {}
 
   get(id: string): Account | null {
@@ -190,6 +196,7 @@ export class Accounts {
   /** Une fiche encore en ligne (pas purgée, pas expirée) : sa date de création, sinon null. */
   private liveAt(cardId: string | null): number | null {
     if (!cardId) return null;
+    cardId = this.resolve(cardId) ?? cardId;
     const r = this.db.prepare(`SELECT created_at FROM cards WHERE id = ? AND (expires_at IS NULL OR expires_at > ?)`).get(cardId, this.now()) as { created_at: number } | undefined;
     return r?.created_at ?? null;
   }
@@ -231,7 +238,8 @@ export class Accounts {
     const keep = aCard !== null && bCard === null ? a : bCard !== null && aCard === null ? b : older;
     const other = keep === a ? b : a;
     // Deux fiches liées : la plus récente.
-    const cardId = aCard !== null && bCard !== null ? (aCard >= bCard ? a.cardId : b.cardId) : (this.liveAt(keep.cardId) !== null ? keep.cardId : other.cardId);
+    const picked = aCard !== null && bCard !== null ? (aCard >= bCard ? a.cardId : b.cardId) : (this.liveAt(keep.cardId) !== null ? keep.cardId : other.cardId);
+    const cardId = picked ? (this.resolve(picked) ?? picked) : null;
     // Le mémo LinkedIn (§18.105) suit l'identité LinkedIn : celui du compte qui la portait.
     const memo = keep.linkedinKey ? keep.linkedin : other.linkedin;
     this.db.prepare(`DELETE FROM accounts WHERE id = ?`).run(other.id);
@@ -341,7 +349,7 @@ export function createAccounts(o: AccountOptions): AccountKit | null {
   const secret = o.secret;
   const now = o.now ?? Date.now;
   const store = o.store;
-  const accounts = new Accounts(store.db, now);
+  const accounts = new Accounts(store.db, now, (id) => store.fileRow(id)?.id ?? null);
   const cookieBase = { httpOnly: true, secure: o.secure, sameSite: "Lax" as const, path: "/" };
   const expected = new Map<string, { login: string; exp: number }>();
 
@@ -357,10 +365,16 @@ export function createAccounts(o: AccountOptions): AccountKit | null {
   };
 
   const cardOf = (a: Account): CardRow | null => {
+    // Un compte resté sur une fiche remplacée depuis passe au dossier, à la première lecture (§18.106).
+    const linked = a.cardId ? store.fileRow(a.cardId) : null;
+    if (linked && linked.id !== a.cardId) {
+      accounts.linkCard(a.id, linked.id);
+      a.cardId = linked.id;
+    }
     const owner = a.githubId !== null ? store.getOwnerById(a.githubId) : null;
     const byLogin = owner ? cardOfLogin(owner.login) : null;
     if (byLogin) return byLogin;
-    return a.cardId ? alive(store.fileRow(a.cardId)) : null;
+    return alive(linked);
   };
 
   const fromRequest = (c: Context): Account | null => {

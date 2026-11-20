@@ -724,7 +724,14 @@ export function createApp(opts: AppOptions) {
         store.recordEvent("denounce_sent", id, { by: denounce.byCardId });
         const mark = () => store.markDenounced(id, denounce.byCardId, denounce.named, born);
         if (store.getCard(id)) mark();
-        else void pipeline.wait(id).then(mark);
+        else {
+          // Le dossier qu'elle fera ne prend pas le compte de la personne dénoncée (§18.106).
+          if (born) store.expectDenounced(id);
+          void pipeline
+            .wait(id)
+            .then(mark)
+            .finally(() => store.forgetDenounced(id));
+        }
       };
 
       // « Se connecter avec LinkedIn » (§18.80) : le profil lancé est celui de la personne
