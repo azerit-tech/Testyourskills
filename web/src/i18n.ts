@@ -448,6 +448,8 @@ const fr = frTypoDeep({
     addGithub: { title: "Ajoute ton GitHub au dossier", text: "Ton CV porte le parcours. Ton GitHub porte le code\u00a0: trois critères s'ouvrent.", btn: "Ajouter mon GitHub" },
     /** Fiche LinkedIn seule (§18.24) : un seul appel, relancé en comparaison. */
     prove: { title: "Ajoute ton GitHub\u00a0: trois critères s'ouvrent", label: "Pseudo GitHub", btn: "Ajouter mon GitHub" },
+    /** Sous sa fiche à une source, l'autre trouvée pendant la lecture (§18.100) : un toucher, sans rien taper. */
+    propose: { github: "C'est ton GitHub ?", linkedin: "C'est ton LinkedIn ?", yes: "Oui, ajoute-le", no: "Non" },
     /** Sous une fiche GitHub seule, en miroir : LinkedIn porte le parcours. */
     addLinkedin: {
       title: "Ajoute ton LinkedIn au dossier",
@@ -1251,6 +1253,7 @@ const en: Dict = {
     },
     addGithub: { title: "Add your GitHub to the file", text: "Your résumé carries the career. Your GitHub carries the code: three more criteria open.", btn: "Add my GitHub" },
     prove: { title: "Add your GitHub: three more criteria open", label: "GitHub username", btn: "Add my GitHub" },
+    propose: { github: "Is this your GitHub?", linkedin: "Is this your LinkedIn?", yes: "Yes, add it", no: "No" },
     addLinkedin: {
       title: "Add your LinkedIn to the file",
       text: "Your GitHub carries the code. Your LinkedIn carries the career: experience, employers and school go on file.",

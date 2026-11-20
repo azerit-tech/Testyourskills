@@ -61,9 +61,10 @@ function Dock({ item, toast, add }: { item: Shareable; toast: (m: string) => voi
   // bloc de la source à ajouter (le bouton, pas le haut du bloc : la barre reste tant qu'il est sous le pli).
   // Ces blocs arrivent et repartent : on les guette.
   // Du bloc de partage aussi, c'est le bouton qui compte : son titre qui affleure au bas du premier écran ne retire plus le rose.
+  // « Oui, ajoute-le » de la proposition sous la fiche (§18.100) est rose lui aussi : la barre s'efface devant.
   const hides = add
-    ? ".after-block.out .out-main, .after-block.denounce.is-done, .after-block.add-source .entry-submit"
-    : ".after-block.out .out-main, .after-block.denounce.is-done";
+    ? ".after-block.out .out-main, .after-block.denounce.is-done, .after-block.propose .propose-yes, .after-block.add-source .entry-submit"
+    : ".after-block.out .out-main, .after-block.denounce.is-done, .after-block.propose .propose-yes";
   useEffect(() => {
     if (typeof IntersectionObserver !== "function") return setBlockSeen(false);
     const seen = new Set<Element>();
