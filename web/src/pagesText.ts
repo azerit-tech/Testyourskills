@@ -249,7 +249,7 @@ const fr = {
         h: "Ce qu'on lit",
         blocks: [
           [
-            "Ton profil LinkedIn public, si tu donnes son lien ou si ton GitHub l'affiche : titre, résumé, postes, formation, compétences. Ni photo, ni lieu, ni contact. Un service tiers de collecte de profils publics le lit pour nous.",
+            "Ton profil LinkedIn public, si tu donnes son lien ou si ton GitHub l'affiche : titre, résumé, postes, formation, compétences, et sa photo de profil pour la fiche. Ni lieu, ni contact. Un service tiers de collecte de profils publics le lit pour nous.",
             "Ton GitHub public : tes repos, ton activité, et quelques fichiers de code lus par l'IA.",
             "Ton CV, si tu le donnes : lu en mémoire, puis jeté.",
           ],
@@ -327,7 +327,7 @@ const fr = {
       },
       {
         h: "Ta photo LinkedIn",
-        blocks: ["Seulement si tu connectes LinkedIn toi-même : on récupère ta photo de profil, rangée avec la fiche et supprimée avec elle. Rien d'autre n'est lu par cette connexion."],
+        blocks: ["Ta fiche montre ta photo LinkedIn quand on l'a : celle que LinkedIn nous rend quand tu te connectes, sinon celle de ton profil public lu pour la fiche. Ta photo GitHub ne sert qu'à défaut. On en garde une copie, rangée avec la fiche et supprimée avec elle."],
       },
       {
         h: "Ton navigateur",
@@ -458,7 +458,7 @@ const en: PagesDict = {
         h: "What we read",
         blocks: [
           [
-            "Your public LinkedIn profile, if you give its link or your GitHub shows it: headline, summary, positions, education, skills. No photo, location or contact details. A third-party service that collects public profiles reads it for us.",
+            "Your public LinkedIn profile, if you give its link or your GitHub shows it: headline, summary, positions, education, skills, and its profile picture for the sheet. No location or contact details. A third-party service that collects public profiles reads it for us.",
             "Your public GitHub: your repositories, your activity, and a few code files read by the AI.",
             "Your résumé, if you give it: read in memory, then thrown away.",
           ],
@@ -536,7 +536,7 @@ const en: PagesDict = {
       },
       {
         h: "Your LinkedIn photo",
-        blocks: ["Only if you connect LinkedIn yourself: we fetch your profile picture, stored with the sheet and deleted with it. Nothing else is read through this connection."],
+        blocks: ["Your sheet shows your LinkedIn picture when we have it: the one LinkedIn gives us when you sign in, otherwise the one on your public profile read for the sheet. Your GitHub picture is only a fallback. We keep a copy, stored with the sheet and deleted with it."],
       },
       {
         h: "Your browser",

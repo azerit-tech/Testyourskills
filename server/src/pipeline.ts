@@ -331,6 +331,12 @@ export interface PipelineOptions {
    */
   vouched?: { login: string; linkedinUrl: string };
   /**
+   * La photo LinkedIn de la fiche (§18.98) : télécharge `url` (media.licdn.com) et la range
+   * sous le nom de la fiche, rend son adresse chez nous ; une adresse LinkedIn signée expire.
+   * Absent : aucune photo LinkedIn à la naissance d'une fiche.
+   */
+  keepPhoto?: (url: string, cardId: string) => Promise<string>;
+  /**
    * Où va la ligne de chronométrage de chaque fiche (timing.ts) : une ligne par
    * fiche sortie ou en échec. Par défaut le journal du serveur (rien sous
    * vitest) ; `false` la coupe.
@@ -402,7 +408,12 @@ export interface JobInput {
    * (email ou photo), pas un choix parmi des homonymes.
    */
   identity?: { githubLogin: string; how: "email" | "name"; sureProfile: boolean };
+  /** Entrée « Se connecter avec LinkedIn » : la photo que LinkedIn vient de rendre de la personne (§18.98). */
+  photo?: string;
 }
+
+/** Une photo LinkedIn qui traîne au téléchargement n'est plus attendue à la sortie de la fiche. */
+const PHOTO_WAIT_MS = 2500;
 
 interface Ctx {
   signal: AbortSignal;
@@ -745,6 +756,19 @@ export class Pipeline {
     // celui de la fiche quoi que dise le profil, sa collecte part donc pendant la
     // lecture du profil (4 s chez Apify) au lieu de l'attendre.
     const isEntry = !!input.linkedinUrl && !login && !pdf;
+
+    // La photo LinkedIn (§18.98) : celle de la connexion d'abord, sinon celle du profil lu.
+    // Son téléchargement court pendant la lecture du code et du profil.
+    const photo: { p?: Promise<string | null> } = {};
+    const keep = (url: string | undefined) => {
+      const kp = this.opts.keepPhoto;
+      if (photo.p || !url || !kp) return;
+      photo.p = kp(url, id).catch((err) => {
+        console.warn(`[photo ${id}] photo LinkedIn non gardée :`, (err as Error).message);
+        return null;
+      });
+    };
+    if (isEntry) keep(input.photo);
     const sure = isEntry && input.identity?.how === "email" && !this.opts.store.isHidden(input.identity.githubLogin) ? input.identity.githubLogin : undefined;
     const earlyGh = sure ? this.githubBranch(sure, ctx, true) : undefined;
     earlyGh?.catch(() => {}); // lu plus bas ; si le profil échoue, la fiche s'arrête et coupe cette branche
@@ -752,6 +776,7 @@ export class Pipeline {
     // Entrée LinkedIn (§18.24) : le profil, et le GitHub que ses liens donnent.
     const entry = isEntry ? await this.linkedinEntry(input.linkedinUrl!, input, ctx) : null;
     if (entry?.githubLogin) login = entry.githubLogin;
+    keep(entry?.profile.photoUrl);
     // Le GitHub de l'identité (§18.80) : l'email d'abord, puis les liens du profil,
     // puis le nom. Masqué par son propriétaire : la fiche LinkedIn sort seule.
     const identity = entry && input.identity && !this.opts.store.isHidden(input.identity.githubLogin) ? input.identity : undefined;
@@ -776,7 +801,7 @@ export class Pipeline {
         ? (facts: unknown) => {
             const found = finder.forGithub(facts, { url: linkedinAsked, spend: input.linkedinSpend, onSlow: slow, signal: ctx.signal });
             lk.p = this.linkedinBranch(found, ctx, true);
-            lk.p.catch(() => {});
+            lk.p.then((r) => keep(r?.profile.photoUrl), () => {});
           }
         : undefined;
 
@@ -791,6 +816,14 @@ export class Pipeline {
     const li = entry ? await lk.p! : lk.p ? await settleBefore(lk.p, () => ctx.deadline() - LINKEDIN_MARGIN_MS) : null;
     const declared: (CvResult & { linkedinUrl?: string; linkedin?: DeclaredLinkedin }) | null =
       cv ?? (li ? { ...li.cv, linkedinUrl: li.profile.url, linkedin: declaredLinkedin(li.profile) } : null);
+    // La photo LinkedIn de la fiche, seulement si son LinkedIn est lu (§18.98) : l'avatar GitHub ne vient qu'à défaut.
+    let liPhoto: string | null = null;
+    if (li && photo.p) {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      liPhoto = await Promise.race([photo.p, new Promise<null>((res) => (timer = setTimeout(() => res(null), PHOTO_WAIT_MS)))]);
+      clearTimeout(timer);
+    }
+    const withLiPhoto = (c: CardData): CardData => (liPhoto ? { ...c, avatarUrl: liPhoto, photoSource: "linkedin" } : c);
 
     const now = Date.now();
     const createdAt = new Date(now).toISOString();
@@ -825,7 +858,7 @@ export class Pipeline {
     // GitHub seule si on l'a, sinon une erreur honnête. Un LinkedIn trouvé mais
     // pas lu : la fiche sort, hors cache 24 h.
     if (!declared?.reading) {
-      if (gh) return [githubRow(githubCard(id), null, gh.degraded || (!!li && !li.cv.reading))];
+      if (gh) return [githubRow(withLiPhoto(githubCard(id)), null, gh.degraded || (!!li && !li.cv.reading))];
       throw new JobError("internal", entry ? MESSAGES.linkedin_unreadable : MESSAGES.cv_unreadable);
     }
 
@@ -853,13 +886,13 @@ export class Pipeline {
     // GitHub, quel que soit le métier qu'il déclare (§18.35).
     if (!gh || (!reading.is_dev_profile && !linkedinUrl)) {
       const found = linkedinUrl ? strongest(ctx.findings()) : [];
-      const card = asDeclared({
+      const card = withLiPhoto(asDeclared({
         ...phaseSync("barème", () => deps.scoreCv(reading, declared.counts, { lang, judgedInSeconds, ...declaredOpts })),
         ...(found.length ? { findings: found } : {}),
         ...(linkedinUrl ? { linkedinUrl } : {}),
         id,
         createdAt,
-      });
+      }));
       return [cvRow(card, null)];
     }
 
@@ -881,7 +914,7 @@ export class Pipeline {
     const found = foundForGithub();
     const pieces = asPieces(scored, { cv: { id: newId(), createdAt }, github: { id: newId(), createdAt, ...(found.length ? { findings: found } : {}) } });
     const cmp = linkedinUrl ? asLinkedinComparison(pieces) : pieces;
-    const comparison: ComparisonData = { ...cmp, id, createdAt };
+    const comparison: ComparisonData = { ...cmp, cv: withLiPhoto(cmp.cv), github: withLiPhoto(cmp.github), id, createdAt };
     return [
       {
         id,

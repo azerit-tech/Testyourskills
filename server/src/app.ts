@@ -18,7 +18,7 @@ import { buildLead, clientEventSchema, sendLead } from "./events";
 import { genericMeta, HOME_IMAGE_PATH, HOME_IMAGE_PATH_EN, injectConfig, injectHomeImage, injectMeta, langOfRequest, messagePage, metaFor, requestLang, siteStylesheets, standalonePage, type MessageKey } from "./html";
 import { ID_RE, MAX_PDF_BYTES, MESSAGES, Pipeline, type Deps, type RenderInput } from "./pipeline";
 import { CARDS_PER_BROWSER, CARDS_PER_DAY, RateLimiter, browserId, clientIp } from "./ratelimit";
-import { inlineAvatar, mountLinkedin, removeAvatars, type LinkedinConfig } from "./linkedin";
+import { applyPhoto, giveSignInPhoto, inlineAvatar, keepPhoto, mountLinkedin, ownPhoto, removeAvatars, savePhoto, showsLinkedinPhoto, type LinkedinConfig } from "./linkedin";
 import { deleteCookie } from "hono/cookie";
 import { mountAuth, ownerFromRequest, sameOrigin, SESSION_COOKIE, type GithubAuthConfig } from "./auth";
 import { createAccounts, mountAccount } from "./account";
@@ -278,6 +278,8 @@ export function createApp(opts: AppOptions) {
     busyAfterMs: opts.busyAfterMs,
     linkedin: opts.linkedinProfiles,
     vouched: opts.showcaseLogin && opts.showcaseLinkedin ? { login: opts.showcaseLogin, linkedinUrl: opts.showcaseLinkedin } : undefined,
+    // La photo LinkedIn d'une fiche, copiée chez nous à sa naissance (§18.98).
+    keepPhoto: (url, cardId) => keepPhoto(url, cardId, { avatarDir, baseUrl, fetchImpl }),
   });
   const limiter = new RateLimiter(store, opts.ipSalt ?? "testyourskills");
   const cardsPerDay = opts.cardsPerDay ?? CARDS_PER_DAY;
@@ -289,6 +291,24 @@ export function createApp(opts: AppOptions) {
   const homeImages = new Map<Lang, { key: string; png: Promise<Uint8Array> }>();
   const avatarDir = opts.avatarDir ?? defaultAvatarDir(ogDir);
   const aiStatus = opts.aiStatus ?? budgetAiStatus;
+
+  /**
+   * « Ajoute ton GitHub », « Ajoute ton LinkedIn » (§18.84) : la photo LinkedIn que la fiche
+   * complétée montrait passe au dossier qui la remplace, s'il n'en montre pas déjà une (§18.98).
+   * Copiée sous le nom du dossier : la supprimer ne dépend plus de l'ancienne fiche.
+   */
+  async function carryLinkedinPhoto(old: CardRow, dossier: CardRow) {
+    try {
+      if (!showsLinkedinPhoto(old) || showsLinkedinPhoto(dossier)) return;
+      const shown = old.kind === "comparison" ? fileOf(old.data as ComparisonData) : (old.data as CardData);
+      const photo = await ownPhoto(shown.avatarUrl, baseUrl, avatarDir);
+      if (!photo) return;
+      const avatarUrl = await savePhoto(avatarDir, baseUrl, dossier.id, photo);
+      await removeImages(ogDir, applyPhoto(store, dossier, avatarUrl));
+    } catch (err) {
+      console.warn(`[photo ${dossier.id}] photo LinkedIn non reprise :`, (err as Error).message);
+    }
+  }
 
   const app = new Hono();
 
@@ -727,6 +747,13 @@ export function createApp(opts: AppOptions) {
         const refait = !!cached && !!who?.github && !store.isHidden(who.github.login) && store.getCard(cached)?.kind !== "comparison";
         if (cached && !refait) {
           denounced(cached);
+          // La personne connectée retrouve une fiche de son profil sans photo LinkedIn : la sienne, d'office (§18.98).
+          // Jamais sur un dossier dont le GitHub n'est pas celui que son identité donne.
+          const row = who?.picture ? store.getCard(cached) : null;
+          const login = row ? store.loginOf(store.fileRow(row.id) ?? row) : null;
+          if (row && (!login || login.toLowerCase() === who?.github?.login.toLowerCase())) {
+            await giveSignInPhoto(row, who?.picture, { store, avatarDir, baseUrl, fetchImpl, removeImages: (ids) => removeImages(ogDir, ids) });
+          }
           lead(cached);
           return c.json({ id: cached, cached: true }, 200);
         }
@@ -800,6 +827,7 @@ export function createApp(opts: AppOptions) {
         // Lectures payantes de profils LinkedIn : une limite par IP en plus du budget du jour (§18.24).
         linkedinSpend: () => limiter.take("linkedin", ip, PAID_CALLS_PER_IP),
         ...(who?.github ? { identity: { githubLogin: who.github.login, how: who.github.how, sureProfile: who.sureProfile } } : {}),
+        ...(who?.picture ? { photo: who.picture } : {}),
       });
       denounced(id, true);
       lead(id);
@@ -826,6 +854,8 @@ export function createApp(opts: AppOptions) {
           // La fiche complétée devient ce dossier : une personne, une note (SPEC §18.84).
           if (row && completed) store.completedBy(completed, row);
           if (row) autoJoinBands(store, row, { from: completed });
+          // Sa photo LinkedIn la suit, si le dossier n'en a pas déjà une (§18.98).
+          if (row && completed) void carryLinkedinPhoto(completed, row);
         });
       }
       // L'insertion arrive toujours après ce retour (le pipeline attend au moins
