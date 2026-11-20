@@ -314,8 +314,10 @@
 
 /* L'étoile qui tombe : le même dessin, trois fois plus grand, sur le ciel
    au-dessus de la berline. Elle claque (--slap, de 2,1 à 1), tient une
-   demi-seconde, puis vole vers sa place dans la rangée (--fly, de 0 à 1 ;
-   --slot, de -2,5 à 2,5) en reprenant sa taille. Ni éclair ni secousse. */
+   demi-seconde, puis vole vers sa place dans la rangée en reprenant sa taille :
+   elle monte au centre (--fly, de 0 à 1), puis glisse vers sa place (--side,
+   de 0 à 1 ; --slot, de -2,5 à 2,5), au-dessus du relevé des critères, sans
+   le couvrir (§18.97). Ni éclair ni secousse. */
 .film-stamp {
   position: absolute;
   top: var(--stamp-y);
@@ -325,7 +327,12 @@
   height: calc(var(--star) * var(--stamp-k));
   margin: calc(var(--star) * var(--stamp-k) / -2) 0 0 calc(var(--star) * var(--stamp-k) / -2);
   pointer-events: none;
-  transform: translate(calc(var(--fly) * var(--slot) * (var(--star) + var(--star-gap))), calc(var(--fly) * (var(--row-top) + var(--star) / 2 - var(--stamp-y))))
+  /* le claquement grandit l'étoile autour de la pointe de sa branche gauche (1,8 et 9 sur 24), pas de son centre :
+     en grand, elle ne déborde pas sur le relevé des critères (§18.97) ; à l'échelle 1, rien ne change */
+  transform: translate(
+      calc(var(--side) * var(--slot) * (var(--star) + var(--star-gap)) + (var(--slap) - 1) * var(--star) * var(--stamp-k) * 0.425),
+      calc(var(--fly) * (var(--row-top) + var(--star) / 2 - var(--stamp-y)) + (var(--slap) - 1) * var(--star) * var(--stamp-k) * 0.125)
+    )
     scale(calc(var(--slap) * (1 - var(--fly) * (1 - 1 / var(--stamp-k)))));
 }
 /* film de 700 px de haut ou moins (360 × 640, 375 × 667) : l'étoile qui tombe garde sa part de
@@ -436,6 +443,108 @@
   display: none;
 }
 
+/* Le relevé des critères (§18.97) : une colonne étroite à gauche, juste sous
+   la rangée des étoiles, au-dessus de l'horizon (de 12 à 37 % de la hauteur
+   environ), à gauche du score et de l'étoile qui tombe (au centre) : à 390 px
+   de large, elle s'arrête avant 136 px, l'étoile posée commence à 143. Une
+   ligne par critère : l'étiquette en mono, crème sur un aplat d'encre, de
+   largeur fixe (--w, le nom le plus long du relevé), puis la note dans la
+   police du titre, crème cernée d'encre comme le score, « /10 » en petit ;
+   sans note (non prouvé, pas au dossier), « ?/10 » en retrait, à la même
+   place ; l'école, « comptée », sur une ligne. Au coup d'un critère,
+   l'étiquette s'inverse, la note claque (--slap) et compte. Sous l'étoile qui
+   tombe (z-index 1). */
+.film-detail {
+  --d-name: clamp(9.5px, 1.15cqh, 10.5px);
+  --d-note: clamp(15px, 2.5cqh, 22px);
+  position: absolute;
+  top: calc(var(--row-top) + var(--star) * 1.14 + 1.2cqh);
+  left: max(10px, 2.6cqw);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4cqh;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  pointer-events: none;
+}
+.film-detail-row {
+  display: flex;
+  align-items: center;
+  gap: 0.3em;
+  height: calc(var(--d-note) * 1.12);
+  font-size: var(--d-note);
+  opacity: var(--enter, 1);
+  transform: translateX(calc((1 - var(--enter, 1)) * -8px));
+}
+.film-detail-name {
+  box-sizing: border-box;
+  flex: none;
+  width: calc(var(--w, 11) * (1ch + 0.02em) + 8px);
+  padding: 2px 4px;
+  border-radius: 2px;
+  background: rgb(12 13 27 / 0.86);
+  color: #fff9cb;
+  font: 500 var(--d-name)/1.35 var(--f-mono);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.film-detail-row.is-hit .film-detail-name {
+  background: #fff9cb;
+  color: #0c0d1b;
+}
+.film-detail-note {
+  display: inline-flex;
+  align-items: baseline;
+  color: #fff9cb;
+  font: 700 var(--d-note)/1 var(--f-name);
+  letter-spacing: 0.02em;
+  -webkit-text-stroke: 3.5px rgb(12 13 27 / 0.55);
+  paint-order: stroke fill;
+  transform: scale(var(--slap, 1));
+  transform-origin: 0 60%;
+}
+.film-detail-note i {
+  display: inline-block;
+  width: 0.5em;
+  font-style: normal;
+  text-align: center;
+}
+.film-detail-note small {
+  margin-left: 0.12em;
+  font: 600 calc(var(--d-note) * 0.48)/1 var(--f-text);
+  -webkit-text-stroke: 3px rgb(12 13 27 / 0.55);
+  opacity: 0.85;
+}
+.film-detail-step {
+  display: none;
+}
+/* hors moyenne (l'open source sous la moyenne des autres) : la note en retrait ; sans note, « ?/10 » plus en retrait */
+.film-detail-row.is-out .film-detail-note {
+  opacity: 0.55;
+}
+.film-detail-row.is-unknown .film-detail-note {
+  opacity: 0.45;
+}
+/* l'école : « comptée », en mono, sur une ligne, sur un aplat plus léger */
+.film-detail-state {
+  padding: 1px 4px;
+  border-radius: 2px;
+  background: rgb(12 13 27 / 0.6);
+  color: rgb(255 249 203 / 0.88);
+  font: 500 calc(var(--d-name) * 0.9)/1.25 var(--f-mono);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+/* téléphone couché : le relevé passe dans la marge d'encre de gauche (plus bas) */
+.film-detail-wide {
+  display: none;
+}
+
 /* mouvement réduit : le film ne joue pas par défaut ; demandé, l'étoile s'allume à
    sa place dès son coup, sans tomber ni voler, et rien ne grossit ni ne monte */
 @media (prefers-reduced-motion: reduce) {
@@ -462,6 +571,20 @@
     display: none;
   }
   .film-score-step {
+    display: inline;
+  }
+  /* le relevé : chaque critère paraît d'un coup, à sa valeur, sans glisser ni claquer */
+  .film-detail-row,
+  .film-detail-note {
+    transform: none;
+  }
+  .film-detail-row {
+    opacity: 1;
+  }
+  .film-detail-run {
+    display: none;
+  }
+  .film-detail-step {
     display: inline;
   }
 }
@@ -515,7 +638,7 @@
   pointer-events: none;
 }
 /* la fiche posée, plus rien du film devant elle */
-.film-stage.is-landed :is(.film-stars, .film-score, .film-stamp, .film-line, .film-verdict) {
+.film-stage.is-landed :is(.film-stars, .film-score, .film-stamp, .film-line, .film-verdict, .film-detail) {
   visibility: hidden;
 }
 
@@ -596,8 +719,24 @@
     bottom: max(15cqh, calc(12cqh + env(safe-area-inset-bottom, 0px) + 1.5cqh));
   }
   .film-frame .film-line,
-  .film-frame .film-verdict {
+  .film-frame .film-verdict,
+  .film-frame .film-detail {
     display: none;
+  }
+  /* le relevé, dans la marge d'encre de gauche, en haut, hors de l'encoche ; à la taille du téléphone debout */
+  .film-detail-wide {
+    position: absolute;
+    top: max(16px, env(safe-area-inset-top, 0px));
+    left: max(16px, env(safe-area-inset-left, 0px));
+    z-index: 3;
+    display: block;
+    pointer-events: none;
+  }
+  .film-detail-wide .film-detail {
+    --d-name: 11px;
+    --d-note: 21px;
+    position: static;
+    gap: 5px;
   }
   .film-line-wide {
     position: absolute;

@@ -4,4 +4,5 @@
 export * from "./cut";
 export * from "./plan";
 export * from "./hud";
+export * from "./detail";
 export * from "./budget";

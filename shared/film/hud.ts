@@ -10,6 +10,11 @@
 import type { Lang, Stars } from "../types";
 import {
   BANDS_CLOSE,
+  DETAIL_COUNT,
+  DETAIL_HIT,
+  DETAIL_IN,
+  DETAIL_SLAP,
+  DETAIL_SLAP_FROM,
   FPS,
   GAUGE_AFTER,
   GAUGE_EASE,
@@ -22,6 +27,8 @@ import {
   LINE_TAIL,
   STAMP_FROM,
   STAMP_HOLD,
+  STAMP_RISE,
+  STAMP_SIDE,
   STAMP_SLAP,
   STAR_LAND,
   STAR_POP,
@@ -33,6 +40,9 @@ import {
   type ShotId,
 } from "./cut";
 import type { FilmPlan } from "./plan";
+import type { DetailKind } from "./detail";
+import type { CriterionCode } from "../types";
+import { STRINGS } from "../card/i18n";
 
 /** « ending » : à six étoiles, FIN6, de l'entrée de la pointe au gel (la musique s'est arrêtée, la berline freine). */
 export type FilmPhase = "chase" | "ending" | "freeze" | "flash" | "over";
@@ -63,8 +73,13 @@ export interface StampHud {
   star: Stars;
   /** L'échelle du claquement : de 2,1 à 1 en trois images. */
   scale: number;
-  /** 0 : tenue au centre ; 1 : arrivée à sa place, à la taille de la rangée. */
+  /** 0 : tenue au centre ; 1 : montée à la hauteur de la rangée, à sa taille. */
   fly: number;
+  /**
+   * Le glissement vers sa place, de 0 (au centre) à 1 (sa place) : il part quand l'étoile est presque montée
+   * (§18.97). Elle monte d'abord, au centre, puis glisse au-dessus du relevé des critères, jamais par-dessus.
+   */
+  side: number;
   opacity: number;
 }
 
@@ -78,6 +93,34 @@ export interface LineHud {
   hit: boolean;
   /** 0 : absente ; 1 : posée. Elle monte en entrant, s'efface en sortant. */
   enter: number;
+}
+
+/**
+ * Un critère du relevé (SPEC §18.97). Toutes les lignes du film sont là dès la première image, à leur place :
+ * celles qui ne sont pas encore tombées sont absentes (`shown` faux), le relevé ne bouge pas quand il se remplit.
+ */
+export interface DetailRowHud {
+  code: CriterionCode;
+  kind: DetailKind;
+  /** Le nom court du critère, celui du dos de la fiche : « Parcours », « Code ». */
+  label: string;
+  /** L'état en mots : « comptée » pour l'école ; vide sinon (une note, ou la marque « ?/10 »). */
+  state: string;
+  /** Sans note (non prouvé ou pas au dossier) : une seule marque courte à la place du chiffre, « ?/10 », en retrait. */
+  unknown: boolean;
+  /** La note qui compte de 0 à sa valeur (montée), puis la valeur ; `step` : la valeur tout de suite (mouvement réduit). */
+  value: number;
+  step: number;
+  /** Hors moyenne : en retrait. */
+  out: boolean;
+  /** Tombé : à l'écran. */
+  shown: boolean;
+  /** Son coup : l'étiquette s'inverse quelques images. */
+  hit: boolean;
+  /** 0 : absent ; 1 : posé. */
+  enter: number;
+  /** L'échelle du claquement de la note : de DETAIL_SLAP_FROM à 1. */
+  slap: number;
 }
 
 export interface Hud {
@@ -110,6 +153,8 @@ export interface Hud {
    * réduit), entiers, de 0 à la note, atteinte à l'image du gel.
    */
   score: { value: number; step: number };
+  /** Le relevé des critères (§18.97), dans l'ordre où ils tombent ; vide sans grille. */
+  detail: DetailRowHud[];
   /** Opacité du flash crème. */
   flash: number;
   /** La position de la tuile de grain (px, 0 à 127). */
@@ -153,10 +198,13 @@ export function hudAt(plan: FilmPlan, t: number, lang: Lang): Hud {
       const age = f - s.frame;
       if (age < STAR_LAND) {
         stars.push({ on: true, scale: 1, flying: true, fill: 1 });
+        // le vol : la montée (et la réduction) sur les six premiers dixièmes, le glissement ensuite, fini à la dernière image en l'air
+        const t = age <= STAMP_HOLD ? 0 : (age - STAMP_HOLD) / (STAR_LAND - STAMP_HOLD);
         stamp = {
           star: s.star,
           scale: age < STAMP_SLAP ? STAMP_FROM - ((STAMP_FROM - 1) * age) / STAMP_SLAP : 1,
-          fly: age <= STAMP_HOLD ? 0 : easeInOut((age - STAMP_HOLD) / (STAR_LAND - STAMP_HOLD)),
+          fly: easeInOut(clamp01(t / STAMP_RISE)),
+          side: easeInOut(clamp01((t - STAMP_SIDE[0]) / (STAMP_SIDE[1] - STAMP_SIDE[0]))),
           opacity: clamp01(0.7 + 0.3 * age),
         };
       } else {
@@ -213,6 +261,29 @@ export function hudAt(plan: FilmPlan, t: number, lang: Lang): Hud {
   }
   const score = { value: Math.round(value), step: Math.round(step) };
 
+  // Le relevé : chaque critère tombe à son image, sa note claque et compte jusqu'à sa valeur ; il reste jusqu'au flash.
+  const back = STRINGS[lang].back;
+  const detail: DetailRowHud[] = plan.detail.map((b) => {
+    const shown = frame >= b.frame;
+    const age = frame - b.frame;
+    const n = b.score ?? 0;
+    const k = clamp01(age / DETAIL_COUNT);
+    return {
+      code: b.code,
+      kind: b.kind,
+      label: back.criteria[b.code],
+      state: b.kind === "counted" ? back.counted : "",
+      unknown: b.kind === "unproven" || b.kind === "missing",
+      value: !shown ? 0 : k >= 1 ? n : Math.floor(n * easeOut(k)),
+      step: n,
+      out: b.out,
+      shown,
+      hit: shown && age < DETAIL_HIT,
+      enter: shown ? clamp01((age + 1) / DETAIL_IN) : 0,
+      slap: shown && age < DETAIL_SLAP ? DETAIL_SLAP_FROM - ((DETAIL_SLAP_FROM - 1) * age) / DETAIL_SLAP : 1,
+    };
+  });
+
   // L'habillage se pose à l'ouverture, se lève après le sommet du flash.
   const bands = landed ? 1 - clamp01((f - flash.peak) / (flash.to - flash.peak)) : clamp01(f / BANDS_CLOSE);
   const flashOpacity = frame < flash.from ? 0 : f < flash.peak ? clamp01((f - flash.from) / (flash.peak - flash.from)) : 1 - clamp01((f - flash.peak) / (flash.to - flash.peak));
@@ -236,6 +307,7 @@ export function hudAt(plan: FilmPlan, t: number, lang: Lang): Hud {
         }
       : null,
     score,
+    detail,
     flash: flashOpacity,
     grain: grainAt(Math.floor(frame / GRAIN_STEP)),
   };

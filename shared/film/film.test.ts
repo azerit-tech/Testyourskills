@@ -273,15 +273,23 @@ describe("hudAt (§2.2, §5.2)", () => {
       expect(hudAt(p, at(s.frame + STAMP_SLAP), "fr").stamp).toMatchObject({ scale: 1, fly: 0, opacity: 1 });
       expect(hudAt(p, at(s.frame + STAMP_HOLD - 1), "fr").stamp).toMatchObject({ scale: 1, fly: 0 });
       let fly = 0;
+      let side = 0;
       for (let f = s.frame; f < s.frame + STAR_LAND; f++) {
         const h = hudAt(p, at(f), "fr");
         expect(h.stamp?.star).toBe(s.star);
         expect(h.stamp!.fly).toBeGreaterThanOrEqual(fly);
         expect(h.stamp!.fly).toBeLessThanOrEqual(1);
+        expect(h.stamp!.side).toBeGreaterThanOrEqual(side);
+        expect(h.stamp!.side).toBeLessThanOrEqual(1);
+        // §18.97 : elle monte d'abord au centre, et ne glisse vers sa place qu'une fois presque montée
+        if (h.stamp!.side > 0) expect(h.stamp!.fly).toBeGreaterThan(0.6);
+        if (f < s.frame + STAMP_HOLD) expect(h.stamp!.side).toBe(0);
         fly = h.stamp!.fly;
+        side = h.stamp!.side;
         expect(h.stars[s.star - 1].flying).toBe(true);
       }
-      expect(fly).toBeGreaterThan(0.95);
+      expect(fly).toBe(1);
+      expect(side).toBeCloseTo(1, 6);
       // posée : la rangée la montre pleine, elle claque de 1,5 à 1
       const down = hudAt(p, at(s.frame + STAR_LAND), "fr");
       expect(down.stamp).toBeNull();

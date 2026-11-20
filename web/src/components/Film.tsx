@@ -21,7 +21,7 @@ import { createFilmSound } from "../lib/filmSound";
 import { buzz } from "../lib/haptics";
 import { inAppBrowser } from "../lib/sharing";
 import { canPlayFilm, createFilmPlayer, type FilmPlayer, type FilmStats } from "../film/player";
-import { FilmHud, FilmLine, FilmVerdict } from "../film/FilmHud";
+import { FilmDetail, FilmHud, FilmLine, FilmVerdict } from "../film/FilmHud";
 import { filmVideo } from "../film/unlock";
 import { ensureStill, paintStill, stillShot } from "../film/freeze";
 import type { FileId } from "../film/files";
@@ -411,6 +411,10 @@ function FilmView({ card, lang, phase, onReady, onGesture, onStage, onHandoff, o
         <div className="film-line-wide" style={{ transform: `translateY(${(1 - hud.bands) * 100}%)` }}>
           <FilmLine line={hud.line} />
           <FilmVerdict plan={plan} hud={hud} lang={lang} />
+        </div>
+        {/* téléphone couché : le relevé des critères dans la marge d'encre de gauche, hors de la colonne étroite (film.css) */}
+        <div className="film-detail-wide">
+          <FilmDetail hud={hud} />
         </div>
         {flashLook(hud.flash, landed) > 0 && <div className="film-flash" style={{ opacity: flashLook(hud.flash, landed) }} />}
       </div>
