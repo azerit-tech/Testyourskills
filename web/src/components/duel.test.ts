@@ -1,6 +1,4 @@
-// La suite du visiteur (§18.48) : le vote posé mène à « À ton tour », le duel s'envoie.
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+// La suite du visiteur (§18.48) : le duel s'envoie.
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -8,15 +6,12 @@ import { FIXTURES } from "../../../shared/fixtures";
 import type { CardData } from "../../../shared/types";
 import { DICTS, LangProvider } from "../i18n";
 import { Duel, useDuelSend } from "./Duel";
-import { Jury } from "./Jury";
 import type { MyCard } from "../lib/session";
 
 /** Le duel tel que la page le monte pour un visiteur : plus bas que la fiche, l'envoi en contour (§18.104). */
 function DuelWith({ mine, card: c, info }: { mine: MyCard; card: CardData; info?: boolean }) {
   return createElement(Duel, { mine, card: c, duel: useDuelSend(mine, c, () => undefined), info });
 }
-
-const jurySrc = readFileSync(join(__dirname, "Jury.tsx"), "utf8");
 
 function stub(lang: string) {
   vi.stubGlobal("window", {
@@ -34,24 +29,6 @@ const render = (node: ReturnType<typeof createElement>, lang = "fr-FR") => {
 afterEach(() => vi.unstubAllGlobals());
 
 const card: CardData = { ...FIXTURES.silver, id: "DuelCard001", login: "camroux", overall: 68 };
-const toast = () => undefined;
-
-describe("le jury, une fois le vote posé", () => {
-  const jury = (turn: string | null, mine: "guilty" | null, lang?: string) =>
-    render(createElement(Jury, { cardId: card.id, card, jury: { guilty: 3, cleared: 1, mine }, toast, turn }), lang);
-
-  it("« Tu as jugé @x. » et un bouton en contour « À ton tour »", () => {
-    const html = jury("@camroux", "guilty");
-    expect(html).toContain('<div class="jury-next"><p>Tu as jugé @camroux.</p><button type="button" class="pill">À ton tour</button></div>');
-    expect(jury("@camroux", "guilty", "en-US")).toContain('<p>You judged @camroux.</p><button type="button" class="pill">Your turn</button>');
-  });
-
-  it("rien avant le vote, rien pour qui a déjà sa fiche ; la page ne défile plus toute seule", () => {
-    expect(jury("@camroux", null)).not.toContain("jury-next");
-    expect(jury(null, "guilty")).not.toContain("jury-next");
-    expect(jurySrc).not.toContain("setTimeout");
-  });
-});
 
 describe("le duel de qui a déjà sa fiche", () => {
   const duel = (overall: number, over: Partial<CardData> = {}, lang?: string, info?: boolean) =>

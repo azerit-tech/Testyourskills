@@ -1,15 +1,14 @@
 // Attente (§18.27, §18.48) : la photo d'identité. Sur un fond d'encre plat, un
 // groupe centré dans la hauteur : la marque et le titre (« Découvre à quel point
 // ton profil est recherché. »), le cadre de la fiche (toise et plaque, Mugshot.tsx) avec l'avatar
-// du pseudo dès la première seconde, le pari (« Tu plaides combien d'étoiles ? »,
-// Plea.tsx), puis la pile des pièces. En bas, à une place fixe, la barre qui
+// du pseudo dès la première seconde, puis la pile des pièces. En bas, à une place fixe, la barre qui
 // avance sur la durée estimée et, dessous, une ligne sur deux rangs réservés :
 // les messages du §6.2, nourris par les ProgressEvent quand il y en a, sinon par
 // du remplissage. En file d'attente, la ligne dit combien de fiches passent
 // avant, et la barre attend.
 //
-// Rien ne bouge d'une étape à l'autre : chaque emplacement (pari, pile, barre,
-// ligne) a sa hauteur réservée dès la première image, quel que soit le texte.
+// Rien ne bouge d'une étape à l'autre : chaque emplacement (pile, barre, ligne)
+// a sa hauteur réservée dès la première image, quel que soit le texte.
 //
 // L'enquête en direct (§18.26) : dès que la collecte a parlé, les trouvailles
 // tombent une à une dans la pile, toutes les 2,5 s, comme des pièces versées au
@@ -29,7 +28,6 @@ import type { Finding, Lang, ProgressEvent } from "../../../shared/types";
 import { pick, useT } from "../i18n";
 import { AzeritMark } from "./Brand";
 import { Mugshot } from "./Mugshot";
-import { PleaPrompt } from "./Plea";
 
 interface Line {
   uid: number;
@@ -67,8 +65,6 @@ interface WaitingProps {
   initials?: string | null;
   /** Le jour de la fiche, dès qu'elle est prête : la plaque de l'attente et celle de la fiche portent la même date. */
   createdAt?: string | null;
-  /** Le pari se propose (une vraie attente, pas une fiche servie du cache). */
-  plea?: boolean;
   /** La fiche est prête : rendre la main dès que les trouvailles minimales sont lues. */
   ready?: boolean;
   onRelease?: () => void;
@@ -117,7 +113,7 @@ function PieceText({ finding, lang }: { finding: Finding; lang: Lang }) {
   );
 }
 
-export function Waiting({ cardId, progress, startedAt, queue, findings = [], login, avatarUrl, slug, cv = false, name, initials, createdAt, plea = false, ready = false, onRelease, scene, onOpen, leaving = false, offline = false, onRetry }: WaitingProps) {
+export function Waiting({ cardId, progress, startedAt, queue, findings = [], login, avatarUrl, slug, cv = false, name, initials, createdAt, ready = false, onRelease, scene, onOpen, leaving = false, offline = false, onRetry }: WaitingProps) {
   const { t, lang } = useT();
   // L'attente s'ouvre en haut de la page, avant sa première image : jamais à la hauteur où l'accueil était défilé.
   useLayoutEffect(() => {
@@ -306,8 +302,6 @@ export function Waiting({ cardId, progress, startedAt, queue, findings = [], log
           </h1>
         </header>
         <Mugshot cardId={cardId} login={plate.login} slug={plate.slug} cv={plate.cv} name={plate.name} initials={plate.initials} src={avatarUrl} createdAt={createdAt ?? startedAt} />
-        {/* le pari a sa place dès la première image : la question, puis la ligne, sans rien pousser */}
-        <div className="load-plea">{plea && <PleaPrompt cardId={cardId} />}</div>
         <div className="load-dossier" aria-hidden>
           {/* les pièces d'avant, en pile sous la dernière ; avant la première, une feuille vierge à sa place */}
           <div className="pile">

@@ -13,8 +13,6 @@ const SAID: Record<EventName, [RegExp, RegExp]> = {
   denounce_sent: [/dénonciations envoyées/, /tip-offs sent/],
   denounce_landed: [/visites d'une fiche dénoncée/, /visits to a tipped-off sheet/],
   denounce_claimed: [/fiches dénoncées revendiquées/, /tipped-off sheets claimed/],
-  jury_vote: [/votes du jury/, /jury votes/],
-  plea: [/plaidoyers/, /pleas/],
   film: [/déroulement du film/, /how the film played/],
   band_join: [/entrées et sorties de bande/, /crews joined/],
   band_leave: [/sorties de bande/, /joined and left/],

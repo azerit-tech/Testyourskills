@@ -94,7 +94,7 @@ La base et les PNG sont dans le volume monté sur `/data`, comme les deux listes
   - `github/` : collecte ; `ai/` : lecture par l'IA, budget et crédit ; `cv/` : extraction du PDF ; `linkedinProfile/` : lecture d'un profil LinkedIn.
   - `scoring/` : le barème et la grille de recrutement, en code pur ; `findings/` : les trouvailles de l'enquête.
   - `render/` : images de partage en PNG ; `html.ts` : page `/c/:id` avec ses balises d'aperçu.
-  - `auth.ts` : revendication par GitHub OAuth ; `linkedin.ts` : photo LinkedIn ; `top.ts`, `jury.ts`, `denounce.ts` : top de la semaine, jury, dénonciation.
+  - `auth.ts` : revendication par GitHub OAuth ; `linkedin.ts` : photo LinkedIn ; `top.ts`, `denounce.ts` : top de la semaine, dénonciation.
   - `db.ts` : SQLite. Jamais le CV ni son texte.
 - `scripts/` : déploiement, tableau de la semaine (`npm run weekly`), centiles de référence, montage du film (`film-*.ts`).
 - `tools/bake/` : la chaîne Blender de l'ascenseur ; `tools/film/` : la liste de montage du film ; `tools/film3d/` : la scène et le rendu du film.

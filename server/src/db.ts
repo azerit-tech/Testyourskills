@@ -61,15 +61,6 @@ export interface CardRow {
   supersededBy: string | null;
 }
 
-export type Verdict = "guilty" | "cleared";
-
-/** Décompte du jury d'une fiche (§18.27) ; `mine` : le vote de l'IP qui demande, sinon null. */
-export interface Jury {
-  guilty: number;
-  cleared: number;
-  mine: Verdict | null;
-}
-
 export interface OwnerRow {
   login: string;
   githubId: number;
@@ -267,7 +258,8 @@ export function migrate(db: Database.Database) {
   }
   // Cache et budget de la lecture des profils LinkedIn (§18.24) : tables neuves.
   ensureLinkedinTables(db);
-  // Le jury de la page partagée (§18.27) : un vote par fiche et par IP, l'IP en hash seulement.
+  // L'ancien jury de la page partagée (§18.27, retiré au §18.129) : plus rien ne lit ni n'écrit cette table.
+  // Elle reste en place, sans migration ; ses lignes partent encore avec leur fiche (deleteGroup, purgeExpired).
   db.exec(`CREATE TABLE IF NOT EXISTS votes (
     card_id    TEXT NOT NULL,
     ip_hash    TEXT NOT NULL,
@@ -681,28 +673,6 @@ export class Store {
       | { n: number }
       | undefined;
     return r?.n ?? 0;
-  }
-
-  // --- Jury (§18.27) --------------------------------------------------------
-
-  /** Pose le vote de cette IP sur cette fiche. Le premier reste : false si elle avait déjà voté. */
-  castVote(cardId: string, ipHash: string, verdict: Verdict, now = Date.now()): boolean {
-    const r = this.db
-      .prepare(`INSERT INTO votes (card_id, ip_hash, verdict, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(card_id, ip_hash) DO NOTHING`)
-      .run(cardId, ipHash, verdict, now);
-    return r.changes === 1;
-  }
-
-  jury(cardId: string, ipHash: string): Jury {
-    const rows = this.db.prepare(`SELECT verdict, COUNT(*) AS n FROM votes WHERE card_id = ? GROUP BY verdict`).all(cardId) as {
-      verdict: Verdict;
-      n: number;
-    }[];
-    const mine = this.db.prepare(`SELECT verdict FROM votes WHERE card_id = ? AND ip_hash = ?`).get(cardId, ipHash) as
-      | { verdict: Verdict }
-      | undefined;
-    const n = (v: Verdict) => rows.find((r) => r.verdict === v)?.n ?? 0;
-    return { guilty: n("guilty"), cleared: n("cleared"), mine: mine?.verdict ?? null };
   }
 
   // --- Propriétaires (§18.1) -----------------------------------------------

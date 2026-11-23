@@ -93,7 +93,7 @@ describe("weeklyReport", () => {
     store.recordEvent("cta_azerit_clicked", "Gone000001", { from: "result" }, W46 + 2 * H);
     store.recordEvent("denounce_sent", "Keep000001", { by: "Gone000001" }, W46 + 2 * H);
     store.recordEvent("card_shared", "Keep000001", { channel: "x" }, W46 + 2 * H);
-    store.recordEvent("jury_vote", "Old0000001", { verdict: "guilty" }, W46 + 2 * H);
+    store.recordEvent("denounce_landed", "Old0000001", {}, W46 + 2 * H);
     const before = weeklyReport(store.db, { weeks: 1, now: NOW })[0]!;
 
     store.deleteGroup("Gone000001");

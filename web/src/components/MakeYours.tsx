@@ -35,7 +35,7 @@ export function MakeYours({ watch = false, onLawyer = null }: Props) {
 
 const isField = (el: Element | null) => !!el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName);
 
-/** Vers le champ de « À ton tour » : la barre, le jury après le vote et le bloc d'une fiche dénoncée y mènent. */
+/** Vers le champ de « À ton tour » : la barre et le bloc d'une fiche dénoncée y mènent. */
 export function toYourTurn(reduced: boolean) {
   const you = document.getElementById("you");
   const input = you?.querySelector<HTMLInputElement>("input:not([type='file'])");

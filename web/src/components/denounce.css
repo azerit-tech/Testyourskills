@@ -203,7 +203,7 @@
 
 /* ---------- arrivée sur une fiche dénoncée (CardPage) ---------- */
 
-/* marine : il informe ; le jury, juste dessous, est l'appel (prune) */
+/* marine : il informe ; « C'est bien moi », dedans, est l'appel */
 .denounced {
   display: grid;
   gap: 10px;

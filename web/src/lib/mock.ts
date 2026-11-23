@@ -11,7 +11,7 @@ import { oneNote } from "../../../shared/caseFile";
 import { asLinkedinCard, asLinkedinComparison } from "../../../shared/linkedinText";
 import { publicView } from "../../../shared/publicView";
 import { hasLinks, profileLinks } from "../../../shared/profileLinks";
-import type { CaseInfo, CreateInput, CreateResult, Jury, Showcase, Verdict } from "./api";
+import type { CaseInfo, CreateInput, CreateResult, Showcase } from "./api";
 import { ApiError } from "./errors";
 
 type FixtureKey = keyof typeof FIXTURES;
@@ -35,8 +35,6 @@ interface MockJob {
 const MOCK_ACCOMPLICES = ["camroux", "nour-rs", "jplefevre"].map((login) => ({ login, avatarUrl: `https://github.com/${login}.png?size=80` }));
 
 const jobs = new Map<string, MockJob>();
-/** Le jury en démo (§18.27) : les votes de la session, par fiche, gardés en mémoire. */
-const juries = new Map<string, Jury>();
 /** Cartes dont la photo vient de LinkedIn (simulé). */
 const photos = new Set<string>();
 /** « Non » dit à la proposition d'une fiche de démo (§18.100). */
@@ -70,19 +68,6 @@ function hash(s: string) {
   let h = 0;
   for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0;
   return h;
-}
-
-/** Décompte de départ plausible, stable pour une même fiche : 18 à 57 votes, 55 à 84 % coupable. */
-function juryOf(id: string): Jury {
-  let j = juries.get(id);
-  if (!j) {
-    const h = hash(id);
-    const total = 18 + (h % 40);
-    const guilty = Math.round((total * (55 + ((h >>> 8) % 30))) / 100);
-    j = { guilty, cleared: total - guilty, mine: null };
-    juries.set(id, j);
-  }
-  return j;
 }
 
 const rand = () => Math.random().toString(36).slice(2, 8);
@@ -462,16 +447,7 @@ export const mockApi = {
       by: marker === "N" ? "leamd" : null,
       x: login === "nour-rs" ? "nour_codes" : null,
       accomplices: MOCK_ACCOMPLICES.filter((a) => a.login !== login),
-      jury: { ...juryOf(id) },
     };
-  },
-
-  /** Un vote par fiche, comme le serveur : le premier reste. */
-  async vote(id: string, verdict: Verdict): Promise<Jury> {
-    await sleep(250);
-    const j = juryOf(id);
-    if (!j.mine) juries.set(id, { ...j, [verdict]: j[verdict] + 1, mine: verdict });
-    return { ...juryOf(id) };
   },
 
   async sendEmail(cardId: string, email: string) {

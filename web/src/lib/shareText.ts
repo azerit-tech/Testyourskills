@@ -1,13 +1,11 @@
 // Le texte de partage (§18.27, §18.48), en fonction pure. Dans le fil LinkedIn, deux
 // lignes se lisent avant « voir plus » : la fiche d'abord (« Ma fiche de dev selon la
-// grille de recrutement d'Azerit : ★★★★★☆ Menace publique, 79/100. »), le pari en chute
-// (« Je plaidais ★★★☆☆☆ : trop modeste. »), puis le profil et le rang quand il flatte,
+// grille de recrutement d'Azerit : ★★★★★☆ Menace publique, 79/100. »), puis le profil et le rang quand il flatte,
 // le point fort, la trouvaille, et « Fais la tienne : » avec le lien. Des virgules,
 // jamais une chaîne de points médians.
 // Les mots viennent d'i18n (`result.share.words`) ; rien ici ne lit le navigateur.
 import { starsLine } from "../../../shared/stars";
 import type { Dict } from "../i18n";
-import { pleaGap } from "./plea";
 
 export type ShareWords = Dict["result"]["share"]["words"];
 
@@ -18,12 +16,10 @@ interface Common {
   level: string;
   /** Profil criminel, déjà dans la langue. */
   profile: string | null;
-  /** Dossier vide fait par un tiers, pas encore revendiqué (shared/publicView.ts) : ni note, ni étoiles, ni pari. */
+  /** Dossier vide fait par un tiers, pas encore revendiqué (shared/publicView.ts) : ni note, ni étoiles. */
   sealed?: boolean;
   /** « 7e ce mois-ci », seulement pendant le mois en cours et dans le top 10 (`flatteringRank`). */
   rank: string | null;
-  /** Étoiles plaidées pendant l'attente (lib/plea.ts), ou null. */
-  plea: number | null;
 }
 
 export interface CardShare extends Common {
@@ -84,8 +80,6 @@ function build(w: ShareWords, x: ShareInput, cut: Cut): string {
   // Première ligne : la fiche, ses étoiles, son niveau et sa note sur 100 (§18.37 : la grille dès qu'elle note).
   const stars = starsLine(x.stars);
   const head = x.graded ? w.file(stars, x.level, x.overall) : w.sheet(stars, x.level, x.overall);
-  // Deuxième ligne : le pari, en chute.
-  const plea = x.plea ? w.plea(starsLine(x.plea), pleaGap(x.plea, x.stars)) : null;
   // Puis le profil et le rang (« Profil « Machine à livrer », 4e ce mois-ci. »).
   const rank = cut < 4 ? x.rank : null;
   const who = cut < 5 && x.profile ? `${w.profile(x.profile)}${rank ? `, ${rank}` : ""}.` : rank ? `${rank}.` : null;
@@ -94,7 +88,7 @@ function build(w: ShareWords, x: ShareInput, cut: Cut): string {
   // Les sources du dossier partent en premier quand la place manque.
   const exhibits = cut === 0 && x.exhibits ? w.exhibits(x.exhibits) : null;
   const parts: (string | null)[] = [who, cut < 3 && x.graded ? (x.strong ?? null) : null, exhibits, detail, cut < 3 && !x.graded ? w.ai(x.secs) : null, w.cta];
-  return [head, plea, parts.filter(Boolean).join(" ")].filter(Boolean).join("\n");
+  return [head, parts.filter(Boolean).join(" ")].filter(Boolean).join("\n");
 }
 
 /** Le texte sans le lien, pour qui le reçoit à part (feuille de partage du système). Il finit sur « Fais la tienne : ». */

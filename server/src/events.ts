@@ -18,10 +18,6 @@ export const EVENT_NAMES = [
   "denounce_sent",
   "denounce_landed",
   "denounce_claimed",
-  // Le jury (§18.27) : un vote posé, par le serveur seul.
-  "jury_vote",
-  // Le pari (§18.27) : étoiles plaidées et écart avec le verdict, envoyé par le front quand le verdict s'affiche.
-  "plea",
   // Le film (§18.36, docs/cinematique-poursuite.md §5.6) : une fois par lecture, ce qu'il en est advenu.
   "film",
   // Les bandes (§18.38) : entrer et sortir, par le serveur seul ; une bande ouverte au classement de l'accueil et son partage, par le front (§18.101).
@@ -36,9 +32,9 @@ export const EVENT_NAMES = [
 ] as const;
 export type EventName = (typeof EVENT_NAMES)[number];
 
-/** Événements que le front peut envoyer. card_generated, denounce_sent, denounce_claimed et jury_vote sont posés par le serveur seul. */
+/** Événements que le front peut envoyer. card_generated, denounce_sent et denounce_claimed sont posés par le serveur seul. */
 const cardEventSchema = z.object({
-  event: z.enum(["card_shared", "card_email", "cta_azerit_clicked", "shared_visit", "denounce_landed", "plea", "band_view", "band_share", "prime_view"]),
+  event: z.enum(["card_shared", "card_email", "cta_azerit_clicked", "shared_visit", "denounce_landed", "band_view", "band_share", "prime_view"]),
   cardId: z.string().regex(/^[A-Za-z0-9]{6,32}$/).optional(),
   meta: z
     .record(z.string().max(40), z.union([z.string().max(200), z.number(), z.boolean(), z.null()]))

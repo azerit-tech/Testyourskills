@@ -2446,14 +2446,6 @@ svg {
   flex: none;
   width: clamp(124px, 27vh, 208px);
 }
-/* le pari : sa place est réservée, question ou ligne */
-.load-plea {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 100%;
-  height: 72px;
-}
 .load-mug svg {
   width: 100%;
   height: auto;
@@ -2690,135 +2682,6 @@ svg {
   .piece-skel {
     animation: none;
   }
-}
-
-/* le pari (§18.27) : « Tu plaides combien d'étoiles ? », six étoiles à toucher
-   (44 px chacune) pendant l'attente, puis une ligne ; sous la fiche, le verdict */
-.plea {
-  display: grid;
-  justify-items: center;
-  gap: 2px;
-}
-.plea-ask {
-  font: var(--font-item);
-  text-transform: uppercase;
-  color: var(--cream);
-}
-.plea-stars {
-  display: flex;
-}
-.plea-star {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border: 0;
-  background: none;
-}
-/* l'étoile du pari : le dessin commun (.star-shape), en 26 px */
-.plea-star svg {
-  width: 26px;
-  height: 26px;
-  transition: transform 0.18s var(--ease-out);
-}
-.plea-star:active svg {
-  transform: scale(0.88);
-}
-/* la n-ième allume les n premières : aperçu au survol et au clavier */
-.plea-stars:focus-within .plea-star svg {
-  fill: var(--star);
-  stroke: var(--star);
-}
-.plea-star:focus ~ .plea-star svg {
-  fill: none;
-  stroke: var(--star-off);
-}
-@media (hover: hover) {
-  .plea-stars:hover .plea-star svg {
-    fill: var(--star);
-    stroke: var(--star);
-  }
-  .plea-star:hover ~ .plea-star svg {
-    fill: none;
-    stroke: var(--star-off);
-  }
-}
-.plea-line {
-  display: block;
-  font: 500 var(--t-14) / 24px var(--f-text);
-  color: var(--c-text);
-  animation: line-in 0.4s var(--ease-out);
-}
-/* sous le pari fait : quand tombe le verdict */
-.plea-noted {
-  font: var(--font-small);
-  color: var(--c-text-2);
-  animation: line-in 0.4s var(--ease-out) 0.15s both;
-}
-.plea-verdict {
-  display: grid;
-  justify-items: center;
-  gap: 6px;
-  text-align: center;
-}
-/* le pari contre le verdict, en tableau de deux lignes : libellés à droite, étoiles sur la même verticale,
-   au téléphone comme au bureau */
-.plea-said {
-  display: grid;
-  grid-template-columns: auto auto;
-  align-items: center;
-  gap: 4px 12px;
-  font: 500 var(--t-16) / 1.4 var(--f-text);
-  color: var(--c-text);
-}
-.plea-said dt {
-  justify-self: end;
-  white-space: nowrap;
-}
-.plea-said dd {
-  display: flex;
-  margin: 0;
-}
-/* au retour du film, sur téléphone : le verdict du pari au-dessus de la fiche, une ligne (deux à 320 px).
-   Sa place est tenue pendant le film (la fiche se taille dessous), il paraît quand la fiche est posée (§18.52). */
-.plea-strip {
-  display: none;
-}
-@media (max-width: 640px) {
-  .plea-strip {
-    display: block;
-    margin: 0 auto;
-    padding: 2px var(--gutter) 6px;
-    max-width: var(--measure);
-    font: 500 var(--t-14) / 1.35 var(--f-text);
-    text-align: center;
-    color: var(--cream);
-    text-wrap: balance;
-    visibility: hidden;
-  }
-  .plea-strip b {
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
-  }
-  /* ciel clair (heure rose) : à l'encre, comme l'en-tête */
-  .page-result:has(> .card-sky.sky-light.is-in) .plea-strip {
-    color: var(--ink-0);
-  }
-  .plea-strip.is-on {
-    visibility: visible;
-    animation: line-in 0.4s var(--ease-out);
-  }
-  /* le bloc du verdict, sous la fiche, ne répète pas la ligne */
-  .page-result:has(.plea-strip) .after-head .plea-verdict {
-    display: none;
-  }
-}
-.plea-word {
-  font: var(--font-block);
-  text-transform: uppercase;
-  color: var(--cream);
-  text-wrap: balance;
 }
 
 .stage-slot {
@@ -3178,15 +3041,12 @@ svg {
   }
 }
 
-/* sous la fiche du visiteur : ce qu'il regarde, le jury, les critères, le reste replié ; puis « À ton tour » */
+/* sous la fiche du visiteur : ce qu'il regarde, les critères, le reste replié ; puis « À ton tour » */
 .visitor-col {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   min-width: 0;
-}
-.visitor-col .jury {
-  margin-bottom: 0;
 }
 /* la phrase qui dit ce que c'est, au-dessus de la fiche à la place de la tête (téléphone) : deux lignes
    au plus, centrées sur l'axe de la fiche, posées sur le ciel (crème, ou encre sur l'heure rose) */
@@ -3368,100 +3228,6 @@ svg {
 }
 .you .entry {
   margin-top: 6px;
-}
-
-/* le jury (§18.27) : un geste à un toucher, entre la fiche et « Et toi ? » */
-.page-result .jury {
-  position: relative;
-  z-index: 2;
-}
-.jury {
-  display: grid;
-  gap: 14px;
-  margin-bottom: 12px;
-  padding: var(--pad-block);
-  border-radius: var(--r-block);
-  background: var(--s-call);
-}
-.jury h2 {
-  font: var(--font-block);
-  text-transform: uppercase;
-  color: var(--cream);
-  text-wrap: balance;
-  overflow-wrap: anywhere;
-}
-/* les deux états ont la même hauteur : le décompte ne fait pas sauter la page */
-.jury-choices,
-.jury-result {
-  min-height: 52px;
-}
-.jury-choices {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-/* deux choix de même poids : deux contours, à la hauteur du bouton principal */
-.jury-choices .pill {
-  min-height: var(--h-main);
-}
-.jury-result {
-  display: grid;
-  align-content: center;
-  gap: 10px;
-}
-/* deux aplats : coupable en crème, relaxe en lilas discret */
-.jury-bar {
-  display: flex;
-  gap: 3px;
-  height: 12px;
-}
-.jury-bar span {
-  flex: 0 1 0;
-  min-width: 0;
-  border-radius: var(--r-pill);
-  background: var(--cream);
-}
-.jury-bar .is-cleared {
-  background: var(--c-text-2);
-}
-.jury-tally {
-  font: 600 var(--t-16) / 1.2 var(--f-text);
-  color: var(--cream);
-}
-/* le vote posé : « Tu as jugé @x. » et le bouton qui mène à « À ton tour » */
-.jury-next {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px 16px;
-}
-.jury-next p {
-  font: 500 var(--t-16) / 1.4 var(--f-text);
-  color: var(--cream);
-}
-/* pour qui a fait la fiche : le décompte, en texte courant, sous le pari */
-.jury-line {
-  font: 500 var(--t-14) / 1.4 var(--f-text);
-  color: var(--c-text);
-  text-wrap: balance;
-}
-/* en tête de l'après-fiche, le verdict en une ligne (§18.76) : le jury, et le pari s'il y en a un.
-   Sans cadre : une ligne posée entre la fiche et le partage, pas un bloc de plus */
-.after-head {
-  display: grid;
-  gap: 10px;
-  padding: 0 var(--pad-block);
-}
-.after-head:empty {
-  display: none;
-}
-.after-head {
-  justify-items: center;
-  text-align: center;
-}
-.after-head .jury-line {
-  text-wrap: balance;
 }
 
 /* « Fais la tienne » toujours sous le pouce (§18.48) : la barre fixe du visiteur est la même pièce
@@ -4520,8 +4286,8 @@ a.dossier-item:hover {
     grid-row: 2;
     margin-top: 0;
   }
-  /* qui a sa fiche, sur celle d'un autre : le duel et « Dénonce un complice » en bas de la colonne, sous le jury
-     et les plis (§18.104, §18.118) ; le jury ouvre la colonne, à hauteur de la fiche */
+  /* qui a sa fiche, sur celle d'un autre : le duel et « Dénonce un complice » en bas de la colonne, sous les plis
+     (§18.104, §18.118) ; les plis ouvrent la colonne, à hauteur de la fiche */
   .page-result.is-visitor > .result-top > .you-col.is-duel {
     grid-row: 3;
     padding-top: 16px;

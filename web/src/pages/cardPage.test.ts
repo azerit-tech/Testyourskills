@@ -14,10 +14,8 @@ import { LangProvider } from "../i18n";
 import { Fold, WeekLine, type Shareable } from "../components/After";
 import { linkedinFromField } from "../components/AddLinkedin";
 import { skyOf } from "../components/ProfileTile";
-import { JuryLine } from "../components/Jury";
 import { tokens } from "../lib/api";
 import { githubGridMock } from "../lib/mockGrid";
-import { setPlea } from "../lib/plea";
 import { markChaseWatched } from "../lib/session";
 import { Result, type ResultProps } from "./CardPage";
 
@@ -38,12 +36,11 @@ function stub(lang: string) {
   vi.stubGlobal("document", { documentElement: { dataset: {}, classList: { add: () => undefined, remove: () => undefined } }, querySelector: () => null, getElementById: () => null });
 }
 
-function renderResult(item: Shareable, opts: { owner: boolean; lang?: string; token?: string; plea?: number; me?: ResultProps["me"]; claimedAs?: string; fresh?: boolean; kase?: ResultProps["kase"]; mine?: { id: string; login: string | null; overall: number } }): string {
+function renderResult(item: Shareable, opts: { owner: boolean; lang?: string; token?: string; me?: ResultProps["me"]; claimedAs?: string; fresh?: boolean; kase?: ResultProps["kase"]; mine?: { id: string; login: string | null; overall: number } }): string {
   stub(opts.lang ?? "fr-FR");
   if (opts.mine) localStorage.setItem("tys_mine", JSON.stringify(opts.mine));
   const id = item.kind === "card" ? item.card.id : item.comparison.id;
   if (opts.token) tokens.set(id, opts.token);
-  if (opts.plea) setPlea(id, opts.plea);
   const props: ResultProps = {
     item,
     animate: false,
@@ -53,7 +50,6 @@ function renderResult(item: Shareable, opts: { owner: boolean; lang?: string; to
     owner: opts.owner,
     fresh: opts.fresh ?? false,
     kase: opts.kase ?? null,
-    caseLate: false,
     claimedAs: opts.claimedAs ?? null,
     notice: null,
     me: opts.me ?? null,
@@ -75,11 +71,14 @@ const card = (over: Partial<CardData> = {}): Shareable => ({ kind: "card", card:
 afterEach(() => vi.unstubAllGlobals());
 
 describe("page partagée, vue par un visiteur", () => {
-  it("l'en-tête, la phrase qui dit ce que c'est, la fiche, le jury, les plis, « À ton tour » (§18.48, §18.76)", () => {
+  it("l'en-tête, la phrase qui dit ce que c'est, la fiche, les plis, « À ton tour » (§18.48, §18.76, §18.129)", () => {
     const html = renderResult(card(), { owner: false });
-    const order = at(html, ['class="wanted"', 'class="visitor-lead"', 'class="result-stage"', 'class="jury"', 'class="rest"', 'id="you"']);
+    const order = at(html, ['class="wanted"', 'class="visitor-lead"', 'class="result-stage"', 'class="rest"', 'id="you"']);
     expect(ascending(order), JSON.stringify(order)).toBe(true);
-    // Épurée (§18.76) : ni peine ni caution sous le jury, plus de pli « Vois les autres pièces » (elles sont au dos de la fiche).
+    // Plus de jury (§18.129) : la fiche, puis directement les plis.
+    expect(html).not.toContain('class="jury');
+    expect(html).not.toMatch(/Coupable|Relaxe|Jury/);
+    // Épurée (§18.76) : ni peine ni caution, plus de pli « Vois les autres pièces » (elles sont au dos de la fiche).
     expect(html).not.toContain('class="penalty"');
     expect(html).not.toContain('class="fold dossier"');
     // « À ton tour » hors de la colonne (au bureau, il passe sous la fiche).
@@ -165,7 +164,7 @@ describe("page partagée, vue par un visiteur", () => {
     expect(page).toMatch(/<div className="you-col">\s*\{self\.id !== id && \([\s\S]*?<\/section>\s*\)\}\s*<Denounce cardId=\{self\.id\}/);
     // Téléphone : 16 px entre le duel et la dénonciation (ils étaient collés).
     expect(css).toMatch(/\.result-top > \.you-col \{\s*display: grid;\s*grid-template-columns: minmax\(0, 1fr\);\s*gap: 16px;\s*margin-top: 16px;/);
-    // Bureau : la pile a sa place dans la colonne de droite (le bloc tombait dans la marge, coupé), en bas, sous le jury (§18.104).
+    // Bureau : la pile a sa place dans la colonne de droite (le bloc tombait dans la marge, coupé), en bas, sous les plis (§18.104).
     const desktop = css.slice(css.indexOf("/* ============ ordinateur ============ */"));
     expect(desktop).toMatch(/\.page-result\.is-visitor > \.result-top > \.you,\s*\.page-result\.is-visitor > \.result-top > \.you-col \{\s*grid-column: 4;\s*grid-row: 2;/);
     expect(desktop).toMatch(/\.page-result\.is-visitor > \.result-top > \.you-col\.is-duel \{\s*grid-row: 3;/);
@@ -197,7 +196,7 @@ describe("page partagée, vue par un visiteur", () => {
   it("sans profil : le reste en place", () => {
     const { profile: _p, ...bare } = FIXTURES.gold;
     const html = renderResult({ kind: "card", card: { ...(bare as CardData), id: "VisitCard02" } }, { owner: false });
-    expect(ascending(at(html, ['class="result-stage"', 'class="jury"', 'id="you"']))).toBe(true);
+    expect(ascending(at(html, ['class="result-stage"', 'class="rest"', 'id="you"']))).toBe(true);
   });
 });
 
@@ -224,12 +223,13 @@ describe("le score dit en toutes lettres, juste au-dessus de la fiche (§18.122)
 describe("après-fiche, vue par qui a fait la fiche (§18.27)", () => {
   const mine = (id: string) => card({ id });
 
-  it("le verdict (pari, jury) en une ligne, la dénonciation, le partage, puis le reste en lignes (§18.48, §18.76, §18.83)", () => {
-    const html = renderResult(mine("OwnCard0001"), { owner: true, token: "tok", plea: 6 });
-    const order = at(html, ['class="after-head"', 'class="plea-verdict"', 'class="jury-line"', 'class="after-block denounce"', 'class="after-block out"', 'class="rest"', 'class="after-foot"']);
+  it("la fiche, puis la dénonciation, le partage, et le reste en lignes ; ni pari ni jury (§18.48, §18.76, §18.83, §18.129)", () => {
+    const html = renderResult(mine("OwnCard0001"), { owner: true, token: "tok" });
+    const order = at(html, ['class="result-stage"', 'class="after-block denounce"', 'class="after-block out"', 'class="rest"', 'class="after-foot"']);
     expect(ascending(order), JSON.stringify(order)).toBe(true);
-    // Le verdict : le pari, puis la ligne du jury (une invitation à partager tant qu'il a moins de trois votes). Ni peine ni caution (§18.76).
-    expect(html).toMatch(/<div class="after-head"><section class="plea-verdict".*?<\/section><p class="jury-line">[^<]*<\/p><\/div>/);
+    // Plus de ligne de verdict sous la fiche (§18.129) : ni pari, ni jury. Ni peine ni caution (§18.76).
+    expect(html).not.toContain('class="after-head"');
+    expect(html).not.toMatch(/jury|plea|plaid|Coupable/i);
     expect(html).not.toContain('class="penalty"');
     expect(html).not.toContain('class="fold dossier"');
     expect(html).not.toContain('class="after-block dossier"');
@@ -237,18 +237,6 @@ describe("après-fiche, vue par qui a fait la fiche (§18.27)", () => {
     expect(html.indexOf('class="wanted"')).toBeLessThan(html.indexOf('class="result-stage"'));
     expect(html.match(/<h1/g)).toHaveLength(1);
     expect(html).not.toContain('id="you"');
-  });
-
-  it("au retour du film, le verdict du pari au-dessus de la fiche, place tenue, une seule fois (parcours 2)", () => {
-    const fresh = renderResult(mine("PleaCard001"), { owner: true, token: "tok", plea: 6, fresh: true }).replace(/ /g, " ");
-    const strip = /<p class="plea-strip[^"]*"[^>]*>.*?<\/p>/.exec(fresh)?.[0] ?? "";
-    expect(strip.replace(/<[^>]+>/g, "")).toMatch(/^(Excès de confiance|Lucide|Trop modeste)\. Tu plaidais 6 étoiles, verdict : \d\.$/);
-    expect(fresh.indexOf("plea-strip")).toBeLessThan(fresh.indexOf('class="result-stage"'));
-    // Sans film tout juste vu, ou pour un visiteur : rien au-dessus de la fiche.
-    expect(renderResult(mine("PleaCard002"), { owner: true, token: "tok", plea: 6 })).not.toContain("plea-strip");
-    expect(renderResult(card({ id: "PleaCard003" }), { owner: false, plea: 6, fresh: true })).not.toContain("plea-strip");
-    const en = renderResult(mine("PleaCard004"), { owner: true, token: "tok", plea: 1, fresh: true, lang: "en-US" });
-    expect(en).toMatch(/You pleaded 1 star, verdict: \d\./);
   });
 
   it("le reste : des lignes repliées, chacune un vrai titre et un chevron", () => {
@@ -302,22 +290,6 @@ describe("après-fiche, vue par qui a fait la fiche (§18.27)", () => {
     expect(cmp).not.toContain("why-sentence");
   });
 
-  it("le jury du propriétaire : une ligne de texte courant, pas un titre", () => {
-    stub("fr-FR");
-    const html = renderToStaticMarkup(createElement(LangProvider, null, createElement(JuryLine, { jury: { guilty: 3, cleared: 1, mine: null } })));
-    expect(html).toBe('<p class="jury-line">Jury\u00a0: 75\u00a0% coupable (4\u00a0votes)</p>');
-    // Avant trois votes, et tant que le d\u00e9compte charge : une invitation \u00e0 partager, pas un vide (parcours 12).
-    const few = (jury: { guilty: number; cleared: number; mine: null } | null, lang = "fr-FR") => {
-      stub(lang);
-      return renderToStaticMarkup(createElement(LangProvider, null, createElement(JuryLine, { jury }))).replace(/\u00a0/g, " ");
-    };
-    expect(few({ guilty: 0, cleared: 0, mine: null })).toBe('<p class="jury-line">Jury : ton r\u00e9seau vote coupable ou relaxe d\u00e8s que tu partages.</p>');
-    expect(few({ guilty: 1, cleared: 1, mine: null })).toContain("ton r\u00e9seau vote");
-    expect(few(null)).toContain("ton r\u00e9seau vote");
-    expect(few(null, "en-US")).toBe('<p class="jury-line">Jury: your network votes guilty or cleared once you share.</p>');
-    // Une phrase, sans point médian.
-    expect(html).not.toContain("·");
-  });
 });
 
 describe("le ciel de la page (§18.29)", () => {
@@ -465,8 +437,8 @@ describe("la lecture du recruteur (§18.37)", () => {
   });
 
   it("la ligne du recruteur, le niveau et les sept tuiles : le premier des plis, après le verdict, la dénonciation et le partage (§18.48, §18.76, §18.83)", () => {
-    const html = renderResult(card({ grid, overall: grid.overall }), { owner: true, token: "tok", plea: 4 });
-    const order = at(html, ['class="result-stage"', 'class="after-head"', 'class="after-block denounce"', 'class="after-block out"', 'add-linkedin', 'class="rest"', 'class="fold rr"', 'class="fold email"']);
+    const html = renderResult(card({ grid, overall: grid.overall }), { owner: true, token: "tok" });
+    const order = at(html, ['class="result-stage"', 'class="after-block denounce"', 'class="after-block out"', 'add-linkedin', 'class="rest"', 'class="fold rr"', 'class="fold email"']);
     expect(ascending(order), JSON.stringify(order)).toBe(true);
     expect(html.match(/class="rr-tile /g)).toHaveLength(7);
     expect(html).toMatch(/<p class="rr-line">[^<]+, [^<]+\. Point fort\u00a0: [^<]+, \d+\/10\./);
@@ -500,8 +472,8 @@ describe("la lecture du recruteur (§18.37)", () => {
 
   it("sous trois étoiles : la source qui manque remonte sous le verdict, avant le partage ; à trois et plus, avant les plis (§18.48, §18.76)", () => {
     const low = githubGridMock("unknownLang", "x")!;
-    const one = renderResult(card({ id: "LowCard0001", grid: low, overall: low.overall }), { owner: true, token: "tok", plea: 3 });
-    const order = at(one, ['class="after-head"', 'class="after-block add-source add-linkedin"', 'class="after-block out"', 'class="fold rr"']);
+    const one = renderResult(card({ id: "LowCard0001", grid: low, overall: low.overall }), { owner: true, token: "tok" });
+    const order = at(one, ['class="result-stage"', 'class="after-block add-source add-linkedin"', 'class="after-block out"', 'class="fold rr"']);
     expect(ascending(order), JSON.stringify(order)).toBe(true);
     const five = renderResult(card({ id: "HighCard001", grid, overall: grid.overall }), { owner: true, token: "tok" });
     const high = at(five, ['class="after-block out"', 'class="after-block add-source add-linkedin"', 'class="rest"', 'class="fold rr"']);
@@ -565,10 +537,10 @@ describe("la lecture du recruteur (§18.37)", () => {
     expect(linkedinFromField("https://github.com/x")).toBeNull();
   });
 
-  it("vue par un visiteur : le pli dans la colonne, sous le jury, le jeu dit dedans", () => {
+  it("vue par un visiteur : le pli dans la colonne, le jeu dit dedans", () => {
     const html = renderResult(card({ grid, overall: grid.overall }), { owner: false });
     const col = html.slice(html.indexOf('class="visitor-col"'));
-    expect(col.indexOf('class="fold rr"')).toBeGreaterThan(col.indexOf('class="jury"'));
+    expect(col.indexOf('class="fold rr"')).toBeGreaterThan(0);
     // Le jeu dit, dans le pli : la dernière ligne avant sa fermeture.
     const fold = html.slice(html.indexOf('class="fold rr"'), html.indexOf("</details></div>", html.indexOf('class="fold rr"')));
     expect(fold).toContain("Pas une décision d&#x27;embauche");
@@ -593,14 +565,14 @@ describe("ligne repliée", () => {
 describe("qui reçoit sa fiche : sa note d'abord, puis la vérifier soi-même (§18.104)", () => {
   // Dénoncée par son lien LinkedIn : « C'est bien moi » (§18.118) ; sans connexion LinkedIn, la refait depuis ce lien.
   const denounced = () => card({ id: "DenCard0001", login: undefined, name: "Maxime Bernard", linkedinUrl: "https://www.linkedin.com/in/maxime-bernard" });
-  const kase = { denounced: true, by: "leamd", jury: null } as unknown as ResultProps["kase"];
+  const kase = { denounced: true, by: "leamd" } as unknown as ResultProps["kase"];
   const mine = { id: "MyCard00001", login: "nour-rs", overall: 83 };
   // Le rose avant « À ton tour » (son formulaire, en fin de page sur téléphone, a le sien).
   const pinks = (html: string) => [...html.slice(0, html.indexOf('id="you"') >>> 0).matchAll(/<(?:button|a)[^>]*class="(?:pill pill-big|pill denounced-me|btn-primary)[^"]*"[^>]*>(?:<svg[^]*?<\/svg>)?(?:<span>)?([^<]*)</g)].map((m) => m[1]);
 
   it("sans fiche dans ce navigateur : la fiche, puis « C'est bien moi », en grand, seul rose ; rien à envoyer", () => {
     const html = renderResult(denounced(), { owner: false, kase }).replace(/&#x27;/g, "'");
-    expect(ascending(at(html, ['class="result-stage"', 'class="denounced', ">C'est bien moi<", 'class="jury"']))).toBe(true);
+    expect(ascending(at(html, ['class="result-stage"', 'class="denounced', ">C'est bien moi<", 'class="rest"']))).toBe(true);
     expect(pinks(html)).toEqual(["C'est bien moi"]);
     expect(html).not.toContain("Lui envoyer ma note");
   });
@@ -613,10 +585,10 @@ describe("qui reçoit sa fiche : sa note d'abord, puis la vérifier soi-même (�
     expect(html).toMatch(/class="you duel"[^]*83\s% contre/);
   });
 
-  it("qui a sa fiche, sur celle d'un autre : aucun rose, l'envoi en contour sous la fiche et le jury", () => {
+  it("qui a sa fiche, sur celle d'un autre : aucun rose, l'envoi en contour sous la fiche et les plis", () => {
     const html = renderResult(card({ id: "OtherCard01" }), { owner: false, mine }).replace(/&#x27;/g, "'");
     expect(pinks(html)).toEqual([]);
     expect(html).toContain('<button type="button" class="pill">Lui envoyer ma note</button>');
-    expect(ascending(at(html, ['class="result-stage"', 'class="jury"', 'class="you duel"']))).toBe(true);
+    expect(ascending(at(html, ['class="result-stage"', 'class="rest"', 'class="you duel"']))).toBe(true);
   });
 });
