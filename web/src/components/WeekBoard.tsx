@@ -1,8 +1,8 @@
-// Top de la semaine sur l'accueil (§18.22, §18.48) : jusqu'à dix fiches de la
-// semaine, une ligne chacune, sous l'étiquette « Top 10 » : ce qu'on voit est ce
-// qu'elle dit (Jacques, 20 nov. 2026). Semaine vide : rien. Mat, sans dégradé :
+// Top du mois sur l'accueil (§18.22, §18.48, §18.128) : jusqu'à dix fiches du
+// mois, une ligne chacune, sous l'étiquette « Top 10 » : ce qu'on voit est ce
+// qu'elle dit (Jacques, 20 nov. 2026). Mois vide : rien. Mat, sans dégradé :
 // celui de l'écran est la fiche.
-// Le tableau porte l'ancre « semaine » ; la ligne de la fiche en mémoire y est mise en évidence.
+// Le tableau garde l'ancre « semaine » (les liens déjà partagés) ; la ligne de la fiche en mémoire y est mise en évidence.
 // Plus de dix classés : « Voir tout le classement (27) » ouvre la suite sur place (§18.126).
 import { useEffect, useRef, useState } from "react";
 import { personLabel } from "../../../shared/boardPerson";
@@ -28,7 +28,7 @@ export function BoardScore({ n }: { n: number }) {
     </span>
   );
 }
-/** L'ancre du tableau : le rang de la semaine d'une fiche y mène (« /#semaine »). */
+/** L'ancre du tableau : le rang du mois d'une fiche y mène (« /#semaine »). */
 export const WEEK_ANCHOR = "semaine";
 
 /** L'heure, relue chaque minute, pour le compte à rebours. */
@@ -90,7 +90,7 @@ export function WeekBoard({ onPlay }: { onPlay: () => void }) {
   const [top, setTop] = useState<WeekTop | null | undefined>(undefined);
   const now = useMinute();
 
-  // Chargé à l'ouverture, puis de nouveau quand la semaine tourne.
+  // Chargé à l'ouverture, puis de nouveau quand le mois tourne.
   const ended = !!top && now >= top.endsAt;
   useEffect(() => {
     let alive = true;
@@ -111,7 +111,7 @@ export function WeekBoard({ onPlay }: { onPlay: () => void }) {
   return <WeekBoardView top={top} now={now} onPlay={onPlay} mine={mine} />;
 }
 
-/** La suite de la semaine, lue à la demande (§18.126). */
+/** La suite du mois, lue à la demande (§18.126). */
 const loadTop = (offset: number, limit: number) => api.getTopPage(offset, limit).then((p) => p && { total: p.total, rows: p.entries });
 
 /**
@@ -133,7 +133,7 @@ function TopMore({ top, mine, initial }: { top: WeekTop; mine?: MyCard | null; i
   );
 }
 
-/** Le tableau d'une semaine connue, sans appel au serveur tant que la suite n'est pas demandée. */
+/** Le tableau d'un mois connu, sans appel au serveur tant que la suite n'est pas demandée. */
 export function WeekBoardView({ top, now, mine, rest }: { top: WeekTop; now: number; onPlay: () => void; mine?: MyCard | null; rest?: TopEntry[] }) {
   const { t } = useT();
   const tt = t.home.top;
@@ -147,7 +147,7 @@ export function WeekBoardView({ top, now, mine, rest }: { top: WeekTop; now: num
   const d = Math.floor(left / 86_400_000);
   const h = Math.floor((left % 86_400_000) / 3_600_000);
   const m = Math.floor((left % 3_600_000) / 60_000);
-  // Les dix premières, d'un seul bloc. Semaine sans fiche : rien, le tableau vient avec la première (Jacques, 20 nov.).
+  // Les dix premières, d'un seul bloc. Mois sans fiche : rien, le tableau vient avec la première (Jacques, 20 nov.).
   const rows = top.entries.slice(0, SIZE);
   if (rows.length === 0) return null;
 
@@ -168,7 +168,7 @@ export function WeekBoardView({ top, now, mine, rest }: { top: WeekTop; now: num
           </ol>
         </div>
       )}
-      {/* Une autre semaine : la liste ouverte se referme. */}
+      {/* Un autre mois : la liste ouverte se referme. */}
       {top.total > SIZE && rows.length === SIZE && <TopMore key={top.weekStart} top={top} mine={mine} initial={rest} />}
     </section>
   );

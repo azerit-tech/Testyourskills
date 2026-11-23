@@ -530,13 +530,13 @@ describe("la lecture du recruteur (§18.37)", () => {
     expect(line(8, true)).toContain("8e");
     // Le lancement : « 8e » sur huit, c'est la dernière place ; rien.
     expect(line(8, false, 8)).toBe("");
-    expect(line(4, false, 8)).toContain("4e cette semaine");
+    expect(line(4, false, 8)).toContain("4e ce mois-ci");
     expect(line(9, false, 12, "fr-FR", true)).toBe("");
-    // Le top 5 dit son rang, comme le texte partagé (« n° 1 cette semaine »).
-    expect(line(1, false)).toBe('<p class="week-rank">N° 1 cette semaine : défends ta place jusqu&#x27;à dimanche</p>');
-    expect(line(3, false)).toContain("3e cette semaine : défends ta place");
-    expect(line(1, false, 40, "en-US")).toContain("#1 this week: hold your spot until Sunday");
-    expect(DICTS.fr.result.week.share(1).replace(/ /g, " ")).toBe("n° 1 cette semaine");
+    // Le top 5 dit son rang, comme le texte partagé (« n° 1 ce mois-ci »).
+    expect(line(1, false)).toBe('<p class="week-rank">N° 1 ce mois-ci : défends ta place jusqu&#x27;à la fin du mois</p>');
+    expect(line(3, false)).toContain("3e ce mois-ci : défends ta place");
+    expect(line(1, false, 40, "en-US")).toContain("#1 this month: hold your spot until the end of the month");
+    expect(DICTS.fr.result.week.share(1).replace(/ /g, " ")).toBe("n° 1 ce mois-ci");
   });
 
   it("le rang : du texte au-dessus du bouton, jamais un lien ; l'écart seulement s'il encourage (parcours 14 et 22, textes 18)", () => {
@@ -545,10 +545,10 @@ describe("la lecture du recruteur (§18.37)", () => {
       const w = { week: 46, rank, total: 40, gapToTop5: gap, inTop5: false, closed: false };
       return renderToStaticMarkup(createElement(LangProvider, null, createElement(WeekLine, { week: w, low }))).replace(/ /g, " ");
     };
-    expect(at(8, 6, false)).toBe('<p class="week-rank">8e sur 40 cette semaine, à 6 points du top 5</p>');
+    expect(at(8, 6, false)).toBe('<p class="week-rank">8e sur 40 ce mois-ci, à 6 points du top 5</p>');
     // Plus de 10 points, ou sous trois étoiles : le rang seul.
-    expect(at(8, 49, false)).toBe('<p class="week-rank">8e sur 40 cette semaine</p>');
-    expect(at(8, 4, true)).toBe('<p class="week-rank">8e sur 40 cette semaine</p>');
+    expect(at(8, 49, false)).toBe('<p class="week-rank">8e sur 40 ce mois-ci</p>');
+    expect(at(8, 4, true)).toBe('<p class="week-rank">8e sur 40 ce mois-ci</p>');
     expect(page).not.toMatch(/<a className="week-rank"/);
   });
 

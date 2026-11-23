@@ -339,11 +339,11 @@ const fr = {
         h: "Les bandes",
         blocks: [
           [
-            "Ta fiche entre d'office dans la bande de l'école et de la boîte lues sur ton profil, une de chaque au plus, et au top de la semaine. Une fiche faite par quelqu'un d'autre pour te dénoncer aussi : elle ne lit que des profils publics. Revendique-la pour la faire tienne, en changer la bande ou la masquer.",
+            "Ta fiche entre d'office dans la bande de l'école et de la boîte lues sur ton profil, une de chaque au plus, et au top du mois. Une fiche faite par quelqu'un d'autre pour te dénoncer aussi : elle ne lit que des profils publics. Revendique-la pour la faire tienne, en changer la bande ou la masquer.",
             "On garde cette entrée avec l'identifiant de la fiche et ses étoiles ; si tu sors, on retient ta sortie pour ne pas t'y remettre.",
             "L'école lue sur ton profil ne s'affiche pas sur ta fiche : elle ne sert qu'à ta bande.",
             "Le nom et la photo de ta fiche s'affichent sous ton école et ta boîte, au classement de l'accueil, avec un lien vers ta fiche ; ils en partent quand tu sors de la bande ou que tu supprimes ta fiche.",
-            "Ta fiche, sur sa page, au classement et au top de la semaine, porte les logos de tes profils publics : ton GitHub et ton LinkedIn. Jamais ton email.",
+            "Ta fiche, sur sa page, au classement et au top du mois, porte les logos de tes profils publics : ton GitHub et ton LinkedIn. Jamais ton email.",
             "Pour changer ou en sortir : « Changer » ou « Sortir », sous ta fiche. Supprimer ta fiche t'en retire aussi, la masquer la retire du compte.",
           ],
         ],
@@ -544,11 +544,11 @@ const en: PagesDict = {
         h: "Crews",
         blocks: [
           [
-            "Your sheet joins the crew of the school and of the company read from your profile, one of each at most, and the weekly top. So does a sheet someone else made to tip you off: it only reads public profiles. Claim it to make it yours, change its crew or hide it.",
+            "Your sheet joins the crew of the school and of the company read from your profile, one of each at most, and the monthly top. So does a sheet someone else made to tip you off: it only reads public profiles. Claim it to make it yours, change its crew or hide it.",
             "We keep that entry with the sheet's ID and its stars; if you leave, we remember it so you aren't put back in.",
             "The school read from your profile isn't shown on your sheet: it only serves your crew.",
             "Your sheet's name and photo show under your school and your company, in the home ranking, with a link to your sheet; they go when you leave the crew or delete your sheet.",
-            "Your sheet, on its page, in the ranking and in the weekly top, carries the logos of your public profiles: your GitHub and your LinkedIn. Never your email.",
+            "Your sheet, on its page, in the ranking and in the monthly top, carries the logos of your public profiles: your GitHub and your LinkedIn. Never your email.",
             "To switch or leave: “Switch” or “Leave”, under your sheet. Deleting your sheet removes you too, hiding it takes it out of the count.",
           ],
         ],

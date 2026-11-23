@@ -159,7 +159,7 @@ CREATE TABLE IF NOT EXISTS cards (
 CREATE INDEX IF NOT EXISTS cards_login ON cards(login, created_at) WHERE parent_id IS NULL;
 CREATE INDEX IF NOT EXISTS cards_parent ON cards(parent_id);
 CREATE INDEX IF NOT EXISTS cards_expires ON cards(expires_at);
--- Top de la semaine (top.ts) : les fiches nées entre deux dates.
+-- Top du mois (top.ts) : les fiches nées entre deux dates.
 CREATE INDEX IF NOT EXISTS cards_created ON cards(created_at);
 
 CREATE TABLE IF NOT EXISTS events (
@@ -384,7 +384,7 @@ export class Store {
     tx(rows);
     for (const r of rows) this.pendingRefs.delete(r.id);
     for (const r of rows) this.supersede(r);
-    // Le classement de la semaine gardé en mémoire (top.ts) : la fiche née doit y lire son rang tout de suite.
+    // Le classement du mois gardé en mémoire (top.ts) : la fiche née doit y lire son rang tout de suite.
     forgetWeekRanks(this.db);
   }
 

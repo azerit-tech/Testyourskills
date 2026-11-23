@@ -3,7 +3,7 @@
 import { createContext, createElement, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import type { CriterionCode, Lang, Position, StatCode } from "../../shared/types";
-import { showsTotal } from "../../shared/week";
+import { deMois, monthName, monthTitle, showsTotal } from "../../shared/week";
 import { starsLine } from "../../shared/stars";
 import { starsFor } from "../../shared/types";
 import { frTypoDeep } from "../../shared/typo";
@@ -148,19 +148,19 @@ const fr = frTypoDeep({
       you: "Et toi ?",
       cta: "Faire ma fiche",
     },
-    /* Top de la semaine (§18.22) */
+    /* Top du mois (§18.22, §18.128) : `month` va de 1 (janvier) à 12. */
     top: {
-      title: "Top de la semaine",
+      title: "Top du mois",
       /* Le nombre de fiches à partir de 20 seulement (§18.27). */
-      meta: (week: number, n: number, left: string) => [`Semaine ${week}`, showsTotal(n) && `${n} fiches`, `fin dans ${left}`].filter(Boolean).join(", "),
+      meta: (month: number, n: number, left: string) => [monthTitle(month, "fr"), showsTotal(n) && `${n} fiches`, `fin dans ${left}`].filter(Boolean).join(", "),
       /* Jamais une unité à zéro : « 1 j », « 5 h », « 1 j 4 h ». */
       left: (d: number, h: number, m: number) => (d > 0 ? (h > 0 ? `${d} j ${h} h` : `${d} j`) : h > 0 ? (m > 0 ? `${h} h ${m} min` : `${h} h`) : `${m} min`),
       cut: "Top 5",
-      /* L'étiquette du top de la semaine : il montre jusqu'à dix lignes. */
+      /* L'étiquette du top du mois : il montre jusqu'à dix lignes. */
       tag: "Top 10",
-      /* Semaine vide : un seul bloc d'invitation ; top 5 incomplet : une seule ligne pour les places libres (§18.48). */
+      /* Mois vide : un seul bloc d'invitation ; top 5 incomplet : une seule ligne pour les places libres (§18.48). */
       emptyTitle: "La place n°\u00a01 est libre",
-      emptyText: "La première fiche de la semaine la prend.",
+      emptyText: "La première fiche du mois la prend.",
       freeRange: (from: number, to: number) => (from === to ? `Place ${from} libre` : `Places ${from} à ${to} libres`),
       take: (n: number): string => (n === 1 ? "Prends-la" : "Prends-en une"),
       free: "Place libre",
@@ -182,7 +182,7 @@ const fr = frTypoDeep({
     errTooManyPages: (n: number) => `${n}\u00a0pages\u00a0: la limite est 10. Un CV tient en une ou deux.`,
     errNetwork: "Le serveur ne répond pas. Réessaie dans un instant.",
     /** Limite atteinte (§18.48) : sous l'erreur, une autre porte que le bouton qui échouerait. */
-    meanwhileTop: "En attendant : le top de la semaine",
+    meanwhileTop: "En attendant : le top du mois",
     meanwhileRanking: "En attendant : le classement",
   },
   stats: {
@@ -410,17 +410,18 @@ const fr = frTypoDeep({
         cta: "Fais la tienne :",
       },
     },
-    /* Rang de la semaine (§18.22), en tête de l'après-fiche. « n° 1 » plutôt que « 1er » : rien ne s'accorde. */
+    /* Rang du mois (§18.22, §18.128), en tête de l'après-fiche. « n° 1 » plutôt que « 1er » : rien ne s'accorde. */
     week: {
       line: (rank: number, total: number, gap: number) =>
-        `${rank}e${showsTotal(total) ? ` sur ${total}` : ""} cette semaine, à ${gap} ${gap > 1 ? "points" : "point"} du top 5`,
+        `${rank}e${showsTotal(total) ? ` sur ${total}` : ""} ce mois-ci, à ${gap} ${gap > 1 ? "points" : "point"} du top 5`,
     /** L'écart ne se dit que s'il encourage (10 points au plus, trois étoiles au moins) : sinon le rang seul. */
-    rank: (rank: number, total: number) => `${rank}e${showsTotal(total) ? ` sur ${total}` : ""} cette semaine`,
-      /** Le rang du top 5, écrit comme dans le texte partagé (« n° 1 cette semaine »). */
-      top5: (rank: number) => `${rank === 1 ? "N° 1" : `${rank}e`} cette semaine : défends ta place jusqu'à dimanche`,
-      closedLine: (rank: number, total: number, week: number) => `${rank}e${showsTotal(total) ? ` sur ${total}` : ""}, semaine ${week}`,
-      closedTop5: (week: number) => `Top 5 de la semaine ${week}`,
-      share: (rank: number) => `${rank === 1 ? "n° 1" : `${rank}e`} cette semaine`,
+    rank: (rank: number, total: number) => `${rank}e${showsTotal(total) ? ` sur ${total}` : ""} ce mois-ci`,
+      /** Le rang du top 5, écrit comme dans le texte partagé (« n° 1 ce mois-ci »). */
+      top5: (rank: number) => `${rank === 1 ? "N° 1" : `${rank}e`} ce mois-ci : défends ta place jusqu'à la fin du mois`,
+      /** Mois fini, `month` de 1 à 12 : « 8e sur 143 en octobre ». */
+      closedLine: (rank: number, total: number, month: number) => `${rank}e${showsTotal(total) ? ` sur ${total}` : ""} en ${monthName(month, "fr")}`,
+      closedTop5: (month: number) => `Top 5 ${deMois(month)}`,
+      share: (rank: number) => `${rank === 1 ? "n° 1" : `${rank}e`} ce mois-ci`,
     },
     linkedin: {
       btn: "Mettre ma photo LinkedIn",
@@ -1055,13 +1056,13 @@ const en: Dict = {
       cta: "Get my rap sheet",
     },
     top: {
-      title: "Top of the week",
-      meta: (week, n, left) => [`Week ${week}`, showsTotal(n) && `${n} sheets`, `ends in ${left}`].filter(Boolean).join(", "),
+      title: "Top of the month",
+      meta: (month, n, left) => [monthTitle(month, "en"), showsTotal(n) && `${n} sheets`, `ends in ${left}`].filter(Boolean).join(", "),
       left: (d, h, m) => (d > 0 ? (h > 0 ? `${d}d ${h}h` : d === 1 ? "1 day" : `${d} days`) : h > 0 ? (m > 0 ? `${h}h ${m}min` : `${h}h`) : `${m}min`),
       cut: "Top 5",
       tag: "Top 10",
       emptyTitle: "Spot #1 is open",
-      emptyText: "This week's first sheet takes it.",
+      emptyText: "This month's first sheet takes it.",
       freeRange: (from, to) => (from === to ? `Spot ${from} is open` : `Spots ${from} to ${to} are open`),
       take: (n) => (n === 1 ? "Take it" : "Take one"),
       free: "Open spot",
@@ -1080,7 +1081,7 @@ const en: Dict = {
     errTooLarge: (mb) => `${mb} MB file: the limit is 5 MB. A résumé, not a thesis.`,
     errTooManyPages: (n) => `${n} pages: the limit is 10. A résumé fits on one or two.`,
     errNetwork: "The server isn't answering. Try again in a moment.",
-    meanwhileTop: "Meanwhile: this week's top",
+    meanwhileTop: "Meanwhile: this month's top",
     meanwhileRanking: "Meanwhile: the ranking",
   },
   stats: {
@@ -1261,12 +1262,12 @@ const en: Dict = {
       },
     },
     week: {
-      line: (rank, total, gap) => `#${rank}${showsTotal(total) ? ` of ${total}` : ""} this week, ${gap} ${gap === 1 ? "point" : "points"} from the top 5`,
-      rank: (rank, total) => `#${rank}${showsTotal(total) ? ` of ${total}` : ""} this week`,
-      top5: (rank) => `#${rank} this week: hold your spot until Sunday`,
-      closedLine: (rank, total, week) => `#${rank}${showsTotal(total) ? ` of ${total}` : ""}, week ${week}`,
-      closedTop5: (week) => `Top 5 of week ${week}`,
-      share: (rank) => `#${rank} this week`,
+      line: (rank, total, gap) => `#${rank}${showsTotal(total) ? ` of ${total}` : ""} this month, ${gap} ${gap === 1 ? "point" : "points"} from the top 5`,
+      rank: (rank, total) => `#${rank}${showsTotal(total) ? ` of ${total}` : ""} this month`,
+      top5: (rank) => `#${rank} this month: hold your spot until the end of the month`,
+      closedLine: (rank, total, month) => `#${rank}${showsTotal(total) ? ` of ${total}` : ""} in ${monthName(month, "en")}`,
+      closedTop5: (month) => `Top 5 of ${monthName(month, "en")}`,
+      share: (rank) => `#${rank} this month`,
     },
     linkedin: {
       btn: "Use my LinkedIn photo",

@@ -138,7 +138,7 @@ const SHAPES: Record<ThemeKey, Shape> = {
   s6: { label: { fr: "Priorité absolue", en: "Top priority" }, palm: true, sky: "night", rim: true },
   wonderkid: { label: { fr: "Débarque en ville", en: "New in town" }, palm: true, horizon: { scale: 0.7, palms: 1 }, badge: { bg: PALETTE.lime, ink: PALETTE.ink0 } },
   flashback: { label: { fr: "Affaire classée", en: "Cold case" }, palm: true, horizon: { scale: 0.7, palms: 1 }, gray: true, badge: { bg: PALETTE.peach, ink: PALETTE.ink0 } },
-  totw: { label: { fr: "Top 5 de la semaine", en: "This week's top 5" }, palm: true, horizon: { scale: 1, palms: 3 }, badge: { bg: PALETTE.cream, ink: PALETTE.ink0 } },
+  totw: { label: { fr: "Top 5 du mois", en: "This month's top 5" }, palm: true, horizon: { scale: 1, palms: 3 }, badge: { bg: PALETTE.cream, ink: PALETTE.ink0 } },
 };
 
 /** Le thème d'un niveau (ou d'une spéciale) dans un coloris. */

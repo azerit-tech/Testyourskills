@@ -6,7 +6,7 @@
 // - fiche d'un pseudo GitHub, revendication active (§18.1) : seulement la
 //   personne connectée comme propriétaire de ce pseudo. Le jeton de la fiche ne
 //   suffit pas : il est à qui a tapé le pseudo en premier, et sa photo serait
-//   vue de tous ceux à qui le cache ressert la fiche, et au top de la semaine ;
+//   vue de tous ceux à qui le cache ressert la fiche, et au top du mois ;
 // - sinon (fiche sans pseudo, ou revendication non configurée) : le créateur de
 //   la fiche, porteur de son jeton de suppression.
 //

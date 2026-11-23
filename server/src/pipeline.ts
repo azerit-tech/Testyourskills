@@ -1050,7 +1050,7 @@ export class Pipeline {
       login: login!,
       kind: "card",
       data: card,
-      // Les données brutes de la pièce, sans note : les faits (le top de la semaine y lit les
+      // Les données brutes de la pièce, sans note : les faits (le top du mois y lit les
       // abonnés, §18.22) et la lecture du code, pour recalculer le dossier quand une pièce arrive.
       facts: gh!.facts,
       ai: gh!.ai,

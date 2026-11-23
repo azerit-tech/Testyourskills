@@ -1,5 +1,5 @@
 // La personne d'une ligne de classement (SPEC §18.88) : les fiches d'une bande et le
-// top de la semaine montrent la vraie personne, comme sa fiche. Pur.
+// top du mois montrent la vraie personne, comme sa fiche. Pur.
 //
 // - Son nom : celui de la fiche, court, le prénom et l'initiale du nom (« Enzo L. »,
 //   §18.127, shared/shortName.ts) : le nom complet ne quitte pas le serveur pour un

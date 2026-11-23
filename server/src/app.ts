@@ -221,7 +221,7 @@ function tokenMatches(given: string | undefined, expected: string): boolean {
 const OG_FILE_RE = /^([A-Za-z0-9]{6,32})(-portrait|-story|-card)?\.png$/;
 const OG_SUFFIXES = ["", "-portrait", "-story", "-card"];
 const OG_FORMATS: Record<string, RenderInput["format"]> = { "-portrait": "portrait", "-story": "story", "-card": "card" };
-/** Fichier sur disque d'une image qui porte la spéciale « Top 5 de la semaine » (§18.22) : une autre clé de cache. */
+/** Fichier sur disque d'une image qui porte la spéciale « Top 5 du mois » (§18.22) : une autre clé de cache. */
 const TOTW_TAG = "-totw";
 /** Fiche faite par un tiers, pas encore revendiquée : son image (sans grille, scellée si le dossier
  *  est vide) a son propre fichier de cache ; revendiquée, la fiche lit l'autre et l'ancien ne sert plus. */
@@ -653,7 +653,7 @@ export function createApp(opts: AppOptions) {
     return c.body(new Uint8Array(await entry.png), 200, { "Content-Type": "image/png", "Cache-Control": "public, max-age=3600" });
   };
 
-  // GET /api/top : le haut du classement de la semaine (§18.22). Rien de privé,
+  // GET /api/top : le haut du classement du mois (§18.22). Rien de privé,
   // ce qui est déjà sur les fiches publiques. Marche aussi sans crédit IA.
   // `?offset=10&limit=50` : la suite, pour « Voir tout le classement » (§18.126) ; 100 lignes au plus.
   app.get("/api/top", (c) => {
@@ -994,7 +994,7 @@ export function createApp(opts: AppOptions) {
     const live = pipeline.jobState(id);
     if (live) return c.json(live);
     if (!row) return c.json(errorBody("internal", MESSAGES.not_found), 404);
-    // Spéciale « Top 5 de la semaine » et rang de la semaine, relus à chaque fois (§18.22).
+    // Spéciale « Top 5 du mois » et rang du mois, relus à chaque fois (§18.22).
     const { data, week } = withWeekSpecial(store.db, stripToken(row.data));
     const rank = week ? { week } : {};
     // `mine` : la session est propriétaire du login de la fiche ; le front lui ouvre l'email, la photo et la suppression sans jeton.
@@ -1129,7 +1129,7 @@ export function createApp(opts: AppOptions) {
     // Fiche masquée : aucune image, pour personne (les robots n'ont pas de session).
     if (!row || store.isHidden(store.loginOf(row))) return c.notFound();
 
-    // La spéciale de la semaine change l'image : elle entre dans la clé du cache disque (§18.22).
+    // La spéciale du mois change l'image : elle entre dans la clé du cache disque (§18.22).
     const week = withWeekSpecial(store.db, row.data);
     const tag = week.totw ? TOTW_TAG : "";
     // Faite par un tiers, non revendiquée : la vue publique, dans un fichier à part (shared/publicView.ts).
@@ -1169,7 +1169,7 @@ export function createApp(opts: AppOptions) {
       "Content-Type": "image/png",
       // L'image d'une fiche porte un nom, comme sa page : hors des index (seo.ts).
       "X-Robots-Tag": NOINDEX,
-      // Spéciale portée pendant la semaine en cours : elle peut encore partir, cache court.
+      // Spéciale portée pendant le mois en cours : elle peut encore partir, cache court.
       // Sinon cache long ; si elle arrive plus tard, og:image change d'adresse (?s=totw).
       // Faite par un tiers : l'image change à la revendication, cache court aussi.
       "Cache-Control": (week.totw && week.live) || tp ? "public, max-age=300" : "public, max-age=31536000, immutable",
