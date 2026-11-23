@@ -947,7 +947,7 @@ Après chaque fusion, on vérifie la grille suivante. On corrige ce qui manque, 
 
 *Décidé par Jacques, construit par Claude. Il fait revenir : on voit le haut du tableau, on veut y grimper.*
 
-- **La semaine** va du lundi 00:00 UTC au dimanche 23:59 UTC.
+- **La semaine** va du lundi 00:00 UTC au dimanche 23:59 UTC. *Depuis le 23 novembre 2026, le classement court sur le mois civil UTC, du 1er au dernier jour : voir §18.128, qui remplace la semaine partout dans ce paragraphe.*
 - **Qui entre** : les fiches GitHub de la semaine, fiche seule ou carte GitHub d'une comparaison. Pas les fiches CV, pas les fiches sorties sans lecture IA, pas les fiches expirées ou supprimées, pas les logins masqués par leur propriétaire.
 - **Hors concours** : les comptes de plus de 5 000 abonnés GitHub. Les célébrités gardent leur fiche, elles ne bouchent pas le haut du tableau. La règle est fixe, donc explicable. La carte GitHub d'une comparaison garde désormais ses faits pour qu'on y lise les abonnés.
 - **Une ligne par login** : sa meilleure note de la semaine. À égalité, la fiche la plus ancienne passe devant.
@@ -3030,3 +3030,13 @@ Le partenaire d'Azerit, adopté par Jacques : « Je ne mettrais pas les liens de
   - Chrome sans tête et muet, 390 × 844, démo.
 
   **Pas vérifié** : la production, un vrai iPhone.
+
+### 18.128 Le classement court sur le mois (23 novembre 2026, Jacques, branche `site/classement-mois`)
+
+Le lundi 23 novembre à 00:00 UTC, la semaine a tourné : le top est tombé de 27 personnes à 3, tout le lancement (jeudi 19 au dimanche 22) a disparu de l'accueil. Jacques : « remet en ligne les profils de la semaine dernière », puis, en ordre ferme : « met le sur un mois ». Ce paragraphe remplace la semaine du §18.22 partout où elle était l'unité du classement.
+
+- **La période** : le mois civil, en UTC, du 1er à 00:00 au dernier jour à 23:59:59. Novembre 2026 va du 1er au 30 : les fiches du lancement y sont toutes. Ensuite décembre, puis janvier 2027. Une seule source : `shared/week.ts` (`periodStart`, `periodEnd`, `periodMonth`), lue par `server/src/top.ts` et par la démo (`web/src/lib/mockTop.ts`). Le front ne calcule aucune borne : il lit `endsAt`.
+- **Ce qui suit le mois** : le top de l'accueil et « Voir tout le classement » (§18.126), le rang après la fiche, la spéciale « Top 5 du mois » (seuil inchangé : 20 classés, le total final pour un mois clos), le texte de partage, le cache court de l'image qui porte la spéciale tant que le mois court. Les ligues de bandes et les primes n'avaient pas de semaine : rien ne change pour elles. Le tableau de `npm run weekly` reste par semaine ISO : c'est une mesure, pas le classement.
+- **API** : les champs gardent leur nom (`WeekTop.weekStart`, `endsAt`, `week` ; `WeekRank.week`, `closed`) ; `week` porte désormais le mois, de 1 (janvier) à 12. `weekStart` est le 1er du mois, `endsAt` le 1er du mois suivant. L'ancre `/#semaine` reste, pour les liens déjà partagés.
+- **Les mots** (FR, EN) : « Top du mois » / « Top of the month » ; « Novembre, 27 fiches, fin dans 7 j 3 h » / « November, 27 sheets, ends in 7d 3h » ; « 7e sur 143 ce mois-ci, à 3 points du top 5 » / « #7 of 143 this month » ; « N° 1 ce mois-ci : défends ta place jusqu'à la fin du mois » / « hold your spot until the end of the month » ; mois fini : « 8e sur 143 en octobre », « Top 5 d'octobre » / « #8 of 143 in October », « Top 5 of October » ; la spéciale : « Top 5 du mois » / « This month's top 5 » ; partage : « 7e ce mois-ci ».
+- **Vérifié** : `top.test.ts` aux bornes (31 octobre 23:59:59, 1er novembre, 19 et 22 novembre, lundi 23 novembre, 30 novembre 23:59:59, 1er décembre, 7 décembre, 31 décembre → 1er janvier), le rang d'une fiche du 19 novembre en direct jusqu'au 30 et clos le 1er décembre, son image en cache court jusque-là ; `weekBoard.test.ts`, `homeBoards.test.ts`, `cardPage.test.ts` pour les textes ; la suite entière, `tsc -b`, `vite build`.
