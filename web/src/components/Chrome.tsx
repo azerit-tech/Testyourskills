@@ -151,7 +151,7 @@ export function Footer() {
     <footer className="footer">
       <div className="footer-in">
         <p className="footer-sign">
-          <AzeritMark size={16} className="footer-mark" />
+          <AzeritMark size={18} className="footer-mark" />
           <span>
             {t.chrome.sign}{" "}
             <a className="footer-azerit" href="https://azerit.tech" target="_blank" rel="noopener" onClick={() => api.track("cta_azerit_clicked", null, { from: "footer" })}>

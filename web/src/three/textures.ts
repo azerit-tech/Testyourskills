@@ -2,6 +2,7 @@
 // dos du pack, dos de carte. Générées au vol ; les assets chargés
 // (stade, matières, joueur, police) sont dans assets.ts.
 import * as THREE from "three";
+import { AZERIT_LOGO_RATIO, AZERIT_LOGO_URI } from "../../../shared/card/azeritLogo";
 import { CARD_H, CARD_PATH, CARD_W } from "../../../shared/card/geometry";
 
 const DISPLAY = "'Barlow Condensed', 'Arial Narrow', sans-serif";
@@ -18,6 +19,43 @@ function srgb(t: THREE.Texture): THREE.Texture {
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 4;
   return t;
+}
+
+/** Une seule image de la mascotte pour toutes les textures, décodée une fois. */
+let logoImg: HTMLImageElement | null = null;
+function logo(): HTMLImageElement {
+  if (!logoImg) {
+    logoImg = new Image();
+    logoImg.src = AZERIT_LOGO_URI;
+  }
+  return logoImg;
+}
+
+/**
+ * La mascotte d'Azerit centrée en (cx, cy), haute de `h`, dans le repère courant de `g`.
+ * Si l'image n'est pas encore décodée, elle est posée dès qu'elle l'est et la texture
+ * est renvoyée à la carte graphique.
+ */
+function drawLogo(g: CanvasRenderingContext2D, tex: () => THREE.Texture | null, cx: number, cy: number, h: number): void {
+  const img = logo();
+  const w = h * AZERIT_LOGO_RATIO;
+  const m = g.getTransform();
+  const paint = () => {
+    g.save();
+    g.setTransform(m);
+    g.drawImage(img, cx - w / 2, cy - h / 2, w, h);
+    g.restore();
+  };
+  if (img.complete && img.naturalWidth) return paint();
+  img.addEventListener(
+    "load",
+    () => {
+      paint();
+      const t = tex();
+      if (t) t.needsUpdate = true;
+    },
+    { once: true },
+  );
 }
 
 /** Étoile à quatre branches pour les étincelles. */
@@ -44,7 +82,7 @@ export function makeSparkTexture(size = 64): THREE.CanvasTexture {
   return new THREE.CanvasTexture(c);
 }
 
-/** Dos de carte : sombre, gemme, mot-symbole, liseré à la couleur du tier. */
+/** Dos de carte : sombre, mascotte, mot-symbole, liseré à la couleur du tier. */
 export function makeCardBackTexture(accent: string): THREE.CanvasTexture {
   const W = CARD_W * 2;
   const H = CARD_H * 2;
@@ -73,33 +111,18 @@ export function makeCardBackTexture(accent: string): THREE.CanvasTexture {
     g.stroke();
   }
   g.globalAlpha = 1;
-  // la gemme Azerit
-  g.translate(CARD_W / 2 - 52 * 0.6, CARD_H * 0.42 - 60 * 0.6);
-  g.scale(0.6, 0.6);
-  g.fillStyle = "#9fd8c2";
-  g.beginPath();
-  g.moveTo(52, 8);
-  g.lineTo(14, 50);
-  g.lineTo(37, 102);
-  g.closePath();
-  g.fill();
-  g.fillStyle = "#4f8fa0";
-  g.beginPath();
-  g.moveTo(63, 10);
-  g.lineTo(92, 42);
-  g.lineTo(85, 80);
-  g.lineTo(47, 112);
-  g.closePath();
-  g.fill();
+  // la mascotte Azerit
+  drawLogo(g, () => tex, CARD_W / 2, CARD_H * 0.42, 74);
   g.restore();
   g.fillStyle = "rgba(255,255,255,0.55)";
   g.font = `800 26px ${DISPLAY}`;
   g.textAlign = "center";
   g.fillText("TESTYOURSKILLS", CARD_W / 2, CARD_H - 72);
-  return srgb(new THREE.CanvasTexture(c)) as THREE.CanvasTexture;
+  const tex = srgb(new THREE.CanvasTexture(c)) as THREE.CanvasTexture;
+  return tex;
 }
 
-/** Face du pack : sachet sombre, liseré, gemme, « DOSSIER » (« CASE FILE » en anglais). */
+/** Face du pack : sachet sombre, liseré, mascotte, « DOSSIER » (« CASE FILE » en anglais). */
 export function makePackFaceTexture(accentA: string, accentB: string, lang: "fr" | "en"): THREE.CanvasTexture {
   const W = 512;
   const H = 768;
@@ -123,7 +146,7 @@ export function makePackFaceTexture(accentA: string, accentB: string, lang: "fr"
   g.lineWidth = 2;
   roundRect(g, 30, 30, W - 60, H - 60, 14);
   g.stroke();
-  // anneau + gemme
+  // anneau + mascotte
   g.save();
   g.translate(W / 2, H * 0.38);
   g.strokeStyle = hexA(accentA, 0.9);
@@ -136,23 +159,7 @@ export function makePackFaceTexture(accentA: string, accentB: string, lang: "fr"
   g.beginPath();
   g.arc(0, 0, 84, 0, Math.PI * 2);
   g.stroke();
-  g.translate(-52 * 0.85, -60 * 0.85);
-  g.scale(0.85, 0.85);
-  g.fillStyle = "#dde27d";
-  g.beginPath();
-  g.moveTo(52, 8);
-  g.lineTo(14, 50);
-  g.lineTo(37, 102);
-  g.closePath();
-  g.fill();
-  g.fillStyle = "#93dbcf";
-  g.beginPath();
-  g.moveTo(63, 10);
-  g.lineTo(92, 42);
-  g.lineTo(85, 80);
-  g.lineTo(47, 112);
-  g.closePath();
-  g.fill();
+  drawLogo(g, () => tex, 0, 0, 112);
   g.restore();
   // textes
   g.textAlign = "center";
@@ -177,7 +184,8 @@ export function makePackFaceTexture(accentA: string, accentB: string, lang: "fr"
   g.fillStyle = "rgba(230,236,242,0.7)";
   g.font = `500 18px ${MONO}`;
   g.fillText(lang === "fr" ? "1 FICHE · JUGÉE PAR BARÈME" : "1 SHEET · JUDGED BY RUBRIC", W / 2, 706);
-  return srgb(new THREE.CanvasTexture(c)) as THREE.CanvasTexture;
+  const tex = srgb(new THREE.CanvasTexture(c)) as THREE.CanvasTexture;
+  return tex;
 }
 
 /** Face arrière du pack : foil sombre uni avec le liseré. */

@@ -883,7 +883,7 @@ Ce qui est retenu :
   - ★★★★★ et ★★★★★★ : un ciel en aplats, immeubles et palmiers.
 - **★★★★★★ seul a un contour éclairé par l'arrière.**
 - **Les spéciales portent une pilule plate.**
-- **La gemme Azerit est en facettes plates.**
+- **La gemme Azerit est en facettes plates.** (Remplacée par la mascotte, §18.130.)
 - **Page partagée :** « Avis de recherche : @X », et en phrase « @X est dans le viseur ».
 
 **La spéciale « Les 5 plus recherchés » devient « Top 5 de la semaine »** (EN « This week's top 5 »). Tous les autres textes qui s'accordent avec la personne sont réécrits en tournure épicène. Claude tranche la liste et l'applique (consigne de Jacques : décider, pas demander). Exemples : « Mainteneur » → « Maintient des projets », « Loup solitaire » → « Sans bande », « Nouveau en ville » → « Débarque en ville », « CTO autoproclamé » → « CTO sur parole », « n suspects avant toi » → « n dossiers devant toi », et en phrase « @X est dans le viseur ».
@@ -1549,7 +1549,7 @@ Neuf lots fusionnés sur `master` : règles du serveur, images de partage, fonda
 **Vitesse et moteurs de recherche**
 - Le HTML porte la marque et un trait d'attente : plus d'écran noir. Chaque page arrive avec ses seuls morceaux, annoncés par le serveur ; les fichiers partent compressés (brotli, sinon gzip), sans dépendance nouvelle. Mesure sur téléphone simulé en 4G lente : premier contenu en 0,9 s au lieu de 4 à 5,8 s.
 - Les fiches (page et images) sont en `noindex` : elles portent un nom. `robots.txt` autorise tout, pour que les aperçus de lien marchent ; `sitemap.xml` ne liste que l'accueil, les bandes, les primes et le règlement quand ils existent, la vie privée.
-- Icônes : la gemme Azerit sur encre (onglet, écran d'accueil du téléphone), manifeste nommé « Azerit ».
+- Icônes : la gemme Azerit sur encre (onglet, écran d'accueil du téléphone), manifeste nommé « Azerit ». (La mascotte depuis le §18.130.)
 - Les polices restent en TTF (compressées à l'envoi) : la conversion en WOFF2 demande un outil absent du Mac, gain attendu d'environ 15 %.
 
 **Accueil**
@@ -3050,3 +3050,12 @@ Jacques : « le délire de donner sa note et tout de rendre coupable via des vot
 - **La ligne du verdict sous la fiche disparaît** (`.after-head`) : la personne fichée passe de la fiche à « Dénonce un complice », puis le partage, la bande, les primes, les plis ; le visiteur, de la fiche aux plis (« Comment c'est noté »), puis « À ton tour ». L'après-fiche n'attend plus le dossier pour entrer, seulement la fiche posée. Le duel (« @x a une étoile d'avance », §18.94) n'est pas touché.
 - **Les données restent** : la table `votes` reste en place, sans migration ni effacement ; plus rien ne la lit ni ne l'écrit, sauf la suppression d'une fiche (ou sa purge à 90 jours), qui emporte encore ses lignes comme avant. Les événements `plea` et `jury_vote` déjà enregistrés suivent la règle des 180 jours ; le tableau de `npm run weekly` ne les comptait pas.
 - **Vérifié** : la suite entière (2 547 tests), `tsc -b`, `vite build` ; en démo, Chrome sans tête et muet, à 390 px et au bureau, la page de la personne fichée et celle du visiteur (avec et sans fiche à soi) : aucun « plaid », « coupable » ni « jury », la page se lit d'un bloc de la fiche à la suite.
+
+### 18.130 Le logo d'Azerit est la mascotte ; deux défauts de la page d'une fiche au bureau (23 novembre 2026, Jacques, branche `site/logo-mascotte`)
+
+Jacques, sur la page d'une fiche : « met le bon logo sur ce site », puis, capture à l'appui, le texte du haut qu'on ne voit pas et le détail du score qui casse la page.
+
+- **Le logo** : la gemme à deux facettes (§18.18) est remplacée partout par la mascotte d'Azerit, l'écran de pierre à l'écran turquoise, la même que sur la landing page et l'app. Un seul fichier source, `web/public/logo.png` (228 × 256, copie exacte de `LandingPage/public/logo.png`) ; `scripts/icons.ts` en tire les icônes (onglet `favicon.ico` et `favicon.png`, mascotte sur fond transparent ; écran d'accueil et manifeste, mascotte sur l'encre) et `shared/card/azeritLogo.ts`, la mascotte réduite à 96 px de haut en data URI, pour la fiche (recto et verso), les images de partage (resvg) et le dos de carte et le sachet de la scène 3D. La barre du haut, le pied, l'attente, la coquille du premier affichage et la page de message du serveur montrent `/logo.png`. `favicon.svg` disparaît. Ce paragraphe remplace « La gemme Azerit est en facettes plates » (§18.18) et la gemme des icônes (§18.49).
+- **La phrase du score au bureau** (« Son profil a un score de 97 % ») passait à l'encre sous un ciel clair, alors qu'au bureau le ciel est déjà fondu dans l'encre à sa hauteur : encre sur encre. Elle ne passe à l'encre que sous 900 px, où le ciel descend jusqu'à la fiche (`--stage-top`) ; au bureau elle garde le crème.
+- **La fiche du visiteur ne bouge plus quand on déplie le détail** : au bureau, la phrase du score était seule à gauche sur la ligne 2 de la grille et la fiche commençait à la ligne 3 ; à droite, la ligne 2 porte « À ton tour », ou « Comment c'est noté » pour qui a sa fiche (le duel). Déplier le détail grandissait la ligne 2 : la fiche descendait de toute sa hauteur (2 600 px mesurés), et sans rien déplier un trou de 290 px restait sous la phrase chez le visiteur sans fiche. La phrase et la fiche partagent désormais la zone des lignes 2 à 7, la fiche décalée de la hauteur de la phrase (`--score-h`, mesurée avec `--stage-top`).
+- **Vérifié** : la suite entière (2 547 tests), `tsc -b` ; Chrome sans tête sur `/c/TMto39xP9s` (front local, API de prod), 1325 × 900 : la fiche reste à 323 px sous la phrase, pli fermé, ouvert et détail déplié, et suit le défilement ; 390 × 844 inchangé, phrase à l'encre sur le ciel clair ; rendu resvg de l'image de partage avec la mascotte.
