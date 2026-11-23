@@ -294,7 +294,7 @@ export function Waiting({ cardId, progress, startedAt, queue, findings = [], log
       <div className="load-main">
         <header className="load-head">
           <p className="load-brand label" aria-hidden>
-            <AzeritMark size={12} />
+            <AzeritMark size={14} />
             Azerit
           </p>
           <h1 id="waiting-title" className="load-title">

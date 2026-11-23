@@ -4274,11 +4274,16 @@ a.dossier-item:hover {
     grid-column: 2;
     padding: 0 0 12px;
   }
+  /* Chez le visiteur, la colonne de droite commence à la ligne 2 (« À ton tour », ou « Comment c'est noté »
+     qu'on déplie) : la phrase et la fiche partagent la même zone, la fiche décalée de la hauteur de la phrase
+     (--score-h, mesurée par la page). Ainsi rien à droite ne pousse la fiche vers le bas. */
   .page-result.is-visitor .score-line {
-    grid-row: 2;
+    grid-row: 2 / 7;
+    align-self: start;
   }
   .page-result.is-visitor:has(.score-line) .result-stage {
-    grid-row: 3 / 7;
+    grid-row: 2 / 7;
+    margin-top: var(--score-h, 88px);
   }
   .page-result.is-visitor > .result-top > .you,
   .page-result.is-visitor > .result-top > .you-col {
@@ -4434,8 +4439,15 @@ a.dossier-item:hover {
 }
 
 /* ciel clair (heure rose) : le texte posé dessus passe à l'encre */
-.page-result:has(> .card-sky.sky-light.is-in) :is(.wanted-kicker, .wanted-name, .visitor-lead, .score-say, .score-pct, .score-means) {
+.page-result:has(> .card-sky.sky-light.is-in) :is(.wanted-kicker, .wanted-name, .visitor-lead) {
   color: var(--ink-0);
+}
+/* la phrase du score : sur téléphone, le ciel descend jusqu'à la fiche (--stage-top) et la couvre ; au
+   bureau, le ciel est fondu bien avant la fiche et la phrase est posée sur l'encre : elle garde ses couleurs */
+@media (max-width: 899px) {
+  .page-result:has(> .card-sky.sky-light.is-in) :is(.score-say, .score-pct, .score-means) {
+    color: var(--ink-0);
+  }
 }
 .shell:has(> .page-result > .card-sky.sky-light.is-in) .topbar :is(.brand, .demo-pill, .topbar-link, .lang-toggle button, .lang-toggle button::before) {
   color: var(--ink-0);

@@ -61,6 +61,7 @@ const Film = lazy(() => loadFilm().then((m) => ({ default: m.Film })));
  * La hauteur de ce qui est au-dessus de la fiche (bandeau, barre du haut, tête, phrase du visiteur),
  * mesurée et posée en `--stage-top` sur la page : sur téléphone, la fiche se taille dans ce qui reste
  * au-dessus de la barre fixe (§18.52), quelle que soit la hauteur de l'écran ou la taille du texte.
+ * Aussi la hauteur de la phrase du score, en `--score-h` : au bureau, la fiche du visiteur s'y décale.
  * Posée avant la première image (layout effect) : la fiche ne change pas de taille sous les yeux.
  */
 function useStageTop(page: RefObject<HTMLElement | null>, stage: RefObject<HTMLElement | null>) {
@@ -68,7 +69,12 @@ function useStageTop(page: RefObject<HTMLElement | null>, stage: RefObject<HTMLE
     const el = page.current;
     const st = stage.current;
     if (!el || !st) return;
-    const set = () => el.style.setProperty("--stage-top", `${Math.round(st.getBoundingClientRect().top + window.scrollY)}px`);
+    const set = () => {
+      el.style.setProperty("--stage-top", `${Math.round(st.getBoundingClientRect().top + window.scrollY)}px`);
+      // Au bureau, la fiche du visiteur se décale de la phrase du score, posée dans la même zone de la grille.
+      const line = st.parentElement?.querySelector(":scope > .score-line");
+      el.style.setProperty("--score-h", `${line ? Math.round(line.getBoundingClientRect().height) : 0}px`);
+    };
     set();
     const ro = typeof ResizeObserver === "function" ? new ResizeObserver(set) : null;
     const siblings = [...(st.parentElement?.children ?? [])];

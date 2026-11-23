@@ -6,11 +6,14 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { FIXTURES } from "../fixtures";
 import type { CardData, Lang } from "../types";
+import { AZERIT_LOGO_URI } from "./azeritLogo";
 import { CardGraphic } from "./Card";
 import { MUG_PHOTO, MUG_SIZE, PLACARD, PLATE, Plate, Silhouette, Toise, caseDate, caseLabel, caseNumber, initialsOf, plateInitials, plateName, plateSub, toiseCover } from "./mug";
 
 const face = (card: CardData, lang: Lang, avatarHref?: string) => renderToStaticMarkup(createElement(CardGraphic, { card, lang, avatarHref }));
 /** Les graduations dessinées : les nombres à trois chiffres de la toise, en mono 12. */
+/** Les images de la fiche autres que le logo d'Azerit (la mascotte, toujours en haut à gauche). */
+const photos = (svg: string) => [...svg.matchAll(/<image\b[^>]*>/g)].filter((m) => !m[0].includes(AZERIT_LOGO_URI)).length;
 const ticks = (svg: string) => [...svg.matchAll(/font-size="12"[^>]*>(1\d0)</g)].map((m) => m[1]);
 
 describe("la toise", () => {
@@ -41,10 +44,10 @@ describe("sans photo : la silhouette à initiales", () => {
     expect(svg).toContain("data-silhouette");
     // Les initiales suivent la plaque : « @LEAMD » donne « LE ».
     expect(svg).toContain(">LE<");
-    expect(svg).not.toContain("<image");
+    expect(photos(svg)).toBe(0);
     const withPhoto = face(FIXTURES.gold, "fr", "data:image/png;base64,AAAA");
     expect(withPhoto).not.toContain("data-silhouette");
-    expect(withPhoto).toContain("<image");
+    expect(photos(withPhoto)).toBe(1);
   });
 
   it("les initiales tiennent dans la tête, en capitales ; sans initiales, la silhouette seule", () => {

@@ -181,7 +181,7 @@ function PosterTitle({ x, y, size, lang }: { x: number; y: number; size: number;
 }
 
 /**
- * Le surtitre d'une image de bande ou de prime, signé : la gemme et « AZERIT »
+ * Le surtitre d'une image de bande ou de prime, signé : la mascotte et « AZERIT »
  * (le dessin de la barre du site, 28 de haut), puis « · BANDE D'ÉCOLE ». Sur
  * l'image d'une fiche, la marque est déjà dans la fiche.
  */
@@ -189,7 +189,7 @@ export function BrandKicker({ x, y, size, text }: { x: number; y: number; size: 
   const ls = size * 0.26;
   const gemH = 28;
   const brand = "AZERIT";
-  const tx = x + Math.round(gemH * 0.87) + 10;
+  const tx = x + Math.round(gemH * (228 / 256)) + 10;
   const brandW = measure(brand, "sans-600", size, ls);
   return (
     <g data-brand="">

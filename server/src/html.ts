@@ -290,8 +290,8 @@ export function siteStylesheets(template: string | null | undefined): string {
   return (template.match(/<link\b[^>]*\brel=["']stylesheet["'][^>]*>/gi) ?? []).join("\n    ");
 }
 
-/** La gemme d'Azerit (web/src/components/Brand.tsx), en clair, à la taille de la barre du site. */
-const MARK = `<svg width="18" height="21" viewBox="0 0 104 120" fill="none" aria-hidden="true"><path d="M52 8 L14 50 L37 102 Z" fill="#c9d67c" stroke="#c9d67c" stroke-width="9" stroke-linejoin="round"/><path d="M63 10 L92 42 L85 80 L47 112 Z" fill="#6fb2a8" stroke="#6fb2a8" stroke-width="9" stroke-linejoin="round"/></svg>`;
+/** La mascotte d'Azerit (web/src/components/Brand.tsx), à la taille de la barre du site. */
+const MARK = `<img src="/logo.png" width="20" height="22" alt="" aria-hidden="true" style="display:block"/>`;
 
 /**
  * Le gabarit du site (web/src/styles.css) : encre, crème, lilas, rose pour ce qui se touche.
