@@ -83,7 +83,7 @@ export function PrimesList() {
 
 /* ---------- /primes/:id ---------- */
 
-/** Une ligne du classement : la même grille que le top de la semaine, visage compris. */
+/** Une ligne du classement : la même grille que le top du mois, visage compris. */
 function Row({ r, me }: { r: BoardRow; me: boolean }) {
   const { t } = useT();
   const href = `/c/${r.cardId}`;

@@ -1,4 +1,4 @@
-// Top de la semaine (§18.22) sur une base de test en mémoire.
+// Top du mois (§18.22, §18.128) sur une base de test en mémoire.
 
 import { mkdtempSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -11,7 +11,7 @@ import { createApp } from "./app";
 import { RETENTION_MS, Store, type NewCardRow } from "./db";
 import type { Deps } from "./pipeline";
 import { RANK_CACHE_MS, TOTW_MIN_ENTRIES, weekRank, weekTop, withWeekSpecial } from "./top";
-import { weekStart } from "./weekly";
+import { periodStart } from "../../shared/week";
 
 const stores: Store[] = [];
 afterEach(() => {
@@ -20,9 +20,13 @@ afterEach(() => {
 
 const H = 3600 * 1000;
 const DAY = 24 * H;
-// Lundi 9 novembre 2026, 00:00 UTC : semaine ISO 46.
+// Le classement court sur le mois civil UTC (§18.128). Novembre 2026 : du 1er au 30.
+const NOV1 = Date.UTC(2026, 10, 1);
+const DEC1 = Date.UTC(2026, 11, 1);
+// Lundi 9 novembre 2026, 00:00 UTC, dans le mois de novembre.
 const W46 = Date.UTC(2026, 10, 9);
-const W45 = W46 - 7 * DAY;
+// Lundi 12 octobre 2026 : le mois d'avant, clos.
+const W45 = Date.UTC(2026, 9, 12);
 const NOW = W46 + 2 * DAY + 15 * H; // mercredi 11, 15:00
 
 function newStore() {
@@ -83,9 +87,9 @@ describe("weekTop", () => {
     const b = gh("Kevin", 75, W46 + 4 * H, { login: "Kevin" });
     store.insertCards([a1, a2, a3, b]);
     const top = weekTop(store.db, { now: NOW, limit: 10 });
-    expect(top.weekStart).toBe(W46);
-    expect(top.endsAt).toBe(W46 + 7 * DAY);
-    expect(top.week).toBe(46);
+    expect(top.weekStart).toBe(NOV1);
+    expect(top.endsAt).toBe(DEC1);
+    expect(top.week).toBe(11);
     expect(top.total).toBe(2);
     expect(top.entries.map((e) => [e.rank, e.login, e.overall, e.cardId])).toEqual([
       [1, "lea", 82, a2.id],
@@ -210,12 +214,41 @@ describe("weekTop", () => {
     expect(store.fileRow(before.id)!.id).toBe(before.id);
   });
 
-  it("change de semaine le lundi 00:00 UTC", () => {
+  it("change de mois le 1er à 00:00 UTC (§18.128)", () => {
     const store = newStore();
-    store.insertCards([gh("sunday", 90, W46 - 1), gh("monday", 50, W46)]);
-    expect(weekTop(store.db, { now: NOW }).entries.map((e) => e.login)).toEqual(["monday"]);
-    expect(weekTop(store.db, { now: W46 - 2 }).entries.map((e) => e.login)).toEqual(["sunday"]);
-    expect(weekTop(store.db, { now: W46 - 2 }).week).toBe(45);
+    // Les bornes : 31 oct. 23:59:59.999, 1er nov., 19 nov. (le lancement), 30 nov. 23:59:59.999, 1er déc.
+    const oct31 = NOV1 - 1;
+    const launch = Date.UTC(2026, 10, 19, 10);
+    const lastWeek = Date.UTC(2026, 10, 22, 22);
+    const nov30 = DEC1 - 1;
+    store.insertCards([gh("oct", 90, oct31), gh("nov1", 50, NOV1), gh("launch", 60, launch), gh("sunday22", 55, lastWeek), gh("nov30", 40, nov30), gh("dec", 99, DEC1)]);
+    const logins = (now: number) => weekTop(store.db, { now }).entries.map((e) => e.login);
+    // Le lundi 23 novembre ne tourne plus rien : les fiches du lancement restent au classement.
+    expect(logins(Date.UTC(2026, 10, 23))).toEqual(["launch", "sunday22", "nov1", "nov30"]);
+    expect(logins(nov30)).toEqual(["launch", "sunday22", "nov1", "nov30"]);
+    expect(weekTop(store.db, { now: nov30 })).toMatchObject({ weekStart: NOV1, endsAt: DEC1, week: 11, total: 4 });
+    expect(logins(oct31)).toEqual(["oct"]);
+    expect(weekTop(store.db, { now: oct31 })).toMatchObject({ weekStart: Date.UTC(2026, 9, 1), endsAt: NOV1, week: 10 });
+    expect(logins(DEC1)).toEqual(["dec"]);
+    expect(weekTop(store.db, { now: Date.UTC(2026, 11, 7) })).toMatchObject({ weekStart: DEC1, endsAt: Date.UTC(2027, 0, 1), week: 12, total: 1 });
+    // Le rang d'une fiche du 19 novembre : en direct jusqu'au 30 à 23:59:59, clos le 1er décembre.
+    const id = (login: string) => store.db.prepare(`SELECT id FROM cards WHERE login = ?`).pluck().get(login) as string;
+    expect(weekRank(store.db, id("launch"), Date.UTC(2026, 10, 23))).toMatchObject({ rank: 1, total: 4, week: 11, closed: false });
+    expect(weekRank(store.db, id("launch"), nov30)).toMatchObject({ closed: false });
+    expect(weekRank(store.db, id("launch"), DEC1)).toMatchObject({ rank: 1, total: 4, week: 11, closed: true });
+    // Son image : cache court tant que novembre court, cache long ensuite.
+    const live = (now: number) => withWeekSpecial(store.db, store.getCard(id("launch"))!.data as CardData, now).live;
+    expect([live(Date.UTC(2026, 10, 23)), live(nov30), live(DEC1)]).toEqual([true, true, false]);
+  });
+
+  it("décembre se ferme le 31 à 23:59:59 UTC, janvier ouvre l'année suivante", () => {
+    const store = newStore();
+    const jan1 = Date.UTC(2027, 0, 1);
+    store.insertCards([gh("dec31", 70, jan1 - 1), gh("jan1", 60, jan1)]);
+    expect(weekTop(store.db, { now: jan1 - 1 })).toMatchObject({ weekStart: DEC1, endsAt: jan1, week: 12 });
+    expect(weekTop(store.db, { now: jan1 - 1 }).entries.map((e) => e.login)).toEqual(["dec31"]);
+    expect(weekTop(store.db, { now: jan1 })).toMatchObject({ weekStart: jan1, endsAt: Date.UTC(2027, 1, 1), week: 1 });
+    expect(weekTop(store.db, { now: jan1 }).entries.map((e) => e.login)).toEqual(["jan1"]);
   });
 
   it("respecte la limite, le total compte tout le monde", () => {
@@ -252,13 +285,13 @@ describe("classement gardé 60 s en mémoire", () => {
     vi.restoreAllMocks();
   });
 
-  it("chaque semaine a son classement", () => {
+  it("chaque mois a son classement", () => {
     const store = newStore();
     const old = gh("old", 60, W45 + H);
     store.insertCards([old, gh("new", 70, W46 + H)]);
     const rankings = countRankings(store);
     expect(weekTop(store.db, { now: NOW }).entries.map((e) => e.login)).toEqual(["new"]);
-    expect(weekRank(store.db, old.id, NOW)).toMatchObject({ rank: 1, total: 1, week: 45, closed: true });
+    expect(weekRank(store.db, old.id, NOW)).toMatchObject({ rank: 1, total: 1, week: 10, closed: true });
     expect(weekTop(store.db, { now: NOW }).entries.map((e) => e.login)).toEqual(["new"]);
     expect(rankings()).toBe(2);
     vi.restoreAllMocks();
@@ -302,7 +335,7 @@ describe("weekRank", () => {
     const rows = [90, 85, 81, 80, 79, 78, 70].map((n, i) => gh(`d${i}`, n, W46 + H));
     store.insertCards(rows);
     // 79 contre 70 : 10 points pour passer devant le 5e, l'égalité ne suffit pas.
-    expect(weekRank(store.db, rows[6]!.id, NOW)).toEqual({ rank: 7, total: 7, gapToTop5: 10, inTop5: false, week: 46, closed: false });
+    expect(weekRank(store.db, rows[6]!.id, NOW)).toEqual({ rank: 7, total: 7, gapToTop5: 10, inTop5: false, week: 11, closed: false });
     expect(weekRank(store.db, rows[5]!.id, NOW)!.gapToTop5).toBe(2);
     expect(weekRank(store.db, rows[4]!.id, NOW)).toMatchObject({ rank: 5, inTop5: true, gapToTop5: 0 });
   });
@@ -314,7 +347,7 @@ describe("weekRank", () => {
     expect(weekRank(store.db, rows[1]!.id, NOW)).toMatchObject({ rank: 2, total: 2, inTop5: true, gapToTop5: 0 });
   });
 
-  it("null hors classement ; semaine close une fois passée", () => {
+  it("null hors classement ; mois clos une fois passé", () => {
     const store = newStore();
     const cv = { ...gh("x", 80, W46 + H), source: "cv" as const, login: null };
     const deg = gh("deg", 80, W46 + H, { degraded: true });
@@ -323,7 +356,7 @@ describe("weekRank", () => {
     expect(weekRank(store.db, cv.id, NOW)).toBeNull();
     expect(weekRank(store.db, deg.id, NOW)).toBeNull();
     expect(weekRank(store.db, "nope", NOW)).toBeNull();
-    expect(weekRank(store.db, last.id, NOW)).toMatchObject({ rank: 1, total: 1, week: 45, closed: true, inTop5: true });
+    expect(weekRank(store.db, last.id, NOW)).toMatchObject({ rank: 1, total: 1, week: 10, closed: true, inTop5: true });
   });
 });
 
@@ -333,7 +366,7 @@ function crowd(prefix: string, n: number, at: number): NewCardRow[] {
 }
 
 describe("withWeekSpecial", () => {
-  it(`seuil : ${TOTW_MIN_ENTRIES} logins classés dans la semaine, sinon pas de spéciale`, () => {
+  it(`seuil : ${TOTW_MIN_ENTRIES} logins classés dans le mois, sinon pas de spéciale`, () => {
     const store = newStore();
     const first = gh("first", 90, W46 + H);
     store.insertCards([first, ...crowd("c", TOTW_MIN_ENTRIES - 2, W46 + H)]);
@@ -345,12 +378,12 @@ describe("withWeekSpecial", () => {
     store.insertCards(crowd("d", 1, W46 + 2 * H));
     expect(read(NOW).week!.total).toBe(20);
     expect(read(NOW).data.special).toBe("totw");
-    // Semaine close : son total final compte, une fiche de la semaine suivante n'y change rien.
-    store.insertCards([gh("next", 99, W46 + 8 * DAY)]);
-    expect(read(NOW + 10 * DAY).data.special).toBe("totw");
+    // Mois clos : son total final compte, une fiche du mois suivant n'y change rien.
+    store.insertCards([gh("next", 99, DEC1 + DAY)]);
+    expect(read(DEC1 + 2 * DAY).data.special).toBe("totw");
   });
 
-  it("semaine close sous le seuil : jamais de spéciale", () => {
+  it("mois clos sous le seuil : jamais de spéciale", () => {
     const store = newStore();
     const first = gh("solo", 90, W45 + H);
     store.insertCards([first, ...crowd("p", TOTW_MIN_ENTRIES - 2, W45 + H), ...crowd("q", 5, W46 + H)]);
@@ -359,7 +392,7 @@ describe("withWeekSpecial", () => {
     expect(out.data.special).toBeUndefined();
   });
 
-  it("pose « Top 5 de la semaine » sur la fiche classée du top 5, jamais ailleurs", () => {
+  it("pose « Top 5 du mois » sur la fiche classée du top 5, jamais ailleurs", () => {
     const store = newStore();
     const rows = [90, 85, 81, 80, 79, 78].map((n, i) => gh(`s${i}`, n, W46 + H));
     const lower = gh("s0", 60, W46 + 2 * H); // même login que le 1er, fiche moins bonne
@@ -377,7 +410,7 @@ describe("withWeekSpecial", () => {
     expect(read(kid).totw).toBe(false);
     // Rien n'est écrit dans la ligne.
     expect((store.getCard(rows[0]!.id)!.data as CardData).special).toBeUndefined();
-    // La semaine finie, elle reste.
+    // Le mois fini, elle reste.
     const later = withWeekSpecial(store.db, store.getCard(rows[0]!.id)!.data as CardData, NOW + 30 * DAY);
     expect(later.data.special).toBe("totw");
     expect(later.live).toBe(false);
@@ -537,7 +570,7 @@ describe("routes", () => {
     return { app, store, ogDir, renders };
   }
 
-  it("GET /api/top : le top 10 de la semaine, en cache 60 s", async () => {
+  it("GET /api/top : le top 10 du mois, en cache 60 s", async () => {
     const { app, store } = setup();
     const now = Date.now();
     store.insertCards([gh("alpha", 80, now - 1000), gh("beta", 70, now - 2000)]);
@@ -545,7 +578,7 @@ describe("routes", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("cache-control")).toBe("public, max-age=60");
     const top = (await res.json()) as WeekTop;
-    expect(top.weekStart).toBe(weekStart(now));
+    expect(top.weekStart).toBe(periodStart(now));
     expect(top.total).toBe(2);
     expect(top.entries.map((e) => e.login)).toEqual(["alpha", "beta"]);
   });
@@ -577,7 +610,7 @@ describe("routes", () => {
     expect((await page("?offset=-3&limit=abc")).entries.map((e) => e.rank)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
   });
 
-  it("GET /api/card/:id : le rang de la semaine et la spéciale lue à la volée", async () => {
+  it("GET /api/card/:id : le rang du mois et la spéciale lue à la volée", async () => {
     const { app, store } = setup();
     const now = Date.now();
     const rows = [90, 85, 81, 80, 79, 70].map((n, i) => gh(`r${i}`, n, now - 1000 - i));
@@ -595,7 +628,7 @@ describe("routes", () => {
     expect("week" in cvState).toBe(false);
   });
 
-  it("/og : la spéciale change la clé du cache disque ; semaine en cours, cache court", async () => {
+  it("/og : la spéciale change la clé du cache disque ; mois en cours, cache court", async () => {
     const { app, store, ogDir, renders } = setup();
     const now = Date.now();
     const mine = gh("me", 60, now - 1000);
@@ -613,13 +646,13 @@ describe("routes", () => {
     // Page /c/:id : l'image de partage d'une fiche du top 5 a sa propre adresse.
     const html = await (await app.request(`/c/${store.getCard(weekTop(store.db).entries[0]!.cardId!)!.id}`)).text();
     expect(html).toContain("?v=11&amp;s=totw");
-    expect(html).toContain("Top 5 de la semaine");
+    expect(html).toContain("Top 5 du mois");
   });
 
-  it("/og : semaine close, l'image ne bouge plus, cache long", async () => {
+  it("/og : mois clos, l'image ne bouge plus, cache long", async () => {
     const { app, store, renders } = setup();
-    const old = gh("past", 70, weekStart(Date.now()) - 2 * DAY);
-    store.insertCards([old, ...crowd("j", TOTW_MIN_ENTRIES - 1, weekStart(Date.now()) - 2 * DAY)]);
+    const old = gh("past", 70, periodStart(Date.now()) - 2 * DAY);
+    store.insertCards([old, ...crowd("j", TOTW_MIN_ENTRIES - 1, periodStart(Date.now()) - 2 * DAY)]);
     const res = await app.request(`/og/${old.id}-portrait.png`);
     expect(res.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
     expect(renders).toEqual(["portrait:totw"]);

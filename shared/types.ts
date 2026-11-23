@@ -320,23 +320,23 @@ export interface ComparisonData {
   linkUnproven?: boolean;
 }
 
-/** Rang d'une fiche GitHub dans le top de sa semaine (§18.22). Absent : hors classement. */
+/** Rang d'une fiche dans le top de son mois (§18.22, §18.128 : le nom « week » est resté). Absent : hors classement. */
 export interface WeekRank {
-  /** 1 = en tête. Une ligne par login, sa meilleure note de la semaine. */
+  /** 1 = en tête. Une ligne par personne, sa note du mois. */
   rank: number;
-  /** Nombre de logins classés cette semaine-là. */
+  /** Nombre de personnes classées ce mois-là. */
   total: number;
   /** Points qui manquent pour passer devant le 5e ; 0 dans le top 5. */
   gapToTop5: number;
   inTop5: boolean;
-  /** Numéro de la semaine ISO (lundi 00:00 UTC au dimanche 23:59 UTC). */
+  /** Le mois du classement, 1 (janvier) à 12 (§18.128 : du 1er 00:00 UTC au dernier jour 23:59:59 UTC). */
   week: number;
-  /** La semaine est finie : le classement ne bouge plus. */
+  /** Le mois est fini : le classement ne bouge plus. */
   closed: boolean;
 }
 
 /**
- * La personne d'une ligne de classement (top de la semaine, fiches d'une bande, §18.88) :
+ * La personne d'une ligne de classement (top du mois, fiches d'une bande, §18.88) :
  * ce que sa fiche montre déjà. Construite par shared/boardPerson.ts.
  */
 export interface BoardPerson {
@@ -353,7 +353,7 @@ export interface BoardPerson {
   initials: string;
 }
 
-/** Une ligne du top de la semaine (GET /api/top) : la personne de la fiche (son nom, son visage, sa fiche, §18.88) et sa note. Rien de privé : ce qui est déjà sur la fiche publique. */
+/** Une ligne du top du mois (GET /api/top) : la personne de la fiche (son nom, son visage, sa fiche, §18.88) et sa note. Rien de privé : ce qui est déjà sur la fiche publique. */
 export interface TopEntry extends BoardPerson {
   rank: number;
   overall: number;
@@ -363,13 +363,13 @@ export interface TopEntry extends BoardPerson {
 }
 
 export interface WeekTop {
-  /** Lundi 00:00 UTC, en ms. */
+  /** Début de la période du classement : le 1er du mois, 00:00 UTC, en ms (§18.128). */
   weekStart: number;
-  /** Lundi suivant 00:00 UTC, en ms : la fin de la semaine. */
+  /** Le 1er du mois suivant, 00:00 UTC, en ms : la fin du mois. */
   endsAt: number;
-  /** Numéro de la semaine ISO. */
+  /** Le mois, 1 (janvier) à 12. */
   week: number;
-  /** Nombre de personnes classées cette semaine. */
+  /** Nombre de personnes classées ce mois-ci. */
   total: number;
   entries: TopEntry[];
 }

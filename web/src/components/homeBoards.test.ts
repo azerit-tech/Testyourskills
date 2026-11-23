@@ -23,8 +23,8 @@ const count = (html: string, needle: string) => html.split(needle).length - 1;
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe("le top de la semaine sur l'accueil", () => {
-  it("semaine vide : rien, le tableau vient avec la première fiche", () => {
+describe("le top du mois sur l'accueil", () => {
+  it("mois vide : rien, le tableau vient avec la première fiche", () => {
     expect(board(0)).toBe("");
     expect(board(0, "en-US")).toBe("");
   });
@@ -110,18 +110,18 @@ describe("le top de la semaine sur l'accueil", () => {
   });
 });
 
-describe("le top de la semaine avant la réponse du serveur", () => {
+describe("le top du mois avant la réponse du serveur", () => {
   it("le titre, l'ancre et la place du top 5 sont là dès le premier rendu", () => {
     const html = render(createElement(WeekBoard, { onPlay: () => undefined }));
     expect(html).toContain('<section class="board" id="semaine"');
     expect(html).toContain('aria-busy="true"');
-    expect(html).toContain("Top de la semaine");
+    expect(html).toContain("Top du mois");
     expect(count(html, "board-wait")).toBe(1);
     expect(html).not.toContain("board-row");
   });
 });
 
-describe("ma ligne au top de la semaine", () => {
+describe("ma ligne au top du mois", () => {
   const mine = (m: { id: string; login: string | null }) => render(createElement(WeekBoardView, { top: week(7), now: 0, onPlay: () => undefined, mine: { ...m, overall: 80 } }));
 
   it("le tableau porte l'ancre « semaine »", () => {

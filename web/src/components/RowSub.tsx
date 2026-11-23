@@ -1,5 +1,5 @@
 // Sous le nom d'une ligne de classement (§18.127) : les étoiles, puis le niveau d'expérience
-// en un mot mat (« Junior »). Le top de la semaine, sa suite, et les fiches d'une bande ouverte.
+// en un mot mat (« Junior »). Le top du mois, sa suite, et les fiches d'une bande ouverte.
 import { SENIORITY_TAG } from "../../../shared/gridText";
 import type { SeniorityCode } from "../../../shared/types";
 import { useT } from "../i18n";

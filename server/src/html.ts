@@ -24,8 +24,8 @@ export interface PageMeta {
 }
 
 const SPECIAL_NAMES: Record<Lang, Record<Special, string>> = {
-  fr: { wonderkid: "Débarque en ville", flashback: "Affaire classée", totw: "Top 5 de la semaine" },
-  en: { wonderkid: "New in town", flashback: "Cold case", totw: "This week's top 5" },
+  fr: { wonderkid: "Débarque en ville", flashback: "Affaire classée", totw: "Top 5 du mois" },
+  en: { wonderkid: "New in town", flashback: "Cold case", totw: "This month's top 5" },
 };
 
 /** og:site_name : le seul nom visible du produit (§18.48). */
@@ -70,7 +70,7 @@ export function metaFor(data: CardData | ComparisonData, baseUrl: string): PageM
 /** L'aperçu d'une fiche ; `exhibits` (« LinkedIn » ou « CV ») : celle d'un dossier à deux sources. */
 function cardMeta(data: CardData, baseUrl: string, exhibits?: string): PageMeta {
   const url = `${baseUrl}/c/${data.id}`;
-  // Spéciale de la semaine (§18.22), ou nouveau dessin (shared/images.ts) : une autre adresse
+  // Spéciale du mois (§18.22, §18.128), ou nouveau dessin (shared/images.ts) : une autre adresse
   // d'image, pour que les réseaux ne resservent pas l'ancienne.
   const image = `${baseUrl}/og/${data.id}.png?${IMAGE_QUERY}${data.special === "totw" ? "&s=totw" : ""}`;
   const lang = data.lang ?? "fr";

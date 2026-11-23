@@ -1,5 +1,5 @@
 // Le classement des écoles et des boîtes sur l'accueil (§18.92, §18.101) : un
-// classement par ligue, fait comme le top de la semaine (WeekBoard). Cinq lignes :
+// classement par ligue, fait comme le top du mois (WeekBoard). Cinq lignes :
 // la place, le nom, les fiches, les étoiles ; une seule ligne pour les places
 // libres, qui ramène au formulaire. Sa propre bande est mise en évidence ; plus bas
 // que la cinquième place, elle vient après un filet. Une ligne touchée s'ouvre sur

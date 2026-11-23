@@ -20,7 +20,7 @@ interface Common {
   profile: string | null;
   /** Dossier vide fait par un tiers, pas encore revendiqué (shared/publicView.ts) : ni note, ni étoiles, ni pari. */
   sealed?: boolean;
-  /** « 7e cette semaine », seulement pendant la semaine en cours et dans le top 10 (`flatteringRank`). */
+  /** « 7e ce mois-ci », seulement pendant le mois en cours et dans le top 10 (`flatteringRank`). */
   rank: string | null;
   /** Étoiles plaidées pendant l'attente (lib/plea.ts), ou null. */
   plea: number | null;
@@ -47,7 +47,7 @@ export type ShareInput = CardShare;
 
 export { starsLine };
 
-/** Le rang ne s'affiche et ne part dans le texte que s'il flatte : le top 10 de la semaine (§18.48),
+/** Le rang ne s'affiche et ne part dans le texte que s'il flatte : le top 10 du mois (§18.48),
  *  et la première moitié des fiches (§18.52) : « 8e » sur huit, le jeudi du lancement, c'est la dernière place. */
 export const SHARE_RANK_MAX = 10;
 export const flatteringRank = (rank: number, total: number): boolean => rank >= 1 && rank <= SHARE_RANK_MAX && rank <= total / 2;
@@ -86,7 +86,7 @@ function build(w: ShareWords, x: ShareInput, cut: Cut): string {
   const head = x.graded ? w.file(stars, x.level, x.overall) : w.sheet(stars, x.level, x.overall);
   // Deuxième ligne : le pari, en chute.
   const plea = x.plea ? w.plea(starsLine(x.plea), pleaGap(x.plea, x.stars)) : null;
-  // Puis le profil et le rang (« Profil « Machine à livrer », 4e cette semaine. »).
+  // Puis le profil et le rang (« Profil « Machine à livrer », 4e ce mois-ci. »).
   const rank = cut < 4 ? x.rank : null;
   const who = cut < 5 && x.profile ? `${w.profile(x.profile)}${rank ? `, ${rank}` : ""}.` : rank ? `${rank}.` : null;
   // La trouvaille part d'abord : remplacée par le chef d'accusation, plus court, puis retirée.

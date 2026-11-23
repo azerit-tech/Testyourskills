@@ -90,7 +90,7 @@ export function Fold({ name, title, attention = false, onOpen, children }: FoldP
   );
 }
 
-/* ---------- rang de la semaine (§18.22) ---------- */
+/* ---------- rang du mois (§18.22) ---------- */
 
 /** L'écart au top 5 ne se dit que s'il encourage : 10 points au plus. */
 export const GAP_SHOWN_MAX = 10;
@@ -225,7 +225,7 @@ export function useSharing(item: Shareable, toast: (m: string) => void) {
   const id = idOf(item);
   const url = shareUrl(id);
   const week = weekOf(id);
-  // Le rang n'entre dans le texte que pendant sa semaine, et seulement s'il flatte (top 10) : « 7e cette semaine ».
+  // Le rang n'entre dans le texte que pendant son mois, et seulement s'il flatte (top 10) : « 7e ce mois-ci ».
   const rank = week && !week.closed && flatteringRank(week.rank, week.total) ? t.result.week.share(week.rank) : null;
   const input = shareInput(item, lang, rank);
   const named = item.kind === "card" ? item.card : fileOf(item.comparison);

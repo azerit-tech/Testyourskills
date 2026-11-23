@@ -1,4 +1,4 @@
-// Le visage d'une ligne de tableau (top de la semaine, bande, prime), en petit : la
+// Le visage d'une ligne de tableau (top du mois, bande, prime), en petit : la
 // photo de la fiche, ou l'avatar public d'un pseudo GitHub. Sans photo, les initiales
 // de la fiche (l'initiale du pseudo si on n'a que lui) : jamais l'icône d'image cassée,
 // jamais le damier que GitHub génère pour un compte sans photo (card/avatar.ts).

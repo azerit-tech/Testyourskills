@@ -492,10 +492,10 @@ async function createCard(input: CreateInput): Promise<CreateResult> {
   return res.json();
 }
 
-/** Rang de la semaine des fiches lues (§18.22), gardé pour l'après-fiche. */
+/** rang du mois des fiches lues (§18.22), gardé pour l'après-fiche. */
 const weeks = new Map<string, WeekRank>();
 
-/** Rang de la semaine de cette fiche, lu avec elle ; null : hors classement. */
+/** rang du mois de cette fiche, lu avec elle ; null : hors classement. */
 export function weekOf(id: string): WeekRank | null {
   return weeks.get(id) ?? null;
 }
@@ -693,7 +693,7 @@ async function getShowcase(): Promise<Showcase | null> {
 /** La requête du top en cours : le tableau de l'accueil et son ancre « /#semaine » la partagent. */
 let topFlight: Promise<WeekTop | null> | null = null;
 
-/** Le haut du classement de la semaine (§18.22) ; null si le serveur ne répond pas. */
+/** Le haut du classement du mois (§18.22) ; null si le serveur ne répond pas. */
 function getTop(): Promise<WeekTop | null> {
   if (isMock()) return Promise.resolve(mockTop());
   topFlight ??= fetchTop().finally(() => {
@@ -702,7 +702,7 @@ function getTop(): Promise<WeekTop | null> {
   return topFlight;
 }
 
-/** La suite du classement de la semaine, `limit` lignes après les `offset` premières (§18.126) ; null si le serveur ne répond pas. */
+/** La suite du classement du mois, `limit` lignes après les `offset` premières (§18.126) ; null si le serveur ne répond pas. */
 function getTopPage(offset: number, limit: number): Promise<WeekTop | null> {
   if (isMock()) return Promise.resolve(mockTopPage(offset, limit));
   return fetchTop(`?offset=${offset}&limit=${limit}`);

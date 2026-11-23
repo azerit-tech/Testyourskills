@@ -52,7 +52,7 @@ type Open = Door | "link";
 /** Les erreurs qui reviendraient au même toucher (limite du jour, commissariat fermé ou débordé) :
  * le bouton passe en contour tant que le champ n'a pas changé, et un lien propose autre chose. */
 const BLOCKING = new Set(["rate_limited", "closed", "busy"]);
-/** Le top de la semaine sur l'accueil (WeekBoard.tsx, WEEK_ANCHOR) : pas importé, pour ne pas l'emporter dans ce paquet. */
+/** Le top du mois sur l'accueil (WeekBoard.tsx, WEEK_ANCHOR) : pas importé, pour ne pas l'emporter dans ce paquet. */
 const WEEK_ID = "semaine";
 
 /** Un collage ne lance la carte que s'il ressemble à une URL GitHub (ou LinkedIn), pas à un simple mot. */
@@ -662,7 +662,7 @@ export function EntryForm({ inputRef, variant = "full", secondary = false, anoth
     </p>
   );
 
-  /** Limite atteinte : « En attendant : le top de la semaine », plutôt qu'un bouton qui échouera. */
+  /** Limite atteinte : « En attendant : le top du mois », plutôt qu'un bouton qui échouera. */
   const meanwhile = blocked && !!error && (
     <button
       type="button"

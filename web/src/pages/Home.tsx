@@ -2,7 +2,7 @@
 // titre, la promesse dessous, les portes, le champ et le bouton, et la fiche de
 // Jacques (le produit) debout sur son crépuscule : à droite au bureau, juste
 // sous le formulaire sur téléphone, où son haut dépasse du premier écran.
-// Ensuite, dans l'ordre de l'envie : la berline (§18.79), le top de la semaine
+// Ensuite, dans l'ordre de l'envie : la berline (§18.79), le top du mois
 // (§18.22), les primes si elles sont ouvertes (§18.4), un classement des écoles et un des boîtes (§18.92,
 // sous l'ancre « classement » où mène « Classement » de la barre du haut, §18.101), le
 // mur des 13 profils (§18.28), et un dernier formulaire avant le pied de page.
@@ -10,7 +10,7 @@
 // L'accueil se souvient : le dossier encore en cours tient en une ligne au-dessus du
 // formulaire, à la place de la promesse.
 // Qui a déjà sa fiche a un autre accueil (§18.89) : sa fiche en haut, les classements
-// dessous (le top de la semaine, les primes ouvertes, les écoles, les boîtes, §18.92), et rien d'autre.
+// dessous (le top du mois, les primes ouvertes, les écoles, les boîtes, §18.92), et rien d'autre.
 // L'exemple est la vraie fiche de Jacques (fondateur d'Azerit) : la maquette
 // s'affiche d'abord, la fiche calculée par le serveur la remplace dès qu'elle existe.
 // Aucun dégradé dans la page : seul celui de la fiche.
@@ -72,7 +72,7 @@ function useShowcase(on: boolean): Showcase {
   return showcase;
 }
 
-/** Le top de la semaine a-t-il répondu ? La requête est celle du tableau (lib/api.ts) ; elle sert à l'ancre « /#semaine ». */
+/** Le top du mois a-t-il répondu ? La requête est celle du tableau (lib/api.ts) ; elle sert à l'ancre « /#semaine ». */
 function useTopKnown(): boolean {
   const [known, setKnown] = useState(false);
   useEffect(() => {
@@ -289,7 +289,7 @@ const homeAnchor = (): string | null => {
 /**
  * L'accueil ouvert sur une ancre : le tableau n'est pas à sa place à la première image (la
  * fiche d'exemple et la berline prennent leur hauteur ensuite). On y descend quand il est là
- * (le top de la semaine quand il a répondu ; le classement des écoles et des boîtes tient sa
+ * (le top du mois quand il a répondu ; le classement des écoles et des boîtes tient sa
  * place dès le premier rendu), puis de nouveau quand les polices et la vitrine sont posées,
  * tant que la personne n'a pas défilé elle-même. Le titre arrive en haut de l'écran (scroll-margin-top).
  */
@@ -397,7 +397,7 @@ export function Home() {
   if (mineHome && mem.mine) {
     return (
       <main className="page page-home is-mine" id="main">
-        {/* Sa fiche, puis les classements : le top de la semaine (sa ligne en évidence), les primes ouvertes, les écoles et les boîtes. */}
+        {/* Sa fiche, puis les classements : le top du mois (sa ligne en évidence), les primes ouvertes, les écoles et les boîtes. */}
         <div className="home-mine">
           <MineCard mine={mem.mine} card={mem.card} />
           <WeekBoard onPlay={play} />
@@ -468,7 +468,7 @@ export function Home() {
       </div>
       {/* La voiture, et la preuve que d'autres y sont : côte à côte au bureau. */}
       <div className="home-proof">
-        {/* La caisse de la poursuite (§18.79) : la berline du film, sous la fiche d'exemple sur téléphone, à côté du top de la semaine au bureau ; l'accueil n'a pas de film. */}
+        {/* La caisse de la poursuite (§18.79) : la berline du film, sous la fiche d'exemple sur téléphone, à côté du top du mois au bureau ; l'accueil n'a pas de film. */}
         <Spin ready place="home" />
         <WeekBoard onPlay={play} />
       </div>

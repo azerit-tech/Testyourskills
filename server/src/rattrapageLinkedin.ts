@@ -1,4 +1,4 @@
-// Rattrapage du §18.125 : les fiches GitHub seules du top de la semaine, nées avant la nouvelle
+// Rattrapage du §18.125 : les fiches GitHub seules du top du mois, nées avant la nouvelle
 // correspondance, cherchent leur LinkedIn par le nom (une recherche par fiche, en cache un
 // jour). Un lien fort fait ce que fait « Ajoute ton LinkedIn » : le pipeline calcule le dossier
 // LinkedIn + GitHub (prouvé « match »), qui remplace la fiche (`completedBy`) et suit ses bandes.
@@ -20,7 +20,7 @@ export interface TopGithubCard {
   lang: Lang;
 }
 
-/** Les fiches GitHub seules du haut du classement de la semaine, sans LinkedIn. */
+/** Les fiches GitHub seules du haut du classement du mois, sans LinkedIn. */
 export function topGithubOnly(store: Store, limit = 50, now = Date.now()): TopGithubCard[] {
   return weekTop(store.db, { limit, now }).entries.flatMap((e) => {
     const row = store.getCard(e.cardId);

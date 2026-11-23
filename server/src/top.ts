@@ -1,7 +1,8 @@
-// Le top de la semaine (SPEC §18.22, §18.84). Semaine du lundi 00:00 UTC au dimanche
-// 23:59 UTC. Le top classe des personnes, une ligne par personne, sur leur seule
-// note : celle de leur dossier. Entrent les fiches racines de la semaine, sorties
-// avec la lecture IA, encore en ligne, pas remplacées par un dossier plus complet :
+// Le top du mois (SPEC §18.22, §18.84, §18.128). La période est le mois civil, du 1er
+// 00:00 UTC au dernier jour 23:59:59 UTC (shared/week.ts) ; les noms « week » sont restés.
+// Le top classe des personnes, une ligne par personne, sur leur seule note :
+// celle de leur dossier. Entrent les fiches racines du mois, sorties avec
+// la lecture IA, encore en ligne, pas remplacées par un dossier plus complet :
 // - un dossier à deux pièces LinkedIn et GitHub dont le lien est prouvé (GitHub
 //   affiche ce LinkedIn, §18.24) : la note du dossier, sous son login ;
 // - une fiche GitHub seule : sa note, sous son login ;
@@ -16,9 +17,9 @@
 // mais ne bouchent pas le haut du tableau). Une fiche née d'une dénonciation
 // (`cards.denounce_born`) entre comme les autres, revendiquée ou non, GitHub ou
 // LinkedIn seule (§18.119) : ce ne sont que des données publiques. Une ligne par personne : son dossier s'il existe, sinon sa fiche seule ; entre
-// deux du même genre, la meilleure note de la semaine ; à égalité, la plus ancienne
+// deux du même genre, la meilleure note du mois ; à égalité, la plus ancienne
 // passe devant. Tout se calcule à la lecture, rien n'est écrit.
-// Le classement d'une semaine est gardé 60 s en mémoire : il est demandé à
+// Le classement d'un mois est gardé 60 s en mémoire : il est demandé à
 // chaque page de fiche, chaque image et chaque lecture du top. La base
 // (db.ts) l'oublie dès qu'une fiche naît, part, ou qu'un login est masqué.
 
@@ -28,14 +29,12 @@ import { fileOf } from "../../shared/caseFile";
 import { catalogProfile, withCatalogProfiles } from "../../shared/profileCatalog";
 import type { CardData, ComparisonData, Fact, TopEntry, WeekRank, WeekTop } from "../../shared/types";
 import { starsFor } from "../../shared/types";
-import { isoWeekLabel, weekStart } from "./weekly";
-
-export const WEEK_MS = 7 * 24 * 3600 * 1000;
+import { periodEnd, periodMonth, periodStart } from "../../shared/week";
 /** Au-delà, le compte est hors concours (célébrité). */
 export const CELEBRITY_FOLLOWERS = 5000;
-/** Taille du top qui donne la spéciale « Top 5 de la semaine ». */
+/** Taille du top qui donne la spéciale « Top 5 du mois ». */
 export const TOP_N = 5;
-/** Logins classés qu'il faut dans la semaine pour que la spéciale ait un sens ; semaine close : le total final. */
+/** Logins classés qu'il faut dans le mois pour que la spéciale ait un sens ; mois clos : le total final. */
 export const TOTW_MIN_ENTRIES = 20;
 
 interface Ranked {
@@ -45,17 +44,12 @@ interface Ranked {
   login: string | null;
   overall: number;
   createdAt: number;
-  /** Toutes ses fiches racines de la semaine qui entrent au classement. */
+  /** Toutes ses fiches racines du mois qui entrent au classement. */
   ids: string[];
   /** L'adresse LinkedIn de la fiche qui porte le rang, s'il y en a une (§18.108). */
   linkedinUrl?: string | null;
   /** La fiche qui porte le rang est née d'une dénonciation. */
   denounceBorn: boolean;
-}
-
-/** Numéro de la semaine ISO de ce lundi (« 2026-W46 » donne 46). */
-export function isoWeekNumber(monday: number): number {
-  return Number(isoWeekLabel(monday).slice(-2));
 }
 
 /** Les abonnés du compte GitHub d'une fiche racine : sur ses faits, ou sur ceux de sa pièce GitHub. */
@@ -84,8 +78,8 @@ const ENTERS_SQL = `c.parent_id IS NULL AND c.degraded = 0
          )`;
 
 /**
- * Les fiches racines encore vivantes qui entrent au classement (la règle du top, toutes
- * semaines confondues), de la plus ancienne à la plus récente. Pour le rattrapage des bandes
+ * Les fiches racines encore vivantes qui entrent au classement (la règle du top, tous
+ * mois confondus), de la plus ancienne à la plus récente. Pour le rattrapage des bandes
  * (server/src/rattrapageBandes.ts).
  */
 export function enteringRootIds(db: Database.Database, now = Date.now()): string[] {
@@ -95,10 +89,10 @@ export function enteringRootIds(db: Database.Database, now = Date.now()): string
   return rows.map((r) => r.id);
 }
 
-/** Durée pendant laquelle le classement d'une semaine est gardé en mémoire. */
+/** Durée pendant laquelle le classement d'un mois est gardé en mémoire. */
 export const RANK_CACHE_MS = 60_000;
 
-/** Par base, puis par lundi : le classement et l'instant (`now` de l'appel) où il a été calculé. */
+/** Par base, puis par début de mois : le classement et l'instant (`now` de l'appel) où il a été calculé. */
 const rankCache = new WeakMap<Database.Database, Map<number, { at: number; ranked: Ranked[] }>>();
 
 /** Oublie les classements gardés : une fiche est née, supprimée ou purgée, un login masqué ou revendiqué. */
@@ -106,16 +100,16 @@ export function forgetWeekRanks(db: Database.Database): void {
   rankCache.delete(db);
 }
 
-/** Le classement d'une semaine, gardé RANK_CACHE_MS. Ne pas modifier le tableau rendu. */
-function rankWeek(db: Database.Database, monday: number, now: number): readonly Ranked[] {
+/** Le classement d'un mois, gardé RANK_CACHE_MS. Ne pas modifier le tableau rendu. */
+function rankWeek(db: Database.Database, start: number, now: number): readonly Ranked[] {
   let weeks = rankCache.get(db);
-  const hit = weeks?.get(monday);
+  const hit = weeks?.get(start);
   if (hit && Math.abs(now - hit.at) < RANK_CACHE_MS) return hit.ranked;
   if (!weeks) rankCache.set(db, (weeks = new Map()));
-  // Les semaines qu'on ne regarde plus ne restent pas en mémoire.
+  // Les mois qu'on ne regarde plus ne restent pas en mémoire.
   for (const [k, v] of weeks) if (Math.abs(now - v.at) >= RANK_CACHE_MS) weeks.delete(k);
-  const ranked = computeWeek(db, monday, now);
-  weeks.set(monday, { at: now, ranked });
+  const ranked = computeWeek(db, start, now);
+  weeks.set(start, { at: now, ranked });
   return ranked;
 }
 
@@ -130,10 +124,10 @@ interface WeekRow {
 }
 
 /**
- * Le classement d'une semaine, du premier au dernier : une ligne par personne,
+ * Le classement d'un mois, du premier au dernier : une ligne par personne,
  * sur la note de son dossier (la seule), sinon de sa fiche seule.
  */
-function computeWeek(db: Database.Database, monday: number, now: number): Ranked[] {
+function computeWeek(db: Database.Database, start: number, now: number): Ranked[] {
   const rows = db
     .prepare(
       `SELECT c.id, c.login, c.kind, c.created_at AS createdAt,
@@ -147,9 +141,9 @@ function computeWeek(db: Database.Database, monday: number, now: number): Ranked
          AND ${ENTERS_SQL}
        ORDER BY overall DESC, c.created_at ASC, c.id ASC`,
     )
-    .all(monday, monday + WEEK_MS, now, CELEBRITY_FOLLOWERS) as WeekRow[];
+    .all(start, periodEnd(start), now, CELEBRITY_FOLLOWERS) as WeekRow[];
   // La personne d'une fiche : son login ; une fiche LinkedIn seule dont un dossier de la
-  // semaine porte l'adresse est celle de ce login ; sinon son adresse LinkedIn.
+  // mois porte l'adresse est celle de ce login ; sinon son adresse LinkedIn.
   const loginOf = new Map<string, string>();
   for (const r of rows) if (r.login && r.linkedinUrl) loginOf.set(r.linkedinUrl, r.login);
   const person = (r: WeekRow) => (r.login ? `gh:${r.login}` : r.linkedinUrl ? (loginOf.has(r.linkedinUrl) ? `gh:${loginOf.get(r.linkedinUrl)}` : `li:${r.linkedinUrl}`) : `card:${r.id}`);
@@ -184,15 +178,15 @@ export function pageQuery(offset: string | undefined, limit: string | undefined,
 }
 
 /**
- * Une page du classement de la semaine en cours : `limit` lignes (la route les borne, pageQuery)
+ * Une page du classement du mois en cours : `limit` lignes (la route les borne, pageQuery)
  * à partir de la place `offset + 1`. Par défaut, les dix premières.
  */
 export function weekTop(db: Database.Database, opts: { now?: number; limit?: number; offset?: number } = {}): WeekTop {
   const now = opts.now ?? Date.now();
   const limit = Math.max(0, Math.floor(opts.limit ?? 10));
   const offset = Math.max(0, Math.floor(opts.offset ?? 0));
-  const monday = weekStart(now);
-  const ranked = rankWeek(db, monday, now);
+  const start = periodStart(now);
+  const ranked = rankWeek(db, start, now);
   const get = db.prepare(`SELECT json, kind FROM cards WHERE id = ?`);
   const entries: TopEntry[] = ranked.slice(offset, offset + limit).map((r, j) => {
     const i = offset + j;
@@ -212,11 +206,11 @@ export function weekTop(db: Database.Database, opts: { now?: number; limit?: num
       ...(profile ? { profile } : {}),
     };
   });
-  return { weekStart: monday, endsAt: monday + WEEK_MS, week: isoWeekNumber(monday), total: ranked.length, entries };
+  return { weekStart: start, endsAt: periodEnd(start), week: periodMonth(start), total: ranked.length, entries };
 }
 
 /**
- * Rang de la personne de cette fiche dans la semaine où la fiche est née, ou null si
+ * Rang de la personne de cette fiche dans le mois où la fiche est née, ou null si
  * la fiche n'entre pas au classement (CV, sortie sans IA, célébrité, masquée, expirée,
  * lien non prouvé, remplacée). L'id d'une pièce vaut celui de son dossier. `entry` dit
  * si c'est cette fiche-là qui porte le rang de la personne.
@@ -236,8 +230,8 @@ export function weekRankDetail(
   for (let hops = 0; row?.next && hops < 8; hops++) row = (get.get(row.next) as Hop | undefined) ?? { ...row, next: null };
   if (!row) return null;
   const rootId = row.id;
-  const monday = weekStart(row.created_at);
-  const ranked = rankWeek(db, monday, now);
+  const start = periodStart(row.created_at);
+  const ranked = rankWeek(db, start, now);
   // Cette fiche doit entrer elle-même : une fiche dégradée ne prend pas le rang d'une autre.
   const i = ranked.findIndex((r) => r.ids.includes(rootId));
   if (i < 0) return null;
@@ -250,8 +244,8 @@ export function weekRankDetail(
     // Passer devant le 5e : à égalité, la fiche la plus ancienne garde sa place.
     gapToTop5: inTop5 || !fifth ? 0 : fifth.overall - me.overall + 1,
     inTop5,
-    week: isoWeekNumber(monday),
-    closed: now >= monday + WEEK_MS,
+    week: periodMonth(start),
+    closed: now >= periodEnd(start),
     entry: me.id === rootId,
     createdAt: row.created_at,
   };
@@ -262,21 +256,21 @@ function publicRank(d: WeekRank & { entry: boolean; createdAt: number }): WeekRa
   return rank;
 }
 
-/** Rang de la semaine pour l'API : sans les détails internes. */
+/** Rang du mois pour l'API : sans les détails internes. */
 export function weekRank(db: Database.Database, cardId: string, now = Date.now()): WeekRank | null {
   const d = weekRankDetail(db, cardId, now);
   return d ? publicRank(d) : null;
 }
 
 /**
- * La spéciale « Top 5 de la semaine », posée à la lecture (jamais écrite) :
- * sur la fiche qui porte le rang d'une personne du top 5 de sa semaine, en direct
- * pendant la semaine et pour toujours ensuite. Une fiche qui a déjà une
+ * La spéciale « Top 5 du mois », posée à la lecture (jamais écrite) :
+ * sur la fiche qui porte le rang d'une personne du top 5 de son mois, en direct
+ * pendant le mois et pour toujours ensuite. Une fiche qui a déjà une
  * spéciale garde la sienne. Pour un dossier, elle se pose sur sa pièce GitHub,
  * d'où la fiche du dossier la lit (shared/caseFile.ts).
- * Seulement si la semaine compte au moins TOTW_MIN_ENTRIES logins classés
- * (une semaine close : son total final) : portée par tous, elle ne dirait rien.
- * `live` : la semaine de la fiche n'est pas finie, la spéciale peut encore
+ * Seulement si le mois compte au moins TOTW_MIN_ENTRIES logins classés
+ * (un mois clos : son total final) : portée par tous, elle ne dirait rien.
+ * `live` : le mois de la fiche n'est pas fini, la spéciale peut encore
  * venir ou partir (ses images ne se gardent pas longtemps en cache).
  */
 export function withWeekSpecial<T extends CardData | ComparisonData>(
@@ -287,7 +281,7 @@ export function withWeekSpecial<T extends CardData | ComparisonData>(
   const isCmp = "cv" in data && "github" in data;
   const card = isCmp ? (data as ComparisonData).github : (data as CardData);
   const born = Date.parse(card.createdAt);
-  const live = Number.isFinite(born) && now < weekStart(born) + WEEK_MS;
+  const live = Number.isFinite(born) && now < periodEnd(periodStart(born));
   // Le rang est celui de la personne, sur la note de son dossier : la fiche racine.
   const d = weekRankDetail(db, data.id, now);
   const week = d ? publicRank(d) : null;

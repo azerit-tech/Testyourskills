@@ -1,5 +1,5 @@
-// « Voir tout le classement (27) » sous un tableau de l'accueil (§18.126) : le top de la
-// semaine et chaque ligue de bandes. Le bouton n'est là que si le classement compte plus
+// « Voir tout le classement (27) » sous un tableau de l'accueil (§18.126) : le top du
+// mois et chaque ligue de bandes. Le bouton n'est là que si le classement compte plus
 // de lignes que le tableau n'en montre. Touché, le classement s'ouvre sur place, sans
 // changer de page : les lignes suivantes, lues par pages de 50, la suivante quand on
 // approche du bas ou sur « Voir plus » ; « Réduire » le referme et ramène au bouton.

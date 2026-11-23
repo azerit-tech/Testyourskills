@@ -1,26 +1,10 @@
-// Mode démo : le top de la semaine (§18.22) avec des données fictives. Sept
+// Mode démo : le top du mois (§18.22) avec des données fictives. Sept
 // classés par défaut ; `?top=1` montre le lancement, `?top=8` le bloc du 6e au 8e,
 // `?top=27` « Voir tout le classement (27) » (§18.126), soixante au plus.
 import { boardPerson } from "../../../shared/boardPerson";
 import type { CardData, SeniorityCode, TopEntry, WeekRank, WeekTop } from "../../../shared/types";
 import { starsFor } from "../../../shared/types";
-
-const DAY = 24 * 3600 * 1000;
-const WEEK = 7 * DAY;
-
-/** Lundi 00:00 UTC de la semaine de `t`. */
-function mondayOf(t: number): number {
-  const d = new Date(t);
-  const midnight = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
-  return midnight - ((d.getUTCDay() + 6) % 7) * DAY;
-}
-
-/** Numéro de semaine ISO 8601 (l'année est celle du jeudi). */
-function isoWeek(monday: number): number {
-  const thursday = new Date(monday + 3 * DAY);
-  const jan4 = Date.UTC(thursday.getUTCFullYear(), 0, 4);
-  return Math.floor((thursday.getTime() - mondayOf(jan4)) / WEEK) + 1;
-}
+import { periodEnd, periodMonth, periodStart } from "../../../shared/week";
 
 /**
  * Les classés fictifs, comme le serveur les rend (§18.88) : des fiches GitHub avec le nom
@@ -77,11 +61,10 @@ function players(): Player[] {
 export function mockWeekRank(card: CardData, now = Date.now()): WeekRank | null {
   if (card.source !== "github") return null;
   const PLAYERS = players();
-  const monday = mondayOf(now);
   const rank = PLAYERS.filter((p) => p.overall >= card.overall).length + 1;
   const fifth = PLAYERS[4]?.overall ?? 0;
   const inTop5 = rank <= 5;
-  return { rank, total: PLAYERS.length + 1, gapToTop5: inTop5 ? 0 : fifth - card.overall + 1, inTop5, week: isoWeek(monday), closed: false };
+  return { rank, total: PLAYERS.length + 1, gapToTop5: inTop5 ? 0 : fifth - card.overall + 1, inTop5, week: periodMonth(periodStart(now)), closed: false };
 }
 
 /** Comme le serveur : les dix premiers, et le nombre de classés. */
@@ -91,7 +74,7 @@ export function mockTop(now = Date.now()): WeekTop {
 
 /** Comme `GET /api/top?offset=&limit=` (§18.126) : `limit` lignes après les `offset` premières, 100 au plus. */
 export function mockTopPage(offset: number, limit: number, now = Date.now()): WeekTop {
-  const monday = mondayOf(now);
+  const start = periodStart(now);
   const all = players();
   const entries: TopEntry[] = all.map(({ login, name, overall }, i) => ({
     rank: i + 1,
@@ -102,5 +85,5 @@ export function mockTopPage(offset: number, limit: number, now = Date.now()): We
     stars: starsFor(overall),
   }));
   const from = Math.max(0, offset);
-  return { weekStart: monday, endsAt: monday + WEEK, week: isoWeek(monday), total: all.length, entries: entries.slice(from, from + Math.min(100, Math.max(0, limit))) };
+  return { weekStart: start, endsAt: periodEnd(start), week: periodMonth(start), total: all.length, entries: entries.slice(from, from + Math.min(100, Math.max(0, limit))) };
 }
