@@ -37,6 +37,8 @@ const fr = frTypoDeep({
     back: "Retour",
     close: "Fermer",
     loading: "Chargement…",
+    /** Libellé lu des étoiles d'une note. */
+    starCount: (n: number) => (n === 1 ? "1 étoile sur 6" : `${n} étoiles sur 6`),
     demo: "Mode démo : données fictives",
     skipToContent: "Aller au contenu",
   },
@@ -304,20 +306,6 @@ const fr = frTypoDeep({
       graph: "contributions · 52 semaines",
     },
   },
-  /* le pari (§18.27) : avant le verdict, combien d'étoiles la personne plaide */
-  plea: {
-    ask: "Tu plaides combien d'étoiles ?",
-    star: (n: number) => (n === 1 ? "Plaider 1 étoile" : `Plaider ${n} étoiles`),
-    count: (n: number) => (n === 1 ? "1 étoile sur 6" : `${n} étoiles sur 6`),
-    pleading: "Tu plaides",
-    /** Sous le pari fait, pendant l'attente : quand tombe le verdict. */
-    noted: "C'est noté. Verdict après la poursuite.",
-    pleaded: "Tu plaidais",
-    verdict: "Verdict",
-    gap: { over: "Excès de confiance", exact: "Lucide", under: "Trop modeste" },
-    /** Au-dessus de la fiche, après le film, sur téléphone : après le mot du verdict. */
-    strip: (pleaded: number, actual: number) => `Tu plaidais ${pleaded === 1 ? "1 étoile" : `${pleaded} étoiles`}, verdict : ${actual}.`,
-  },
   positions: {
     FS: "Full-stack",
     BE: "Backend",
@@ -392,8 +380,6 @@ const fr = frTypoDeep({
       imageAlt: "Ta fiche",
       /** Les morceaux du texte de partage, assemblés et raccourcis par lib/shareText.ts (§18.27). */
       words: {
-        /** Deuxième ligne, après la fiche : le pari et son mot, en bas de casse (« Je plaidais ★★★☆☆☆ : trop modeste. »). */
-        plea: (pleaded: string, gap: "over" | "exact" | "under") => `Je plaidais ${pleaded} : ${{ over: "excès de confiance", exact: "lucide", under: "trop modeste" }[gap]}.`,
         /** Fiche d'avant la grille : la première ligne, sans « selon la grille ». */
         sheet: (stars: string, level: string, overall: number) => `Ma fiche de dev : ${stars} ${level}, ${overall} %.`,
         /** Fiche notée par la grille (§18.37) : ce qu'est la note, dès la première ligne. */
@@ -969,6 +955,7 @@ const en: Dict = {
     back: "Back",
     close: "Close",
     loading: "Loading…",
+    starCount: (n) => (n === 1 ? "1 of 6 stars" : `${n} of 6 stars`),
     demo: "Demo mode: mock data",
     skipToContent: "Skip to content",
   },
@@ -1183,17 +1170,6 @@ const en: Dict = {
       graph: "contributions · 52 weeks",
     },
   },
-  plea: {
-    ask: "How many stars do you plead?",
-    star: (n) => (n === 1 ? "Plead 1 star" : `Plead ${n} stars`),
-    count: (n) => (n === 1 ? "1 of 6 stars" : `${n} of 6 stars`),
-    pleading: "You plead",
-    noted: "Plea entered. Verdict after the chase.",
-    pleaded: "You pleaded",
-    verdict: "Verdict",
-    gap: { over: "Overconfidence", exact: "Clear-eyed", under: "Too modest" },
-    strip: (pleaded, actual) => `You pleaded ${pleaded === 1 ? "1 star" : `${pleaded} stars`}, verdict: ${actual}.`,
-  },
   positions: {
     FS: "Full-stack",
     BE: "Backend",
@@ -1250,7 +1226,6 @@ const en: Dict = {
       holdMessage: "Press and hold to copy your message.",
       imageAlt: "Your rap sheet",
       words: {
-        plea: (pleaded, gap) => `I pleaded ${pleaded}: ${{ over: "overconfident", exact: "clear-eyed", under: "too modest" }[gap]}.`,
         sheet: (stars, level, overall) => `My dev rap sheet: ${stars} ${level}, ${overall}%.`,
         file: (stars, level, overall) => `My dev rap sheet, scored on Azerit's hiring scorecard: ${stars} ${level}, ${overall}%.`,
         profile: (label) => `Profile: “${label}”`,

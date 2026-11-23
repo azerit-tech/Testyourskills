@@ -13,7 +13,7 @@ import { currentRef } from "./session";
 
 export { ApiError };
 
-export type AnalyticsEvent = "card_generated" | "card_shared" | "card_email" | "cta_azerit_clicked" | "shared_visit" | "denounce_landed" | "plea" | "film" | "band_view" | "band_share" | "prime_view";
+export type AnalyticsEvent = "card_generated" | "card_shared" | "card_email" | "cta_azerit_clicked" | "shared_visit" | "denounce_landed" | "film" | "band_view" | "band_share" | "prime_view";
 
 export interface CreateInput {
   login?: string;

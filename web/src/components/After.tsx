@@ -13,7 +13,6 @@ import { pick, useT } from "../i18n";
 import { api, hasGithub, images, isMine, isMock, tokens, weekOf } from "../lib/api";
 import { loadAccount, signOut } from "../lib/account";
 import { navigate } from "../lib/router";
-import { getPlea } from "../lib/plea";
 import { useAppConfig } from "../lib/season";
 import { setPrefill } from "../lib/session";
 import { flatteringRank, shareLead, shareText, type ShareInput } from "../lib/shareText";
@@ -132,9 +131,8 @@ function bestStatus(card: CardData, lang: Lang): string | null {
   return sorted[0] ? pick(sorted[0].label, lang) : null;
 }
 
-/** Ce que le texte de partage dit d'une fiche (lib/shareText.ts) ; le pari vient de ce navigateur. */
+/** Ce que le texte de partage dit d'une fiche (lib/shareText.ts). */
 export function shareInput(item: Shareable, lang: Lang, rank: string | null): ShareInput {
-  const plea = getPlea(idOf(item));
   // Un dossier à deux pièces se partage comme une fiche : sa fiche, sa note, et ses pièces (§18.36).
   const c = item.kind === "card" ? item.card : fileOf(item.comparison);
   const graded = usableGrid(c.grid);
@@ -153,7 +151,6 @@ export function shareInput(item: Shareable, lang: Lang, rank: string | null): Sh
     status: bestStatus(c, lang),
     secs: c.judgedInSeconds,
     rank,
-    plea,
     ...(item.kind === "comparison" ? { exhibits: declaredLabel(item.comparison, lang) } : {}),
   };
 }

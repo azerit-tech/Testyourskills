@@ -11,8 +11,7 @@ const css = read("../styles.css");
 const rule = (sel: string) => new RegExp(`\\n${sel.replace(/\./g, "\\.")} \\{([^}]*)\\}`).exec(css)?.[1] ?? "";
 
 describe("l'attente ne saute pas", () => {
-  it("le pari, la pile, la rangée de la barre et la ligne ont une hauteur fixe", () => {
-    expect(rule(".load-plea")).toMatch(/height: 72px/);
+  it("la pile, la rangée de la barre et la ligne ont une hauteur fixe", () => {
     expect(rule(".load-dossier")).toMatch(/height: 168px/);
     expect(rule(".load-act")).toMatch(/height: var\(--h-main\)/);
     expect(rule(".load-line")).toMatch(/height: 2\.8em/);

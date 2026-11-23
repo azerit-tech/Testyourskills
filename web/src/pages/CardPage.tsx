@@ -21,7 +21,6 @@ import { ErrorBoundary } from "../components/ErrorBoundary";
 import { CardNotFound, Unreachable } from "../components/ErrorPage";
 import { Jury, JuryLine } from "../components/Jury";
 import { MakeYours, visitorBar } from "../components/MakeYours";
-import { PleaStrip, PleaVerdict } from "../components/Plea";
 import { RecruiterRead } from "../components/RecruiterRead";
 import { RemovalRequest } from "../components/Removal";
 import { AddLinkedin } from "../components/AddLinkedin";
@@ -347,7 +346,7 @@ export function CardPage({ id }: { id: string }) {
   const typed = freshLogin(id);
   const doneCard = view.s === "done" ? (view.item.kind === "card" ? view.item.card : fileOf(view.item.comparison)) : null;
   const w = view.s === "pending" ? view : lastPending.current;
-  // L'attente garde la même instance de bout en bout (clé fixe) : la photo, le pari et les pièces restent en place.
+  // L'attente garde la même instance de bout en bout (clé fixe) : la photo et les pièces restent en place.
   const waiting =
     view.s === "pending" || (view.s === "loading" && owed) || hold.show ? (
       <Waiting
@@ -360,7 +359,6 @@ export function CardPage({ id }: { id: string }) {
         name={doneCard?.name}
         initials={doneCard?.initials}
         createdAt={doneCard?.createdAt}
-        plea={owner && sawPending}
         progress={w.progress}
         startedAt={startedAt}
         queue={w.queue}
@@ -503,8 +501,6 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
   // Calculée une fois par dossier : un objet neuf à chaque rendu recréait le film en route (lecteur, son, gel).
   const main: CardData = useMemo(() => (item.kind === "card" ? item.card : fileOf(item.comparison)), [item]);
   const [scene] = useState(revealScene);
-  // Arrivé par le film de sa fiche toute neuve : lu une fois, le film fini ne le retire pas.
-  const [pleaTop] = useState(fresh);
   // Le film part dès que l'attente se lève : sa première image est déjà à l'écran.
   const { phase, open, skip, replay, stage, staged, handoff, finish, animating, settled } = useReveal(animate, start, scene === "film" ? 0 : undefined);
   // Revoir le film (§18.48) : depuis la tête de la fiche, pour tout le monde, jamais en lecture automatique.
@@ -785,8 +781,6 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
             )}
           </p>
         )}
-        {/* Au retour du film, sur téléphone : le verdict du pari au-dessus de la fiche (§18.52). */}
-        {!visitor && pleaTop && <PleaStrip cardId={id} overall={main.overall} shown={settled} />}
         {/* Ce que dit la note, en toutes lettres (§18.122) : « Ton profil a un score de 82 % », juste au-dessus de la fiche. */}
         {!vs && !main.sealed && <ScoreLine overall={main.overall} own={!visitor} shown={settled} />}
 
@@ -866,10 +860,9 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
         {/* L'après-fiche (§18.48, épurée en §18.76, §18.83) : le verdict, dénoncer, le partage, la bande, la course aux primes, puis les plis. */}
         {/* « C'est ton GitHub ? » (§18.100) : juste sous la fiche, avant tout le reste. */}
         {propose}
-        {/* Le verdict en une ligne (§18.76) : le jury, et le pari s'il y en a un. Ni peine ni caution. */}
+        {/* Le verdict en une ligne (§18.76) : le jury. Ni peine ni caution. */}
         {!visitor && (
           <div className="after-head">
-            <PleaVerdict cardId={id} overall={main.overall} shown={settled} />
             <JuryLine jury={kase?.jury ?? null} />
           </div>
         )}

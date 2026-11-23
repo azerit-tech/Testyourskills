@@ -17,7 +17,6 @@ import { skyOf } from "../components/ProfileTile";
 import { JuryLine } from "../components/Jury";
 import { tokens } from "../lib/api";
 import { githubGridMock } from "../lib/mockGrid";
-import { setPlea } from "../lib/plea";
 import { markChaseWatched } from "../lib/session";
 import { Result, type ResultProps } from "./CardPage";
 
@@ -38,12 +37,11 @@ function stub(lang: string) {
   vi.stubGlobal("document", { documentElement: { dataset: {}, classList: { add: () => undefined, remove: () => undefined } }, querySelector: () => null, getElementById: () => null });
 }
 
-function renderResult(item: Shareable, opts: { owner: boolean; lang?: string; token?: string; plea?: number; me?: ResultProps["me"]; claimedAs?: string; fresh?: boolean; kase?: ResultProps["kase"]; mine?: { id: string; login: string | null; overall: number } }): string {
+function renderResult(item: Shareable, opts: { owner: boolean; lang?: string; token?: string; me?: ResultProps["me"]; claimedAs?: string; fresh?: boolean; kase?: ResultProps["kase"]; mine?: { id: string; login: string | null; overall: number } }): string {
   stub(opts.lang ?? "fr-FR");
   if (opts.mine) localStorage.setItem("tys_mine", JSON.stringify(opts.mine));
   const id = item.kind === "card" ? item.card.id : item.comparison.id;
   if (opts.token) tokens.set(id, opts.token);
-  if (opts.plea) setPlea(id, opts.plea);
   const props: ResultProps = {
     item,
     animate: false,
@@ -224,12 +222,12 @@ describe("le score dit en toutes lettres, juste au-dessus de la fiche (§18.122)
 describe("après-fiche, vue par qui a fait la fiche (§18.27)", () => {
   const mine = (id: string) => card({ id });
 
-  it("le verdict (pari, jury) en une ligne, la dénonciation, le partage, puis le reste en lignes (§18.48, §18.76, §18.83)", () => {
-    const html = renderResult(mine("OwnCard0001"), { owner: true, token: "tok", plea: 6 });
-    const order = at(html, ['class="after-head"', 'class="plea-verdict"', 'class="jury-line"', 'class="after-block denounce"', 'class="after-block out"', 'class="rest"', 'class="after-foot"']);
+  it("le verdict (jury) en une ligne, la dénonciation, le partage, puis le reste en lignes (§18.48, §18.76, §18.83)", () => {
+    const html = renderResult(mine("OwnCard0001"), { owner: true, token: "tok" });
+    const order = at(html, ['class="after-head"', 'class="jury-line"', 'class="after-block denounce"', 'class="after-block out"', 'class="rest"', 'class="after-foot"']);
     expect(ascending(order), JSON.stringify(order)).toBe(true);
-    // Le verdict : le pari, puis la ligne du jury (une invitation à partager tant qu'il a moins de trois votes). Ni peine ni caution (§18.76).
-    expect(html).toMatch(/<div class="after-head"><section class="plea-verdict".*?<\/section><p class="jury-line">[^<]*<\/p><\/div>/);
+    // Le verdict : la ligne du jury (une invitation à partager tant qu'il a moins de trois votes). Ni peine ni caution (§18.76).
+    expect(html).toMatch(/<div class="after-head"><p class="jury-line">[^<]*<\/p><\/div>/);
     expect(html).not.toContain('class="penalty"');
     expect(html).not.toContain('class="fold dossier"');
     expect(html).not.toContain('class="after-block dossier"');
@@ -237,18 +235,6 @@ describe("après-fiche, vue par qui a fait la fiche (§18.27)", () => {
     expect(html.indexOf('class="wanted"')).toBeLessThan(html.indexOf('class="result-stage"'));
     expect(html.match(/<h1/g)).toHaveLength(1);
     expect(html).not.toContain('id="you"');
-  });
-
-  it("au retour du film, le verdict du pari au-dessus de la fiche, place tenue, une seule fois (parcours 2)", () => {
-    const fresh = renderResult(mine("PleaCard001"), { owner: true, token: "tok", plea: 6, fresh: true }).replace(/ /g, " ");
-    const strip = /<p class="plea-strip[^"]*"[^>]*>.*?<\/p>/.exec(fresh)?.[0] ?? "";
-    expect(strip.replace(/<[^>]+>/g, "")).toMatch(/^(Excès de confiance|Lucide|Trop modeste)\. Tu plaidais 6 étoiles, verdict : \d\.$/);
-    expect(fresh.indexOf("plea-strip")).toBeLessThan(fresh.indexOf('class="result-stage"'));
-    // Sans film tout juste vu, ou pour un visiteur : rien au-dessus de la fiche.
-    expect(renderResult(mine("PleaCard002"), { owner: true, token: "tok", plea: 6 })).not.toContain("plea-strip");
-    expect(renderResult(card({ id: "PleaCard003" }), { owner: false, plea: 6, fresh: true })).not.toContain("plea-strip");
-    const en = renderResult(mine("PleaCard004"), { owner: true, token: "tok", plea: 1, fresh: true, lang: "en-US" });
-    expect(en).toMatch(/You pleaded 1 star, verdict: \d\./);
   });
 
   it("le reste : des lignes repliées, chacune un vrai titre et un chevron", () => {
@@ -465,7 +451,7 @@ describe("la lecture du recruteur (§18.37)", () => {
   });
 
   it("la ligne du recruteur, le niveau et les sept tuiles : le premier des plis, après le verdict, la dénonciation et le partage (§18.48, §18.76, §18.83)", () => {
-    const html = renderResult(card({ grid, overall: grid.overall }), { owner: true, token: "tok", plea: 4 });
+    const html = renderResult(card({ grid, overall: grid.overall }), { owner: true, token: "tok" });
     const order = at(html, ['class="result-stage"', 'class="after-head"', 'class="after-block denounce"', 'class="after-block out"', 'add-linkedin', 'class="rest"', 'class="fold rr"', 'class="fold email"']);
     expect(ascending(order), JSON.stringify(order)).toBe(true);
     expect(html.match(/class="rr-tile /g)).toHaveLength(7);
@@ -500,7 +486,7 @@ describe("la lecture du recruteur (§18.37)", () => {
 
   it("sous trois étoiles : la source qui manque remonte sous le verdict, avant le partage ; à trois et plus, avant les plis (§18.48, §18.76)", () => {
     const low = githubGridMock("unknownLang", "x")!;
-    const one = renderResult(card({ id: "LowCard0001", grid: low, overall: low.overall }), { owner: true, token: "tok", plea: 3 });
+    const one = renderResult(card({ id: "LowCard0001", grid: low, overall: low.overall }), { owner: true, token: "tok" });
     const order = at(one, ['class="after-head"', 'class="after-block add-source add-linkedin"', 'class="after-block out"', 'class="fold rr"']);
     expect(ascending(order), JSON.stringify(order)).toBe(true);
     const five = renderResult(card({ id: "HighCard001", grid, overall: grid.overall }), { owner: true, token: "tok" });
