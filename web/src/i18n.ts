@@ -859,22 +859,6 @@ const fr = frTypoDeep({
       `${me} % contre ${them} % : ${verdict} ${rel === "tie" ? "avec" : "sur"} ${who}. Verdict d'Azerit :`,
     scoreCopied: "Note copiée : colle-la dans ton message.",
   },
-  /* le jury de la page partagée (§18.27) : on vote sur le chef d'accusation, jamais sur la personne */
-  jury: {
-    title: "Coupable ou relaxe\u00a0?",
-    titleCharge: (charge: string) => `Coupable de «\u00a0${charge}\u00a0»\u00a0?`,
-    guilty: "Coupable",
-    cleared: "Relaxe",
-    /* « votes » plutôt que « jurés », qui s'accorde */
-    tally: (pct: number, n: number) => `${pct}\u00a0% coupable (${n}\u00a0${n === 1 ? "vote" : "votes"})`,
-    owner: (tally: string) => `Jury : ${tally}`,
-    /** Pour qui a fait la fiche, avant trois votes : une invitation plutôt qu'un vide ; la ligne garde sa place. */
-    ownerNone: "Jury : ton réseau vote coupable ou relaxe dès que tu partages.",
-    failed: "Vote non compté. Réessaie.",
-    /* après le vote : la suite, vers « À ton tour » */
-    judged: (who: string) => `Tu as jugé ${who}.`,
-    turn: "À ton tour",
-  },
   /* les bandes (§18.38) : bandsText.ts */
   bands: BANDS_TEXT.fr,
   /* les primes (§18.4, §18.5) : primesText.ts */
@@ -1627,18 +1611,6 @@ const en: Dict = {
     duelFrom: (who) => `You came from ${who}'s sheet`,
     duelText: (me, them, verdict, who, rel) => `${me}% vs ${them}%: ${verdict}${rel === "ahead" ? " of" : rel === "tie" ? " with" : ""} ${who}. Azerit's verdict:`,
     scoreCopied: "Rating copied: paste it into your message.",
-  },
-  jury: {
-    title: "Guilty or cleared?",
-    titleCharge: (charge) => `Guilty of “${charge}”?`,
-    guilty: "Guilty",
-    cleared: "Cleared",
-    tally: (pct, n) => `${pct}% guilty (${n}\u00a0${n === 1 ? "vote" : "votes"})`,
-    owner: (tally) => `Jury: ${tally}`,
-    ownerNone: "Jury: your network votes guilty or cleared once you share.",
-    failed: "Vote not counted. Try again.",
-    judged: (who) => `You judged ${who}.`,
-    turn: "Your turn",
   },
   bands: BANDS_TEXT.en,
   primes: PRIMES_TEXT.en,

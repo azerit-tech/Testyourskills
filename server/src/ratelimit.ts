@@ -64,7 +64,7 @@ export class RateLimiter {
     private salt: string,
   ) {}
 
-  /** Hash salé de l'IP (ou de l'identifiant du navigateur) : la seule forme sous laquelle elle est gardée (compteurs, votes du jury). */
+  /** Hash salé de l'IP (ou de l'identifiant du navigateur) : la seule forme sous laquelle elle est gardée (compteurs). */
   hash(ip: string): string {
     return createHash("sha256").update(this.salt + ip).digest("hex").slice(0, 32);
   }

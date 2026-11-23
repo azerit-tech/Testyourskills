@@ -332,10 +332,6 @@ const fr = {
         ],
       },
       {
-        h: "Le jury",
-        blocks: ["Si tu votes sur une fiche partagée, on garde ton vote (coupable ou relaxe) avec une empreinte de ton adresse IP, jamais l'adresse elle-même : c'est ce qui limite à un vote par fiche. Les votes partent avec la fiche."],
-      },
-      {
         h: "Les bandes",
         blocks: [
           [
@@ -369,7 +365,6 @@ const fr = {
             "les fiches faites et partagées, les visites par un lien partagé ;",
             "les emails laissés et les clics vers azerit.tech ;",
             "les dénonciations envoyées, les visites d'une fiche dénoncée, les fiches dénoncées revendiquées ;",
-            "les votes du jury ;",
             "le déroulement du film ;",
             "les entrées et sorties de bande, les bandes ouvertes au classement et partagées ;",
             "les pages de prime vues, les inscriptions et retraits de prime.",
@@ -537,10 +532,6 @@ const en: PagesDict = {
         ],
       },
       {
-        h: "The jury",
-        blocks: ["If you vote on a shared sheet, we keep your vote (guilty or cleared) with a hash of your IP address, never the address itself: that's what limits it to one vote per sheet. Votes are deleted with the sheet."],
-      },
-      {
         h: "Crews",
         blocks: [
           [
@@ -574,7 +565,6 @@ const en: PagesDict = {
             "sheets made and shared, visits from a shared link;",
             "emails left and clicks to azerit.tech;",
             "tip-offs sent, visits to a tipped-off sheet, tipped-off sheets claimed;",
-            "jury votes;",
             "how the film played;",
             "crews joined and left, crews opened in the ranking and shared;",
             "bounty pages viewed, bounties entered and withdrawn.",

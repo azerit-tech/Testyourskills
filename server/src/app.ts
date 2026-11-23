@@ -26,7 +26,6 @@ import { mountAuth, ownerFromRequest, sameOrigin, SESSION_COOKIE, type GithubAut
 import { createAccounts, mountAccount } from "./account";
 import { DENOUNCE_LIMITED, DENOUNCE_PER_DAY, mountDenounce, parseDenunciation } from "./denounce";
 import { DUEL_FILE_RE, duelMeta, duelOf, duelPath, removeDuels } from "./duel";
-import { mountJury } from "./jury";
 import { autoJoinBands, mountBands, rootOf } from "./bands";
 import { mountBandPages } from "./bandPages";
 import { aiStatus as budgetAiStatus, type AiStatus } from "./ai/budget";
@@ -1243,9 +1242,7 @@ export function createApp(opts: AppOptions) {
   });
 
   // GET /api/card/:id/case : dénonciation et complices suggérés (§18.6, §18.7).
-  // POST /api/vote : le jury de la page partagée (§18.27) ; son décompte part aussi avec /case.
-  const jury = mountJury(app, { store, limiter, notFound: MESSAGES.not_found, withdrawn: MESSAGES.withdrawn });
-  mountDenounce(app, { store, hiddenFrom, notFound: MESSAGES.not_found, withdrawn: MESSAGES.withdrawn, jury });
+  mountDenounce(app, { store, hiddenFrom, notFound: MESSAGES.not_found, withdrawn: MESSAGES.withdrawn });
   // Demande de retrait d'une fiche sans pseudo GitHub, par la personne fichée (removal.ts).
   mountRemoval(app, { store, limiter, leadsEndpoint: opts.leadsEndpoint, baseUrl, fetchImpl });
   // La trace du film sur un vrai téléphone, seulement si on l'a demandée (filmTrace.ts).

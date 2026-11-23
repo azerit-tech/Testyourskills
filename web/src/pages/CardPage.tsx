@@ -19,7 +19,6 @@ import { ScoreLine } from "../components/ScoreLine";
 import { PrimeRace } from "../components/Primes";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { CardNotFound, Unreachable } from "../components/ErrorPage";
-import { Jury, JuryLine } from "../components/Jury";
 import { MakeYours, visitorBar } from "../components/MakeYours";
 import { RecruiterRead } from "../components/RecruiterRead";
 import { RemovalRequest } from "../components/Removal";
@@ -200,7 +199,7 @@ function useJob(id: string, nonce: number) {
 const CASE_LATE_MS = 2500;
 
 /**
- * Le dossier de la fiche (dénonciation, jury), lu en même temps que la fiche : la page d'un visiteur
+ * Le dossier de la fiche (dénonciation), lu en même temps que la fiche : la page d'un visiteur
  * entre en une fois, phrase et bloc d'une fiche dénoncée compris, sans rien pousser sous les yeux.
  */
 function useCase(id: string, nonce: number) {
@@ -457,7 +456,6 @@ export function CardPage({ id }: { id: string }) {
         owner={owner}
         fresh={fresh && owed}
         kase={kase}
-        caseLate={caseLate}
         claimedAs={claimedAs}
         claimedLi={claimedLi}
         notice={notice}
@@ -480,10 +478,8 @@ export interface ResultProps {
   onScene: (state: SceneState) => void;
   owner: boolean;
   fresh: boolean;
-  /** Le dossier (dénonciation, jury), lu par la page ; null tant qu'il charge. */
+  /** Le dossier (dénonciation), lu par la page ; null tant qu'il charge. */
   kase: CaseInfo | null;
-  /** Le dossier tarde : l'après-fiche se montre quand même, sans sa ligne du jury. */
-  caseLate: boolean;
   /** « C'est moi » vient de réussir pour ce pseudo : le bandeau en haut de la fiche. */
   claimedAs?: string | null;
   /** « C'est bien moi » par LinkedIn vient de réussir (§18.118). */
@@ -494,7 +490,7 @@ export interface ResultProps {
   onDeleted: () => void;
 }
 
-export function Result({ item, animate, start, abort, onScene, owner, fresh, kase, caseLate, claimedAs = null, claimedLi = false, notice, me, onMe, onDeleted }: ResultProps) {
+export function Result({ item, animate, start, abort, onScene, owner, fresh, kase, claimedAs = null, claimedLi = false, notice, me, onMe, onDeleted }: ResultProps) {
   const { t, lang } = useT();
   const id = item.kind === "card" ? item.card.id : item.comparison.id;
   // Un dossier à deux pièces s'affiche comme une fiche seule : la fiche du dossier, sa note (§18.36).
@@ -641,7 +637,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
   const links = visitor ? null : api.linksOf(id);
   // Au-dessus de la fiche, sur téléphone : « @pseudo », ou le prénom seul.
   const whoShort = main.login ? `@${main.login}` : (main.name.split(/\s+/)[0] ?? main.name);
-  // Sous trois étoiles (§18.48) : la source qui manque est le remède, elle remonte sous le verdict.
+  // Sous trois étoiles (§18.48) : la source qui manque est le remède, elle remonte sous la fiche.
   const low = starsFor(main.overall) < 3;
   // L'autre source trouvée pendant la lecture (§18.100) : « C'est ton GitHub ? », sous sa fiche, d'un toucher.
   // Tant qu'elle est là, « Ajoute ton GitHub » (ou ton LinkedIn) attend : « Non » le fait revenir.
@@ -830,7 +826,7 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
 
         {/* Au bureau, « À ton tour » ouvre la colonne de droite : il vient aussi d'abord au clavier (exécution 11). */}
         {turnFirst && turn}
-        {/* Sous la fiche, pour le visiteur (§18.48) : ce qu'il regarde, le jury, les critères, le reste replié. */}
+        {/* Sous la fiche, pour le visiteur (§18.48) : ce qu'il regarde, les critères, le reste replié. */}
         {visitor && (
           <div className="visitor-col">
             {/* Fiche dénoncée (§18.6, §18.48) : qui l'a dénoncée, « C'est moi », « Ce n'est pas moi », la demande de retrait, en un bloc. */}
@@ -839,8 +835,6 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
                 {!cardLogin && <RemovalRequest cardId={id} short />}
               </Denounced>
             )}
-            {/* Le jury (§18.27) : un geste à un toucher, sans peine ni caution dessous (§18.76). */}
-            <Jury cardId={id} card={main} jury={kase?.jury ?? null} toast={toast.show} turn={other ? null : who} />
             <div className="rest">
               {/* « Comment c'est noté » (§18.37, §18.76) : un pli fermé ; ni nom d'école ni d'ancien employeur. */}
               <RecruiterRead item={item} shared />
@@ -855,18 +849,12 @@ export function Result({ item, animate, start, abort, onScene, owner, fresh, kas
         {visitor && !cardLogin && !wantedYou && <RemovalRequest cardId={id} />}
       </div>
 
-      {/* L'après-fiche entre en une fois, le dossier lu (ligne du jury) : rien ne pousse les blocs sous les yeux (CLS). */}
-      <div className={`after${settled && (kase !== null || caseLate) ? " is-in" : ""}`} aria-hidden={!settled} inert={!settled ? true : undefined}>
-        {/* L'après-fiche (§18.48, épurée en §18.76, §18.83) : le verdict, dénoncer, le partage, la bande, la course aux primes, puis les plis. */}
+      {/* L'après-fiche entre en une fois, la fiche posée : rien ne pousse les blocs sous les yeux (CLS). */}
+      <div className={`after${settled ? " is-in" : ""}`} aria-hidden={!settled} inert={!settled ? true : undefined}>
+        {/* L'après-fiche (§18.48, épurée en §18.76, §18.83, §18.129) : dénoncer, le partage, la bande, la course aux primes, puis les plis. */}
         {/* « C'est ton GitHub ? » (§18.100) : juste sous la fiche, avant tout le reste. */}
         {propose}
-        {/* Le verdict en une ligne (§18.76) : le jury. Ni peine ni caution. */}
-        {!visitor && (
-          <div className="after-head">
-            <JuryLine jury={kase?.jury ?? null} />
-          </div>
-        )}
-        {/* Dénonce un complice (§18.6), en grand, le premier bloc sous le verdict (§18.83, §18.118) : avant le jury, le partage et le reste. */}
+        {/* Dénonce un complice (§18.6), en grand, le premier bloc sous la fiche (§18.83, §18.118, §18.129) : avant le partage et le reste. */}
         {!visitor && <Denounce cardId={id} selfLogin={cardLogin} mine={main.sealed ? null : main.overall} toast={toast.show} />}
         {/* Sous trois étoiles : « Ajoute ton LinkedIn » (ou ton GitHub) tout de suite, avant le partage. */}
         {low && missing}

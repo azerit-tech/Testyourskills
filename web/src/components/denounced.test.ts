@@ -110,9 +110,9 @@ describe("le bloc d'une fiche dénoncée", () => {
     expect(page).toMatch(/const lawyer = signIns\[0\]\?\.go \?\? remake\?\.go \?\? null;/);
   });
 
-  it("dans la page : le bloc est le premier sous la fiche, avant le jury ; pas de second « C'est moi » dessous", () => {
+  it("dans la page : le bloc est le premier sous la fiche, avant les plis ; pas de second « C'est moi » dessous", () => {
     const col = page.slice(page.indexOf('<div className="visitor-col">'));
-    expect(col.indexOf("<Denounced ")).toBeLessThan(col.indexOf("<Jury "));
+    expect(col.indexOf("<Denounced ")).toBeLessThan(col.indexOf('<div className="rest">'));
     expect(page).toContain("{!wantedYou && <Claim ");
     // GitHub pour un pseudo, LinkedIn pour un profil (§18.118).
     expect(page).toContain("const claimHere = wantedYou && claimOn && cardLogin ? () => api.startClaim(id, cardLogin) : null;");
